@@ -736,6 +736,11 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     controllers_json?: scalar|null|Param, // Deprecated: The "twig_component.controllers_json" config option is deprecated, and will be removed in 3.0. // Default: null
  * }
  * @psalm-type UxTwigComponentAssetConfig = array{
+ *     ux_components_dir?: scalar|null|Param, // Adresár, v ktorom sa nachádzajú komponenty. // Default: "%kernel.project_dir%/src_component"
+ *     component_namespace?: scalar|null|Param, // Namespace pre komponenty. // Default: null
+ *     stimulus?: bool|array{
+ *         enabled?: bool|Param, // Default: true
+ *     },
  *     auto_discovery?: bool|Param, // Či sa majú automaticky hľadať asety v adresári komponentu. // Default: true
  *     placeholder?: scalar|null|Param, // Placeholder v HTML, ktorý bude nahradený asetikami. // Default: "<!-- __UX_TWIG_COMPONENT_ASSETS__ -->"
  * }

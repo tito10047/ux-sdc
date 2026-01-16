@@ -4,191 +4,78 @@
 ![Packagist License](https://img.shields.io/packagist/l/tito10047/ux-twig-component-asset)
 ![Packagist Downloads](https://img.shields.io/packagist/dt/tito10047/ux-twig-component-asset)
 
+✨ **Live demo is available here: [https://formalitka.mostka.sk/](https://formalitka.mostka.sk/)**
+# UX Twig Component Asset Bundle
+
 A Symfony bundle designed to bridge the gap between **AssetMapper** and **Twig Components**. It allows you to define component-specific CSS and JS directly in your PHP classes, ensuring assets are loaded **only when needed** and without "phantom" Stimulus controllers.
 
 ## Quick Example
+
+The bundle is designed to work perfectly with a **Single Directory Component** architecture. Everything related to your component lives in one place.
+
 ```text
-src_component/
-└── Components/
+src/
+└── Component/
     └── Alert/
         ├── Alert.php           # Logic with #[AsTwigComponent] and #[Asset]
         ├── Alert.html.twig     # Template
         ├── Alert.css           # Component styles (Auto-discovered!)
         └── alert_controller.js # Optional Stimulus controller
+
 ```
+
 ```php
-namespace App\Twig\Components;
+namespace App\Component\Alert;
 
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
 use Tito10047\UxTwigComponentAsset\Attribute\Asset;
 
 #[AsTwigComponent('Alert')]
-#[Asset()]
+#[Asset] // That's it! CSS/JS/Twig are now linked to this component.
 class Alert
 {
     public string $type = 'info';
 }
+
 ```
 
 > [!TIP]
-> **Magic Automation:** The bundle automatically sets the HTML template and injects the required CSS and JS into your HTML header.
+> **Magic Automation:** The bundle automatically resolves the HTML template path and injects the required CSS and JS into your HTML header. No manual imports in `app.js` or dummy Stimulus controllers required.
 
-✨ **Live demo is available here: [https://formalitka.mostka.sk/](https://formalitka.mostka.sk/)**
+---
 
+## Why this bundle?
 
-## The Problem
+This project is a direct response to the architectural challenges discussed in **["A Better Architecture for Your Symfony UX Twig Components"](https://hugo.alliau.me/blog/posts/a-better-architecture-for-your-symfony-ux-twig-components)** by **Hugo Alliaume**.
 
-In a standard Symfony UX setup, assets (CSS/JS) are often scattered across the `assets/` directory, while logic lives in `src/` and templates in `templates/`.
+It solves the "AssetMapper struggle": loading component-specific styles without forcing a Flash of Unstyled Content (FOUC) or creating unnecessary JavaScript overhead.
 
-When using Twig Components, we often want a **component-based architecture** where all files related to a component live together. However, **AssetMapper** only detects CSS files if they are imported via JavaScript. This leads to developers creating "dummy" Stimulus controllers just to load a CSS file:
+## Installation & Setup
 
-```javascript
-// alert_controller.js - Created ONLY to load the CSS
-import './alert.css';
-import { Controller } from '@hotwired/stimulus';
-export default class extends Controller {}
-```
-
-If a component doesn't need JavaScript logic, this creates unnecessary overhead and clutter.
-
-## Inspiration & Key Takeaways
-
-This bundle is heavily inspired by the article **["A Better Architecture for Your Symfony UX Twig Components"](https://hugo.alliau.me/blog/posts/a-better-architecture-for-your-symfony-ux-twig-components)** by **Hugo Alliaume** (Symfony UX Core Team).
-
-**Key takeaways from the article addressed by this bundle:**
-
-* **File Scattering:** In default Symfony, a single component's files are spread across four different directory trees.
-* **Single Directory Component (SDC):** Grouping PHP, Twig, CSS, and JS in one folder (e.g., `src_component/Components/Alert/`) significantly improves maintainability.
-* **The CSS Loading Struggle:** Hugo highlights the difficulty of loading CSS only when a component is rendered without causing a Flash of Unstyled Content (FOUC).
-* **Automation:** The need for a system that "collects" required assets during the Twig rendering phase and injects them into the HTML `<head>`.
-
-## Proposed Architecture
-
-This bundle encourages the following "Single Directory" structure for your UI components:
-
-```text
-src_component/
-└── Components/
-    └── Alert/
-        ├── Alert.php           # Logic with #[AsTwigComponent] and #[Asset]
-        ├── Alert.html.twig     # Template
-        ├── Alert.css           # Component styles (Auto-discovered!)
-        └── alert_controller.js # Optional Stimulus controller
-```
-
-### Why this structure?
-
-1. **Isolation:** Everything related to the "Alert" exists in one place.
-2. **Portability:** Moving or deleting a component is as simple as moving/deleting one folder.
-3. **Discovery:** New developers can find all related logic and styles instantly.
-
-## How It Works
-
-1. **Attribute Declaration:** You tag your component with the `#[Asset]` attribute or rely on **Auto-discovery** (the bundle looks for a `.css` or `.js` file with the same name as your class in the same directory).
-2. **Asset Collection:** When Twig renders a component, the bundle's listener intercepts the event and adds the required CSS/JS paths to a request-scoped `AssetRegistry`.
-3. **Response Injection:** A `ResponseListener` looks for a placeholder in your `<head>` (inserted via `{{ render_component_assets() }}`) and replaces it with the actual `<link>` and `<script>` tags generated by **AssetMapper**.
-4. **Performance:** The bundle automatically adds **HTTP Preload headers** for these assets, ensuring the browser starts downloading them before it even finishes parsing the HTML.
-
-## Support
-- Symfony 6.4 | 7.x | 8.0
-- PHP 8.2+
-- Asset Mapper
-
-## Installation
-
-You can install the package via Composer:
-
+1. **Install via Composer:**
 ```bash
 composer require tito10047/ux-twig-component-asset
+
 ```
 
-Register the bundle in `config/bundles.php` (if not done automatically by Symfony Flex):
 
-```php
-return [
-    // ...
-    Tito10047\UxTwigComponentAsset\UxTwigComponentAsset::class => ['all' => true],
-];
-```
-
-## Configuration
-
-### YAML
-`config/packages/ux_twig_component_asset.yaml`
-```yaml
-ux_twig_component_asset:
-    auto_discovery: true
-    placeholder: '<!-- __UX_TWIG_COMPONENT_ASSETS__ -->'
-```
-
-### PHP
-`config/packages/ux_twig_component_asset.php`
-```php
-use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
-
-return static function (ContainerConfigurator $containerConfigurator): void {
-    $containerConfigurator->extension('ux_twig_component_asset', [
-        'auto_discovery' => true,
-        'placeholder' => '<!-- __UX_TWIG_COMPONENT_ASSETS__ -->',
-    ]);
-};
-```
-
-## Usage
-
-### 1. Register in your template
-
-Add the placeholder to your base template (typically in `<head>`). The bundle automatically injects collected CSS and JS here:
-
+2. **Add the placeholder to your base template:**
+   Place this in your `<head>` to tell the bundle where to inject the collected assets:
 ```twig
 <head>
     {# ... #}
     {{ render_component_assets() }}
 </head>
+
 ```
 
-### 2. Tag your component
 
-```php
-namespace App\Twig\Components;
 
-use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
-use Tito10047\UxTwigComponentAsset\Attribute\Asset;
+## Key Features
 
-#[AsTwigComponent('Alert')]
-#[Asset()]
-class Alert
-{
-    public string $type = 'info';
-}
-```
+* **Auto-discovery:** If `Alert.php` has a sibling `Alert.css`, it's automatically included.
+* **Performance:** Uses a **Compiler Pass** to map assets at build time, ensuring zero reflection overhead in production.
+* **Smart Injection:** Assets are injected into the response only if the component was actually rendered on the page.
+* **HTTP Preload:** Automatically adds `Link` headers for all collected assets to trigger early browser downloads.
 
-> [!TIP]
-> **Magic Automation:** The bundle automatically sets the HTML template and injects the required CSS and JS into your HTML header.
 
-Or explicitly define assets:
-
-```php
-#[Asset('styles/alert.css', priority: 10)]
-#[Asset('scripts/alert.js')]
-```
-
-Or rely on **Auto-discovery**. If your component is `App\Twig\Components\Alert`, the bundle will automatically look for `Alert.css`, `Alert.js` and `Alert.html.twig` in the same directory.
-
-## Features
-
-* ✅ **Auto-discovery:** Automatically finds CSS/JS/Twig files matching your component name.
-* ✅ **Zero-JS Loading:** Load CSS via AssetMapper without Stimulus controllers.
-* ✅ **Performance Optimized:** Uses a Compiler Pass to map assets at build time (zero reflection in production).
-* ✅ **HTTP Preload:** Automatic injection of Link headers for faster LCP.
-* ✅ **Flexible:** Support for multiple assets, priorities, and custom HTML attributes.
-
-## Testing
-
-```bash
-./vendor/bin/phpunit
-```
-
-## License
-
-MIT

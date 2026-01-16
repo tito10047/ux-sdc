@@ -18,8 +18,10 @@ class TestKernel extends Kernel {
 
 	public function __construct(
 		private array $configs = [],
+		string $environment = 'test',
+		bool $debug = true
 	) {
-		parent::__construct('test', true);
+		parent::__construct($environment, $debug);
 	}
 
 	public function registerBundles(): iterable {
@@ -72,8 +74,13 @@ class TestKernel extends Kernel {
 
 			public function process(ContainerBuilder $container): void {
 				foreach ($container->getDefinitions() as $id => $definition) {
-					if (str_starts_with($id, 'Tito10047\UxTwigComponentAsset')) {
+					if (str_starts_with($id, 'Tito10047\UxTwigComponentAsset') || str_contains($id, 'twig_component')) {
 						$definition->setPublic(true);
+					}
+				}
+				foreach ($container->getAliases() as $id => $alias) {
+					if (str_contains($id, 'twig_component')) {
+						$alias->setPublic(true);
 					}
 				}
 			}
