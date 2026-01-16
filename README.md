@@ -6,7 +6,35 @@
 
 A Symfony bundle designed to bridge the gap between **AssetMapper** and **Twig Components**. It allows you to define component-specific CSS and JS directly in your PHP classes, ensuring assets are loaded **only when needed** and without "phantom" Stimulus controllers.
 
+## Quick Example
+```text
+src_component/
+└── Components/
+    └── Alert/
+        ├── Alert.php           # Logic with #[AsTwigComponent] and #[Asset]
+        ├── Alert.html.twig     # Template
+        ├── Alert.css           # Component styles (Auto-discovered!)
+        └── alert_controller.js # Optional Stimulus controller
+```
+```php
+namespace App\Twig\Components;
+
+use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
+use Tito10047\UxTwigComponentAsset\Attribute\Asset;
+
+#[AsTwigComponent('Alert')]
+#[Asset()]
+class Alert
+{
+    public string $type = 'info';
+}
+```
+
+> [!TIP]
+> **Magic Automation:** The bundle automatically sets the HTML template and injects the required CSS and JS into your HTML header.
+
 ✨ **Live demo is available here: [https://formalitka.mostka.sk/](https://formalitka.mostka.sk/)**
+
 
 ## The Problem
 
@@ -30,7 +58,7 @@ This bundle is heavily inspired by the article **["A Better Architecture for You
 **Key takeaways from the article addressed by this bundle:**
 
 * **File Scattering:** In default Symfony, a single component's files are spread across four different directory trees.
-* **Single Directory Component (SDC):** Grouping PHP, Twig, CSS, and JS in one folder (e.g., `component/Alert/`) significantly improves maintainability.
+* **Single Directory Component (SDC):** Grouping PHP, Twig, CSS, and JS in one folder (e.g., `src_component/Components/Alert/`) significantly improves maintainability.
 * **The CSS Loading Struggle:** Hugo highlights the difficulty of loading CSS only when a component is rendered without causing a Flash of Unstyled Content (FOUC).
 * **Automation:** The need for a system that "collects" required assets during the Twig rendering phase and injects them into the HTML `<head>`.
 
@@ -110,7 +138,7 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
 ### 1. Register in your template
 
-Add the placeholder to your base template (typically in `<head>`):
+Add the placeholder to your base template (typically in `<head>`). The bundle automatically injects collected CSS and JS here:
 
 ```twig
 <head>
@@ -128,12 +156,21 @@ use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
 use Tito10047\UxTwigComponentAsset\Attribute\Asset;
 
 #[AsTwigComponent('Alert')]
-#[Asset('styles/alert.css', priority: 10)]
-#[Asset('scripts/alert.js')]
+#[Asset()]
 class Alert
 {
     public string $type = 'info';
 }
+```
+
+> [!TIP]
+> **Magic Automation:** The bundle automatically sets the HTML template and injects the required CSS and JS into your HTML header.
+
+Or explicitly define assets:
+
+```php
+#[Asset('styles/alert.css', priority: 10)]
+#[Asset('scripts/alert.js')]
 ```
 
 Or rely on **Auto-discovery**. If your component is `App\Twig\Components\Alert`, the bundle will automatically look for `Alert.css`, `Alert.js` and `Alert.html.twig` in the same directory.
