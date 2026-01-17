@@ -46,12 +46,12 @@ final class AssetResponseListener
                 $attributes .= sprintf(' %s="%s"', $name, htmlspecialchars((string) $value, ENT_QUOTES));
             }
 
-            if ($asset['type'] === 'css' || (null === $asset['type'] && str_ends_with($path, '.css'))) {
+            if ($asset['type'] === 'css' || ('' === $asset['type'] && str_ends_with($path, '.css'))) {
                 $html .= sprintf('<link rel="stylesheet" href="%s"%s>' . "\n", $path, $attributes);
-                $links[] = new Link('preload', $path, ['as' => 'style']);
-            } elseif ($asset['type'] === 'js' || (null === $asset['type'] && str_ends_with($path, '.js'))) {
+                $links[] = (new Link('preload', $path))->withAttribute('as', 'style');
+            } elseif ($asset['type'] === 'js' || ('' === $asset['type'] && str_ends_with($path, '.js'))) {
                 $html .= sprintf('<script src="%s"%s></script>' . "\n", $path, $attributes);
-                $links[] = new Link('preload', $path, ['as' => 'script']);
+                $links[] = (new Link('preload', $path))->withAttribute('as', 'script');
             }
         }
 

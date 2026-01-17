@@ -4,8 +4,14 @@ namespace Tito10047\UX\TwigComponentSdc\Service;
 
 final class AssetRegistry
 {
+    /**
+     * @var array<string, array{path: string, type: string, priority: int, attributes: array<string, mixed>}>
+     */
     private array $assets = [];
 
+    /**
+     * @param array<string, mixed> $attributes
+     */
     public function addAsset(string $path, string $type, int $priority = 0, array $attributes = []): void
     {
         $key = md5($path . $type . serialize($attributes));
@@ -26,7 +32,7 @@ final class AssetRegistry
     }
 
     /**
-     * @return array<int, array{path: string, type: string, priority: int, attributes: array}>
+     * @return array<int, array{path: string, type: string, priority: int, attributes: array<string, mixed>}>
      */
     public function getSortedAssets(): array
     {

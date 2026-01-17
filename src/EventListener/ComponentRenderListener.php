@@ -23,11 +23,16 @@ final class ComponentRenderListener
         $assets = $this->assetMap->getAssetsForComponent($componentName);
 
         foreach ($assets as $asset) {
+            $type = $asset['type'];
+            if ('' === $type) {
+                $type = str_ends_with($asset['path'], '.css') ? 'css' : 'js';
+            }
+
             $this->assetRegistry->addAsset(
                 $asset['path'],
-                $asset['type'] ?? (str_ends_with($asset['path'], '.css') ? 'css' : 'js'),
-                $asset['priority'] ?? 0,
-                $asset['attributes'] ?? []
+                $type,
+                $asset['priority'],
+                $asset['attributes']
             );
         }
     }
@@ -38,7 +43,7 @@ final class ComponentRenderListener
         $componentName = $event->getMetadata()->getName();
         $templatePath = $this->assetMap->getMap()[$componentName . '_template'] ?? null;
 
-        if ($templatePath) {
+        if (is_string($templatePath)) {
             $event->setTemplate($templatePath);
         }
     }

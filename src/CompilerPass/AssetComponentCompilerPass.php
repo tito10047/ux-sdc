@@ -95,7 +95,7 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
                 if ($asset->path) {
                     $assets[] = [
                         'path' => $asset->path,
-                        'type' => $asset->type,
+                        'type' => $asset->type ?? '',
                         'priority' => $asset->priority,
                         'attributes' => $asset->attributes,
                     ];

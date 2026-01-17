@@ -63,12 +63,19 @@ class TwigComponentSdcBundle extends AbstractBundle implements PrependExtensionI
         }
     }
 
+    /**
+     * @param array<int, array<string, mixed>> $configs
+     * @return array<string, mixed>
+     */
     private function processConfiguration(Configuration $configuration, array $configs, ContainerBuilder $container): array
     {
         $processor = new \Symfony\Component\Config\Definition\Processor();
         return $processor->processConfiguration($configuration, $configs);
     }
 
+    /**
+     * @param array<string, mixed> $config
+     */
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
         $container->import('../config/services.php');
