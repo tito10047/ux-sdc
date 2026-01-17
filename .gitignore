@@ -7,3 +7,4 @@ composer.lock
 /phpstan.neon
 z
 /.php-cs-fixer.cache
+e2e-test/
