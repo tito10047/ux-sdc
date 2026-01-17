@@ -19,7 +19,7 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
         }
 
         $autoDiscovery = $container->getParameter('twig_component_sdc.auto_discovery');
-        
+
         $twigRoots = [];
         if ($container->hasParameter('kernel.project_dir')) {
             $defaultDir = $container->getParameterBag()->resolveValue('%kernel.project_dir%/src_component');
@@ -27,7 +27,7 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
                 $twigRoots[] = realpath($defaultDir);
             }
         }
-        
+
         if ($container->hasParameter('twig.default_path')) {
             $twigRoots[] = $container->getParameterBag()->resolveValue($container->getParameter('twig.default_path'));
         }
@@ -38,7 +38,7 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
                 $twigRoots[] = realpath($uxDir);
             }
         }
-        
+
         // Spracovanie twig paths (ak sú dostupné v konfigurácii bundle-u)
         if ($container->hasExtension('twig')) {
             $twigConfigs = $container->getExtensionConfig('twig');
@@ -47,14 +47,16 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
                     foreach ($config['paths'] as $path => $namespace) {
                         // $path môže byť string alebo pole v novších verziách
                         $actualPath = is_array($path) ? key($path) : $path;
-                        if (is_numeric($actualPath)) { $actualPath = $namespace; } // Ak nie je namespace, cesta je v hodnote
-                        
+                        if (is_numeric($actualPath)) {
+                            $actualPath = $namespace;
+                        } // Ak nie je namespace, cesta je v hodnote
+
                         $twigRoots[] = $container->getParameterBag()->resolveValue($actualPath);
                     }
                 }
             }
         }
-        
+
         // Normalizácia a odstránenie duplicít
         $twigRoots = array_unique(array_map('realpath', array_filter($twigRoots)));
 
@@ -89,7 +91,7 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
             foreach ($attributes as $attribute) {
                 /** @var Asset $asset */
                 $asset = $attribute->newInstance();
-                
+
                 if ($asset->path) {
                     $assets[] = [
                         'path' => $asset->path,
@@ -105,7 +107,7 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
             foreach ($sdcAttributes as $attribute) {
                 /** @var AsSdcComponent $sdcComponent */
                 $sdcComponent = $attribute->newInstance();
-                
+
                 if ($sdcComponent->css) {
                     $assets[] = [
                         'path' => $sdcComponent->css,
@@ -114,7 +116,7 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
                         'attributes' => [],
                     ];
                 }
-                
+
                 if ($sdcComponent->js) {
                     $assets[] = [
                         'path' => $sdcComponent->js,
@@ -147,7 +149,7 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
                 $twigFile = realpath($dir . DIRECTORY_SEPARATOR . $baseName . '.html.twig');
                 if ($twigFile && file_exists($twigFile)) {
                     $shortestPath = null;
-                    
+
                     // error_log("Found twig file: " . $twigFile);
                     // error_log("Twig roots: " . print_r($twigRoots, true));
 

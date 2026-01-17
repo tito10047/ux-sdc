@@ -18,16 +18,16 @@ class AsSdcComponentIntegrationTest extends KernelTestCase
     public function testSdcComponentIsRegistered(): void
     {
         $kernel = new TestKernel([]);
-        
+
         $kernel->boot();
         $container = $kernel->getContainer();
 
         /** @var ComponentFactory $componentFactory */
         $componentFactory = $container->get('ux.twig_component.component_factory');
-        
+
         // This will fail unless we register SdcComponent in TestKernel
         $metadata = $componentFactory->metadataFor('SdcComponent');
-        
+
         $this->assertEquals('SdcComponent', $metadata->getName());
         $this->assertEquals(SdcComponent::class, $metadata->getClass());
     }
@@ -43,10 +43,10 @@ class AsSdcComponentIntegrationTest extends KernelTestCase
         $assets = $assetMap->getAssetsForComponent('SdcComponent');
 
         $this->assertCount(2, $assets);
-        
+
         $this->assertEquals('css/sdc.css', $assets[0]['path']);
         $this->assertEquals('css', $assets[0]['type']);
-        
+
         $this->assertEquals('js/sdc.js', $assets[1]['path']);
         $this->assertEquals('js', $assets[1]['type']);
     }
@@ -62,10 +62,10 @@ class AsSdcComponentIntegrationTest extends KernelTestCase
         $assets = $assetMap->getAssetsForComponent('SdcComponentWithAsset');
 
         $this->assertCount(3, $assets);
-        
+
         // From #[Asset]
         $this->assertEquals('css/extra.css', $assets[0]['path']);
-        
+
         // From #[AsSdcComponent]
         $this->assertEquals('css/sdc.css', $assets[1]['path']);
         $this->assertEquals('js/sdc.js', $assets[2]['path']);

@@ -10,7 +10,9 @@ use Tito10047\UX\TwigComponentSdc\CompilerPass\AssetComponentCompilerPass;
 use Tito10047\UX\TwigComponentSdc\Dto\ComponentAssetMap;
 
 #[Asset(path: 'test.css', priority: 5)]
-class MockComponent {}
+class MockComponent
+{
+}
 
 final class AssetComponentCompilerPassTest extends TestCase
 {
@@ -18,7 +20,7 @@ final class AssetComponentCompilerPassTest extends TestCase
     {
         $container = new ContainerBuilder();
         $container->setParameter('twig_component_sdc.auto_discovery', false);
-        
+
         $mapDefinition = new Definition(ComponentAssetMap::class);
         $mapDefinition->setArgument('$map', []);
         $container->setDefinition('Tito10047\UX\TwigComponentSdc\Dto\ComponentAssetMap', $mapDefinition);

@@ -3,7 +3,6 @@
 namespace Tito10047\UX\TwigComponentSdc\Tests\Integration;
 
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
-
 use Symfony\UX\TwigComponent\ComponentFactory;
 use Tito10047\UX\TwigComponentSdc\Tests\Integration\Fixtures\Component\TestComponent;
 
@@ -47,14 +46,14 @@ class ConfigurationIntegrationTest extends KernelTestCase
             'component_namespace' => 'Tito10047\\UX\TwigComponentSdc\\Tests\\Integration\\Fixtures\\Component\\',
         ]);
         $kernel->boot();
-        
+
         $container = $kernel->getContainer();
-        
+
         /** @var ComponentFactory $componentFactory */
         $componentFactory = $container->get('ux.twig_component.component_factory');
-        
+
         $metadata = $componentFactory->metadataFor('TestComponent');
-        
+
         $this->assertEquals('TestComponent', $metadata->getName());
         $this->assertEquals(TestComponent::class, $metadata->getClass());
     }

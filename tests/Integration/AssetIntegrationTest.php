@@ -25,7 +25,7 @@ class AssetIntegrationTest extends IntegrationTestCase
 
         $this->assertArrayHasKey('TestComponent', $map);
         $this->assertCount(2, $map['TestComponent']);
-        
+
         $paths = array_column($map['TestComponent'], 'path');
         $this->assertContains('css/test.css', $paths);
         $this->assertContains('js/test.js', $paths);
@@ -39,10 +39,10 @@ class AssetIntegrationTest extends IntegrationTestCase
 
         $assetMapper = $this->createMock(AssetMapperInterface::class);
         $assetMapper->method('getAsset')
-            ->willReturnCallback(function($path) {
+            ->willReturnCallback(function ($path) {
                 return new MappedAsset($path, publicPath: '/assets/'.$path);
             });
-        
+
         $container->set(AssetMapperInterface::class, $assetMapper);
 
         /** @var Environment $twig */
@@ -80,8 +80,8 @@ class AssetIntegrationTest extends IntegrationTestCase
         $this->assertNotNull($linkProvider);
         $links = iterator_to_array($linkProvider->getLinks());
         $this->assertCount(2, $links);
-        
-        $linkPaths = array_map(fn($l) => $l->getHref(), $links);
+
+        $linkPaths = array_map(fn ($l) => $l->getHref(), $links);
         $this->assertContains('/assets/css/test.css', $linkPaths);
         $this->assertContains('/assets/js/test.js', $linkPaths);
     }

@@ -1,13 +1,13 @@
 <?php
 
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
-
 use Tito10047\UX\TwigComponentSdc\Dto\ComponentAssetMap;
 use Tito10047\UX\TwigComponentSdc\Service\AssetRegistry;
 use Tito10047\UX\TwigComponentSdc\EventListener\AssetResponseListener;
 use Tito10047\UX\TwigComponentSdc\EventListener\ComponentRenderListener;
 use Tito10047\UX\TwigComponentSdc\Twig\AssetExtension;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
+
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 
 /**
@@ -49,15 +49,15 @@ return static function (ContainerConfigurator $container): void {
         ->args(['$placeholder' => '<!-- __UX_TWIG_COMPONENT_ASSETS__ -->'])
         ->tag('twig.extension');
 
-	$services = $container->services();
+    $services = $container->services();
 
-//	$services->defaults()
-//		->autowire()
-//		->autoconfigure();
-//
-//	// Symfony si samo vytiahne hodnoty z parametrov kontajnera
-//	$services->load(
-//		'%twig_component_sdc.component_namespace%',
-//		'%twig_component_sdc.component_dir%'
-//	);
+    //	$services->defaults()
+    //		->autowire()
+    //		->autoconfigure();
+    //
+    //	// Symfony si samo vytiahne hodnoty z parametrov kontajnera
+    //	$services->load(
+    //		'%twig_component_sdc.component_namespace%',
+    //		'%twig_component_sdc.component_dir%'
+    //	);
 };

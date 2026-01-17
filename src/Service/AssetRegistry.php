@@ -9,7 +9,7 @@ final class AssetRegistry
     public function addAsset(string $path, string $type, int $priority = 0, array $attributes = []): void
     {
         $key = md5($path . $type . serialize($attributes));
-        
+
         if (!isset($this->assets[$key])) {
             $this->assets[$key] = [
                 'path' => $path,
@@ -31,7 +31,7 @@ final class AssetRegistry
     public function getSortedAssets(): array
     {
         $sorted = array_values($this->assets);
-        
+
         usort($sorted, function ($a, $b) {
             return $b['priority'] <=> $a['priority'];
         });

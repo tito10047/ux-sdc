@@ -1,0 +1,128 @@
+name: CI
+on:
+    push:
+        branches: [ main ]
+    pull_request: ~
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+jobs:
+    php-cs-fixer:
+        name: "Coding Standard"
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Checkout
+                uses: actions/checkout@v4
+            -   name: Setup PHP
+                uses: shivammathur/setup-php@v2
+                with:
+                    php-version: '8.2'
+                    tools: php-cs-fixer
+            -   name: Check CS
+                run: php-cs-fixer fix --dry-run --diff
+                continue-on-error: true
+    phpstan:
+        name: "Static Analysis"
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Checkout
+                uses: actions/checkout@v4
+            -   name: "Install PHP"
+                uses: "shivammathur/setup-php@v2"
+                with:
+                    php-version: "8.3"
+                    ini-values: memory_limit=-1
+            -   name: "Install dependencies"
+                run: composer update --no-interaction --no-progress
+            -   name: "Run PHPStan"
+                run: vendor/bin/phpstan analyse
+                continue-on-error: true
+    tests:
+        name: "Tests (PHP ${{ matrix.php-version }}, Symfony ${{ matrix.symfony }})"
+        runs-on: ${{ matrix.operating-system }}
+        strategy:
+            fail-fast: false
+            matrix:
+                php-version:
+                    - "8.2"
+                    - "8.3"
+                    - "8.4"
+                    - "8.5"
+                symfony:
+                    - '6.4.*'
+                    - '7.4.*'
+                    - '8.0.*'
+                operating-system:
+                    - "ubuntu-latest"
+                exclude:
+                    -   php-version: "8.2"
+                        symfony: '8.0.*'
+                        operating-system: "ubuntu-latest"
+                    -   php-version: "8.3"
+                        symfony: '8.0.*'
+                        operating-system: "ubuntu-latest"
+        steps:
+            -   name: Checkout
+                uses: actions/checkout@v4
+            -   name: "Install PHP"
+                uses: "shivammathur/setup-php@v2"
+                with:
+                    coverage: "pcov"
+                    php-version: "${{ matrix.php-version }}"
+                    ini-values: memory_limit=-1
+                    tools: php-coveralls
+            -   name: "Configure Symfony"
+                run: 'composer config extra.symfony.require "${{ matrix.symfony }}"'
+            -   name: Get composer cache directory
+                id: composer-cache
+                run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+            -   name: "Cache dependencies"
+                uses: "actions/cache@v4"
+                with:
+                    path: ${{ steps.composer-cache.outputs.dir }}
+                    key: "php-${{ matrix.php-version }}-symfony-${{ matrix.symfony }}"
+                    restore-keys: "php-${{ matrix.php-version }}-symfony-${{ matrix.symfony }}"
+            -   name: "Install highest dependencies"
+                run: |
+                    composer update --no-interaction --no-progress
+            -   name: Execute tests via PHPUnit
+                run: vendor/bin/phpunit --coverage-clover build/reports/clover.xml
+            -   name: Upload coverage results to Coveralls
+                env:
+                    COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                run: |
+                    php-coveralls --coverage_clover=build/reports/clover.xml --json_path=build/reports/coveralls-upload.json -v
+                continue-on-error: true
+    e2e-tests:
+        name: "E2E Test"
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Checkout bundle code
+                uses: actions/checkout@v4
+                with:
+                    path: my-bundle
+            -   name: Setup PHP
+                uses: shivammathur/setup-php@v2
+                with:
+                    php-version: '8.2'
+                    extensions: mbstring, xml, ctype, iconv
+                    tools: composer
+            -   name: Create Dummy Symfony Project
+                run: |
+                    composer create-project symfony/skeleton dummy-project
+                    cd dummy-project
+                    composer config repositories.local '{"type": "path", "url": "../my-bundle", "canonical": false, "options": {"symlink": false}}'
+            -   name: Install Dependencies
+                run: |
+                    cd dummy-project
+                    composer config extra.symfony.allow-contrib true
+                    composer require webapp --no-scripts
+                    composer config minimum-stability dev
+                    composer config prefer-stable true
+                    composer require tito10047/ux-twig-component-sdc:* --no-scripts
+            -   name: Run tests in dummy project
+                run: |
+                    cd dummy-project
+                    # Here we could run some specific commands to verify the bundle is working in a real project
+                    # For now, we'll just check if the bundle is registered
+                    php bin/console debug:container twig_component_sdc

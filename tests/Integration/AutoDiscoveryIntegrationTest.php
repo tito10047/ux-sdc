@@ -25,12 +25,12 @@ class AutoDiscoveryIntegrationTest extends IntegrationTestCase
 
         $this->assertArrayHasKey('AutoDiscoveryComponent', $map);
         $this->assertArrayHasKey('AutoDiscoveryComponent_template', $map);
-        
+
         $assets = $map['AutoDiscoveryComponent'];
         $paths = array_column($assets, 'path');
         $this->assertContains('AutoDiscoveryComponent.css', $paths);
         $this->assertContains('AutoDiscoveryComponent.js', $paths);
-        
+
         $templatePath = $map['AutoDiscoveryComponent_template'];
         $this->assertStringEndsWith('AutoDiscoveryComponent.html.twig', $templatePath);
     }
@@ -46,7 +46,7 @@ class AutoDiscoveryIntegrationTest extends IntegrationTestCase
 
         $this->assertArrayHasKey('SdcAutoDiscoveryComponent', $map);
         $this->assertArrayHasKey('SdcAutoDiscoveryComponent_template', $map);
-        
+
         $assets = $map['SdcAutoDiscoveryComponent'];
         $paths = array_column($assets, 'path');
         $this->assertContains('SdcAutoDiscoveryComponent.css', $paths);
@@ -63,15 +63,15 @@ class AutoDiscoveryIntegrationTest extends IntegrationTestCase
 
         $assetMapper = $this->createMock(AssetMapperInterface::class);
         $assetMapper->method('getAsset')
-            ->willReturnCallback(function($path) {
+            ->willReturnCallback(function ($path) {
                 return new MappedAsset($path, publicPath: '/assets/'.$path);
             });
-        
+
         $container->set(AssetMapperInterface::class, $assetMapper);
 
         /** @var Environment $twig */
         $twig = $container->get(Environment::class);
-        
+
         $loader = $twig->getLoader();
         if ($loader instanceof \Twig\Loader\FilesystemLoader) {
             $loader->addPath(realpath(__DIR__ . '/Fixtures/Component'));

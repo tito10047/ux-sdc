@@ -14,7 +14,7 @@ class TwigComponentSdcBundleTest extends TestCase
         $container = new ContainerBuilder();
         $container->setParameter('kernel.project_dir', realpath(__DIR__ . '/../..'));
         $bundle = new TwigComponentSdcBundle();
-        
+
         $config = [
             'auto_discovery' => true,
             'ux_components_dir' => '%kernel.project_dir%/tests',
@@ -40,7 +40,7 @@ class TwigComponentSdcBundleTest extends TestCase
         $prop = $instance->getProperty('file');
         $prop->setAccessible(true);
         $prop->setValue($configurator, __FILE__);
-        
+
         $bundle->loadExtension($config, $configurator, $container);
 
         $this->assertTrue($container->hasParameter('twig_component_sdc.auto_discovery'));

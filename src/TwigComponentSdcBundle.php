@@ -7,7 +7,6 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
-
 use Tito10047\UX\TwigComponentSdc\CompilerPass\AssetComponentCompilerPass;
 use Tito10047\UX\TwigComponentSdc\DependencyInjection\Configuration;
 
@@ -20,11 +19,11 @@ class TwigComponentSdcBundle extends AbstractBundle implements PrependExtensionI
     {
         $definition->import('../config/definition.php');
     }
-    
+
     public function prepend(ContainerBuilder $builder): void
     {
         $configs = $builder->getExtensionConfig('twig_component_sdc');
-        
+
         $configuration = new Configuration();
         $config = $this->processConfiguration($configuration, $configs, $builder);
 
@@ -69,7 +68,7 @@ class TwigComponentSdcBundle extends AbstractBundle implements PrependExtensionI
         $processor = new \Symfony\Component\Config\Definition\Processor();
         return $processor->processConfiguration($configuration, $configs);
     }
-    
+
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
         $container->import('../config/services.php');
@@ -83,10 +82,10 @@ class TwigComponentSdcBundle extends AbstractBundle implements PrependExtensionI
             $builder->getDefinition('Tito10047\UX\TwigComponentSdc\Twig\AssetExtension')
                 ->setArgument('$placeholder', $config['placeholder']);
         }
-            
+
         $builder->setParameter('twig_component_sdc.auto_discovery', $config['auto_discovery']);
         $builder->setParameter('twig_component_sdc.ux_components_dir', $config['ux_components_dir']);
-        
+
         $namespace = null;
         if (null !== $config['component_namespace']) {
             $namespace = rtrim($config['component_namespace'], '\\') . '\\';
@@ -107,7 +106,7 @@ class TwigComponentSdcBundle extends AbstractBundle implements PrependExtensionI
 
     private function registerClasses(ContainerBuilder $container, string $namespace, string $resource): void
     {
-        $loader = new class($container, new \Symfony\Component\Config\FileLocator()) extends \Symfony\Component\DependencyInjection\Loader\PhpFileLoader {
+        $loader = new class ($container, new \Symfony\Component\Config\FileLocator()) extends \Symfony\Component\DependencyInjection\Loader\PhpFileLoader {
             public function doRegister(string $namespace, string $resource): void
             {
                 $prototype = (new \Symfony\Component\DependencyInjection\Definition())
