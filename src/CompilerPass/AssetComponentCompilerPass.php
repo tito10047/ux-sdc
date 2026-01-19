@@ -174,6 +174,20 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
             }
         }
 
+        $allLogicalPaths = [];
+        foreach ($componentAssets as $key => $assets) {
+            if (str_ends_with((string) $key, '_template')) {
+                continue;
+            }
+            foreach ($assets as $asset) {
+                $allLogicalPaths[] = $asset['path'];
+            }
+        }
+        $allLogicalPaths = array_unique($allLogicalPaths);
+
+        $container->getDefinition(\Tito10047\UX\TwigComponentSdc\Cache\AssetMapperCacheWarmer::class)
+            ->setArgument('$logicalPaths', $allLogicalPaths);
+
         $registryDefinition = $container->getDefinition(SdcMetadataRegistry::class);
         $cachePath = $container->getParameterBag()->resolveValue($registryDefinition->getArgument('$cachePath'));
 

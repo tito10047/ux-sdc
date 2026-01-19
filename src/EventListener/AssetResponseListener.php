@@ -15,8 +15,27 @@ final class AssetResponseListener
     public function __construct(
         private AssetRegistry $assetRegistry,
         private AssetMapperInterface $assetMapper,
-        private string $placeholder = '<!-- __UX_TWIG_COMPONENT_ASSETS__ -->'
+        private string $placeholder = '<!-- __UX_TWIG_COMPONENT_ASSETS__ -->',
+        private ?string $cachePath = null,
+        private bool $debug = false
     ) {
+    }
+
+    public function getPublicPath(string $logicalPath): ?string
+    {
+        if (null !== $this->cachePath && file_exists($this->cachePath)) {
+            $map = require $this->cachePath;
+            if (isset($map[$logicalPath])) {
+                return $map[$logicalPath];
+            }
+        }
+
+        // Len v DEV: Ak mapa neexistuje, zavolaj AssetMapper (pomalšie, ale funkčné pri vývoji)
+        if ($this->debug) {
+            return $this->assetMapper->getAsset($logicalPath)?->publicPath;
+        }
+
+        return null;
     }
 
     #[AsEventListener(event: KernelEvents::RESPONSE)]
@@ -38,8 +57,7 @@ final class AssetResponseListener
         $links = [];
 
         foreach ($assets as $asset) {
-            $mappedAsset = $this->assetMapper->getAsset($asset['path']);
-            $path = $mappedAsset ? $mappedAsset->publicPath : $asset['path'];
+            $path = $this->getPublicPath($asset['path']) ?? $asset['path'];
 
             $attributes = '';
             foreach ($asset['attributes'] as $name => $value) {

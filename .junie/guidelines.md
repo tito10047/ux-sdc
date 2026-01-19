@@ -76,3 +76,6 @@ The bundle consists of several key components that need to be implemented:
 - Assets are collected only when a component is actually rendered.
 - Placeholders in HTML are replaced in `KernelEvents::RESPONSE`.
 - HTTP `Link` headers with `rel=preload` should be added for optimized loading.
+
+## Benchmarks
+./vendor/bin/phpbench run tests/Visual/ComponentBenchmark.php --bootstrap=tests/Visual/bootstrap.php --report=default
