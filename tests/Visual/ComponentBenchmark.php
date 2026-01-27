@@ -150,4 +150,18 @@ class ComponentBenchmark
 		// Renderujeme z disku
 		$twig->render('stress_test_sdc.html.twig');
 	}
+
+	/**
+	 * Meria rýchlosť renderu pre SDC v DEV prostredí (runtime autodiscovery).
+	 * @Revs(10)
+	 * @Iterations(5)
+	 */
+	public function benchRenderSdcDev(): void
+	{
+		$kernel = new BenchmarkKernel('sdc', "dev", true);
+		$kernel->boot();
+
+		$twig = $kernel->getContainer()->get('twig');
+		$twig->render('stress_test_sdc.html.twig');
+	}
 }

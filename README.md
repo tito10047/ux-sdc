@@ -138,13 +138,15 @@ This bundle is designed for high performance with minimal overhead. We've conduc
 
 | Scenario | Classic Approach | SDC Approach | Difference |
 |----------|------------------|--------------|------------|
-| **Warmup (Dev/Debug)** | 783.4ms | 773.7ms | -9.7ms |
-| **Warmup (Prod)** | 573.2ms | 596.5ms | +23.3ms |
-| **Render (Runtime)** | 26.2ms | 27.0ms | +0.8ms |
+| **Warmup (Dev/Debug)** | 759.2ms | 745.4ms | -13.8ms |
+| **Warmup (Prod)** | 578.8ms | 593.8ms | +15.0ms |
+| **Render (Prod Runtime)** | 26.5ms | 27.2ms | +0.7ms |
+| **Render (Dev Runtime)** | 26.5ms | 68.8ms | +42.3ms |
 
 ### Key Findings
-- **Developer Experience:** In `dev` mode, the performance impact is nearly zero thanks to optimized runtime discovery and caching.
-- **Production Performance:** After micro-optimizations (optimized asset hashing and listener early exits), the overhead for rendering 500 components is only about **0.8ms** (~1.6µs per component), which is practically negligible.
+- **Developer Experience (Dev Runtime):** In `dev` mode, there is a measurable overhead (~84µs per component) due to runtime autodiscovery. This allows developers to add CSS/JS/Twig files and see changes instantly without clearing the cache.
+- **Production Performance:** In `prod` mode, the overhead for rendering 500 components is only about **0.7ms** (~1.4µs per component), which is practically negligible.
+- **Warmup:** The SDC approach slightly increases container compilation time in `prod` (~15ms for 500 components) but remains very efficient.
 - **Memory Usage:** The SDC approach requires approximately **8MB** more memory during container compilation for 500 components, which is well within acceptable limits for modern applications.
 
 For detailed results and methodology, see the [Full Benchmark Report](benchmark.md).
