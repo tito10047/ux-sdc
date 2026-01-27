@@ -31,7 +31,7 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
             return;
         }
 
-        $autoDiscovery = $container->getParameter('sdc.auto_discovery');
+        $autoDiscovery = $container->getParameter('ux_sdc.auto_discovery');
         $twigRoots = $this->collectTwigRoots($container);
         
         $resolver = new ComponentMetadataResolver($twigRoots, $autoDiscovery);
@@ -54,8 +54,8 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
             $twigRoots[] = $container->getParameterBag()->resolveValue($container->getParameter('twig.default_path'));
         }
 
-        if ($container->hasParameter('sdc.ux_components_dir')) {
-            $uxDir = $container->getParameterBag()->resolveValue($container->getParameter('sdc.ux_components_dir'));
+        if ($container->hasParameter('ux_sdc.ux_components_dir')) {
+            $uxDir = $container->getParameterBag()->resolveValue($container->getParameter('ux_sdc.ux_components_dir'));
             if (is_dir($uxDir)) {
                 $twigRoots[] = realpath($uxDir);
             }

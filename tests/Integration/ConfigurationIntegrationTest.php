@@ -21,9 +21,9 @@ class ConfigurationIntegrationTest extends KernelTestCase
 
         $this->assertEquals(
             realpath($kernel->getProjectDir() . '/tests/Integration/Fixtures/Component'),
-            realpath($container->getParameter('sdc.ux_components_dir'))
+            realpath($container->getParameter('ux_sdc.ux_components_dir'))
         );
-        $this->assertEquals('Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\\', $container->getParameter('sdc.component_namespace'));
+        $this->assertEquals('Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\\', $container->getParameter('ux_sdc.component_namespace'));
     }
 
     public function testCustomConfigurationIsApplied(): void
@@ -35,8 +35,8 @@ class ConfigurationIntegrationTest extends KernelTestCase
         $kernel->boot();
         $container = $kernel->getContainer();
 
-        $this->assertEquals($kernel->getProjectDir() . '/custom_dir', $container->getParameter('sdc.ux_components_dir'));
-        $this->assertEquals('Tito10047\\UX\Sdc\\Tests\\Integration\\Fixtures\\Component\\', $container->getParameter('sdc.component_namespace'));
+        $this->assertEquals($kernel->getProjectDir() . '/custom_dir', $container->getParameter('ux_sdc.ux_components_dir'));
+        $this->assertEquals('Tito10047\\UX\Sdc\\Tests\\Integration\\Fixtures\\Component\\', $container->getParameter('ux_sdc.component_namespace'));
     }
 
     public function testComponentIsLoadedFromCustomNamespace(): void

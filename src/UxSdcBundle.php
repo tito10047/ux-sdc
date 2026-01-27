@@ -13,8 +13,10 @@ use Tito10047\UX\Sdc\DependencyInjection\Configuration;
 /**
  * @link https://symfony.com/doc/current/bundles/best_practices.html
  */
-class SdcBundle extends AbstractBundle
+class UxSdcBundle extends AbstractBundle
 {
+
+
     public function getContainerExtension(): ?\Symfony\Component\DependencyInjection\Extension\ExtensionInterface
     {
         return new \Tito10047\UX\Sdc\DependencyInjection\SdcExtension();

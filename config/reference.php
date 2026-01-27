@@ -735,7 +735,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     },
  *     controllers_json?: scalar|null|Param, // Deprecated: The "twig_component.controllers_json" config option is deprecated, and will be removed in 3.0. // Default: null
  * }
- * @psalm-type SdcConfig = array{
+ * @psalm-type UxSdcConfig = array{
  *     ux_components_dir?: scalar|null|Param, // Adresár, v ktorom sa nachádzajú komponenty. // Default: "%kernel.project_dir%/src_component"
  *     component_namespace?: scalar|null|Param, // Namespace pre komponenty. // Default: null
  *     stimulus?: bool|array{
@@ -751,7 +751,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     framework?: FrameworkConfig,
  *     twig?: TwigConfig,
  *     twig_component?: TwigComponentConfig,
- *     sdc?: SdcConfig,
+ *     ux_sdc?: UxSdcConfig,
  *     "when@dev"?: array{
  *         imports?: ImportsConfig,
  *         parameters?: ParametersConfig,

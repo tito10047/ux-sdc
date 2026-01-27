@@ -12,6 +12,11 @@ use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 
 class SdcExtension extends Extension implements PrependExtensionInterface
 {
+    public function getAlias(): string
+    {
+        return 'ux_sdc';
+    }
+
     public function load(array $configs, ContainerBuilder $container): void
     {
         $configuration = new Configuration();
@@ -20,8 +25,8 @@ class SdcExtension extends Extension implements PrependExtensionInterface
         $loader = new PhpFileLoader($container, new FileLocator(__DIR__ . '/../../config'));
         $loader->load('services.php');
 
-        $container->setParameter('sdc.auto_discovery', $config['auto_discovery']);
-        $container->setParameter('sdc.ux_components_dir', $config['ux_components_dir']);
+        $container->setParameter('ux_sdc.auto_discovery', $config['auto_discovery']);
+        $container->setParameter('ux_sdc.ux_components_dir', $config['ux_components_dir']);
 
         $this->registerMetadataResolver($container, $config);
 
@@ -42,16 +47,16 @@ class SdcExtension extends Extension implements PrependExtensionInterface
                 ->setArgument('$placeholder', $config['placeholder']);
         }
 
-        $container->setParameter('sdc.auto_discovery', $config['auto_discovery']);
-        $container->setParameter('sdc.ux_components_dir', $config['ux_components_dir']);
-        $container->register('sdc.ux_components_dir', 'string')
+        $container->setParameter('ux_sdc.auto_discovery', $config['auto_discovery']);
+        $container->setParameter('ux_sdc.ux_components_dir', $config['ux_components_dir']);
+        $container->register('ux_sdc.ux_components_dir', 'string')
             ->setPublic(true);
 
         $namespace = null;
         if (isset($config['component_namespace'])) {
             $namespace = rtrim((string) $config['component_namespace'], '\\') . '\\';
         }
-        $container->setParameter('sdc.component_namespace', $namespace);
+        $container->setParameter('ux_sdc.component_namespace', $namespace);
 
         if (null !== $namespace) {
             $uxComponentsDir = $container->resolveEnvPlaceholders($config['ux_components_dir'], true);
@@ -61,7 +66,7 @@ class SdcExtension extends Extension implements PrependExtensionInterface
             }
         }
 
-        $container->setAlias('app.ui_components.dir', 'sdc.ux_components_dir');
+        $container->setAlias('app.ui_components.dir', 'ux_sdc.ux_components_dir');
         $container->setParameter('app.ui_components.dir', $config['ux_components_dir']);
 
         $container->register(SdcMetadataRegistry::class)
@@ -71,7 +76,7 @@ class SdcExtension extends Extension implements PrependExtensionInterface
 
     public function prepend(ContainerBuilder $container): void
     {
-        $configs = $container->getExtensionConfig('sdc');
+        $configs = $container->getExtensionConfig('ux_sdc');
         
         $config = [];
         foreach ($configs as $c) {

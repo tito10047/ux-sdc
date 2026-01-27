@@ -4,12 +4,12 @@ namespace Tito10047\UX\Sdc\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Tito10047\UX\Sdc\SdcBundle;
+use Tito10047\UX\Sdc\UxSdcBundle;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 
 use Tito10047\UX\Sdc\DependencyInjection\SdcExtension;
 
-class SdcBundleTest extends TestCase
+class UxSdcBundleTest extends TestCase
 {
     public function testLoadExtensionSetsParameters(): void
     {
@@ -27,9 +27,9 @@ class SdcBundleTest extends TestCase
 
         $extension->load([$config], $container);
 
-        $this->assertTrue($container->hasParameter('sdc.auto_discovery'));
-        $this->assertEquals('%kernel.project_dir%/tests/Visual/Generated', $container->getParameter('sdc.ux_components_dir'));
-        $this->assertEquals('Tito10047\\UX\\Sdc\\Tests\\Visual\\Generated\\', $container->getParameter('sdc.component_namespace'));
+        $this->assertTrue($container->hasParameter('ux_sdc.auto_discovery'));
+        $this->assertEquals('%kernel.project_dir%/tests/Visual/Generated', $container->getParameter('ux_sdc.ux_components_dir'));
+        $this->assertEquals('Tito10047\\UX\\Sdc\\Tests\\Visual\\Generated\\', $container->getParameter('ux_sdc.component_namespace'));
     }
 
     public function testPrependAddsConfiguration(): void
@@ -38,7 +38,7 @@ class SdcBundleTest extends TestCase
         $container->setParameter('kernel.project_dir', '/var/www');
         $extension = new SdcExtension();
 
-        $container->prependExtensionConfig('sdc', [
+        $container->prependExtensionConfig('ux_sdc', [
             'ux_components_dir' => '/var/www/src_component',
             'component_namespace' => 'App\\Component\\'
         ]);

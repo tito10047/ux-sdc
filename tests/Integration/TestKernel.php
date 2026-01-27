@@ -10,7 +10,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\Routing\RouteCollection;
 use Symfony\UX\TwigComponent\TwigComponentBundle;
-use Tito10047\UX\Sdc\SdcBundle;
+use Tito10047\UX\Sdc\UxSdcBundle;
 
 class TestKernel extends Kernel
 {
@@ -30,7 +30,7 @@ class TestKernel extends Kernel
             new FrameworkBundle(),
             new TwigBundle(),
             new TwigComponentBundle(),
-            new SdcBundle(),
+            new UxSdcBundle(),
         ];
     }
 
@@ -58,7 +58,7 @@ class TestKernel extends Kernel
             'ux_components_dir' => '%kernel.project_dir%/tests/Integration/Fixtures/Component'
         ], $this->configs);
 
-        $container->loadFromExtension('sdc', $configs);
+        $container->loadFromExtension('ux_sdc', $configs);
 
         // Make services public for testing
         $container->addCompilerPass(new class () implements \Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface {

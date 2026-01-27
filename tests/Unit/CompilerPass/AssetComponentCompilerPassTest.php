@@ -36,7 +36,7 @@ final class AssetComponentCompilerPassTest extends TestCase
     public function testProcess(): void
     {
         $container = new ContainerBuilder();
-        $container->setParameter('sdc.auto_discovery', false);
+        $container->setParameter('ux_sdc.auto_discovery', false);
 
         $registryDefinition = new Definition(SdcMetadataRegistry::class);
         $registryDefinition->setArgument('$cachePath', $this->cachePath);

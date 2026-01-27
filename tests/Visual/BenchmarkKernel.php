@@ -10,14 +10,14 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\UX\TwigComponent\TwigComponentBundle;
-use Tito10047\UX\Sdc\SdcBundle;
+use Tito10047\UX\Sdc\UxSdcBundle;
 
 class BenchmarkKernel extends Kernel {
 
 	use MicroKernelTrait;
 
 	public function __construct(
-		private string $type, // 'classic' or 'sdc'
+		private string $type, // 'classic' or 'ux_sdc'
 		string         $environment = 'test',
 		bool           $debug = false
 	) {
@@ -29,7 +29,7 @@ class BenchmarkKernel extends Kernel {
 			new FrameworkBundle(),
 			new TwigBundle(),
 			new TwigComponentBundle(),
-			new SdcBundle(),
+			new UxSdcBundle(),
 		];
 	}
 
@@ -56,7 +56,7 @@ class BenchmarkKernel extends Kernel {
 			'anonymous_template_directory' => 'components/',
 		]);
 
-		$container->loadFromExtension('sdc', [
+		$container->loadFromExtension('ux_sdc', [
 			'component_namespace' => $ns,
 			'ux_components_dir'   => $dir,
 		]);

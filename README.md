@@ -21,7 +21,7 @@ Instead of scattering your component files across `src/`, `templates/`, and `ass
 
 Just create a directory for your component. Everything else is handled automatically.
 ```yaml
-sdc:
+ux_sdc:
     ux_components_dir: '%kernel.project_dir%/src/Component'
     component_namespace: 'App\Component'
 ```
@@ -77,11 +77,12 @@ composer require tito10047/ux-sdc
 ```
 
 2. **Register the bundle** (if not done automatically by Symfony Flex):
+
 ```php
 // config/bundles.php
 return [
     // ...
-    Tito10047\UX\Sdc\SdcBundle::class => ['all' => true],
+    Tito10047\UX\Sdc\UxSdcBundle::class => ['all' => true],
 ];
 ```
 
@@ -89,7 +90,7 @@ return [
 Create a configuration file (e.g., `config/packages/sdc.yaml`):
 
 ```yaml
-sdc:
+ux_sdc:
     # Directory where your SDC components are located (default: %kernel.project_dir%/src_component)
     ux_components_dir: '%kernel.project_dir%/src/Component'
     

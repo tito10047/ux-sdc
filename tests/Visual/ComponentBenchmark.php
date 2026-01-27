@@ -39,14 +39,14 @@ class ComponentBenchmark
 
 		// 2. Vytvorenie stress-test šablón pre Twig
 		$this->createStressTestTemplate('classic', 500);
-		$this->createStressTestTemplate('sdc', 500);
-		$this->createRepeatedStressTestTemplate('sdc', 10, 500);
+		$this->createStressTestTemplate('ux_sdc', 500);
+		$this->createRepeatedStressTestTemplate('ux_sdc', 10, 500);
 	}
 
 	private function createStressTestTemplate(string $type, int $count): void
 	{
 		$content = '';
-		$prefix = $type === 'sdc' ? 'SdcComp' : 'ClassicComp';
+		$prefix = $type === 'ux_sdc' ? 'SdcComp' : 'ClassicComp';
 		for ($i = 1; $i <= $count; $i++) {
 			$content .= "<twig:$prefix$i />\n";
 		}
@@ -58,7 +58,7 @@ class ComponentBenchmark
 	private function createRepeatedStressTestTemplate(string $type, int $uniqueCount, int $totalCount): void
 	{
 		$content = '';
-		$prefix = $type === 'sdc' ? 'SdcComp' : 'ClassicComp';
+		$prefix = $type === 'ux_sdc' ? 'SdcComp' : 'ClassicComp';
 		for ($i = 0; $i < $totalCount; $i++) {
 			$index = ($i % $uniqueCount) + 1;
 			$content .= "<twig:$prefix$index />\n";
@@ -102,8 +102,8 @@ class ComponentBenchmark
  */
 	public function benchWarmupSdcDebug(): void
 	{
-		$this->clearCache('sdc');
-		$kernel = new BenchmarkKernel('sdc', "dev", true);
+		$this->clearCache('ux_sdc');
+		$kernel = new BenchmarkKernel('ux_sdc', "dev", true);
 		$kernel->boot();
 	}
 
@@ -128,8 +128,8 @@ class ComponentBenchmark
  */
 	public function benchWarmupSdc(): void
 	{
-		$this->clearCache('sdc');
-		$kernel = new BenchmarkKernel('sdc', "prod",false);
+		$this->clearCache('ux_sdc');
+		$kernel = new BenchmarkKernel('ux_sdc', "prod",false);
 		$kernel->boot();
 	}
 
@@ -157,7 +157,7 @@ class ComponentBenchmark
 	 */
 	public function benchRenderSdc(): void
 	{
-		$kernel = new BenchmarkKernel('sdc', "prod",false);
+		$kernel = new BenchmarkKernel('ux_sdc', "prod",false);
 		$kernel->boot();
 
 		$twig = $kernel->getContainer()->get('twig');
@@ -172,7 +172,7 @@ class ComponentBenchmark
 	 */
 	public function benchRenderSdcDev(): void
 	{
-		$kernel = new BenchmarkKernel('sdc', "dev", true);
+		$kernel = new BenchmarkKernel('ux_sdc', "dev", true);
 		$kernel->boot();
 
 		$twig = $kernel->getContainer()->get('twig');
@@ -186,7 +186,7 @@ class ComponentBenchmark
 	 */
 	public function benchRenderSdcDevRepeated(): void
 	{
-		$kernel = new BenchmarkKernel('sdc', "dev", true);
+		$kernel = new BenchmarkKernel('ux_sdc', "dev", true);
 		$kernel->boot();
 
 		$twig = $kernel->getContainer()->get('twig');
