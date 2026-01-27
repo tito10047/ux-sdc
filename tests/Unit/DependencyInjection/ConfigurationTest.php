@@ -1,10 +1,10 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\Tests\Unit\DependencyInjection;
+namespace Tito10047\UX\Sdc\Tests\Unit\DependencyInjection;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Config\Definition\Processor;
-use Tito10047\UX\TwigComponentSdc\DependencyInjection\Configuration;
+use Tito10047\UX\Sdc\DependencyInjection\Configuration;
 
 class ConfigurationTest extends TestCase
 {

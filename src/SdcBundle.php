@@ -1,23 +1,23 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc;
+namespace Tito10047\UX\Sdc;
 
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
-use Tito10047\UX\TwigComponentSdc\CompilerPass\AssetComponentCompilerPass;
-use Tito10047\UX\TwigComponentSdc\DependencyInjection\Configuration;
+use Tito10047\UX\Sdc\CompilerPass\AssetComponentCompilerPass;
+use Tito10047\UX\Sdc\DependencyInjection\Configuration;
 
 /**
  * @link https://symfony.com/doc/current/bundles/best_practices.html
  */
-class TwigComponentSdcBundle extends AbstractBundle
+class SdcBundle extends AbstractBundle
 {
     public function getContainerExtension(): ?\Symfony\Component\DependencyInjection\Extension\ExtensionInterface
     {
-        return new \Tito10047\UX\TwigComponentSdc\DependencyInjection\TwigComponentSdcExtension();
+        return new \Tito10047\UX\Sdc\DependencyInjection\SdcExtension();
     }
 
     public function configure(DefinitionConfigurator $definition): void

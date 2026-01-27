@@ -41,7 +41,7 @@ fi
 
 # 4. Inštalácia závislostí
 composer require symfony/twig-bundle symfony/ux-twig-component webapp --no-interaction --no-scripts
-composer require tito10047/ux-twig-component-sdc:* --no-interaction --no-scripts
+composer require tito10047/ux-sdc:* --no-interaction --no-scripts
 
 # 5. Kopírovanie E2E testovacích súborov (z tests_e2e/basic)
 cp -r "$PROJECT_ROOT/tests_e2e/basic/"* .

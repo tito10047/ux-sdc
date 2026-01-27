@@ -1,13 +1,13 @@
 <?php
 
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
-use Tito10047\UX\TwigComponentSdc\Runtime\SdcMetadataRegistry;
-use Tito10047\UX\TwigComponentSdc\Service\AssetRegistry;
-use Tito10047\UX\TwigComponentSdc\Service\ComponentMetadataResolver;
-use Tito10047\UX\TwigComponentSdc\EventListener\AssetResponseListener;
-use Tito10047\UX\TwigComponentSdc\EventListener\ComponentRenderListener;
-use Tito10047\UX\TwigComponentSdc\EventListener\DevComponentRenderListener;
-use Tito10047\UX\TwigComponentSdc\Twig\AssetExtension;
+use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
+use Tito10047\UX\Sdc\Service\AssetRegistry;
+use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
+use Tito10047\UX\Sdc\EventListener\AssetResponseListener;
+use Tito10047\UX\Sdc\EventListener\ComponentRenderListener;
+use Tito10047\UX\Sdc\EventListener\DevComponentRenderListener;
+use Tito10047\UX\Sdc\Twig\AssetExtension;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
@@ -66,7 +66,7 @@ return static function (ContainerConfigurator $container): void {
     //
     //	// Symfony si samo vytiahne hodnoty z parametrov kontajnera
     //	$services->load(
-    //		'%twig_component_sdc.component_namespace%',
-    //		'%twig_component_sdc.component_dir%'
+    //		'%sdc.component_namespace%',
+    //		'%sdc.component_dir%'
     //	);
 };

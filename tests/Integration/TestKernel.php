@@ -1,6 +1,6 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\Tests\Integration;
+namespace Tito10047\UX\Sdc\Tests\Integration;
 
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
@@ -10,7 +10,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\Routing\RouteCollection;
 use Symfony\UX\TwigComponent\TwigComponentBundle;
-use Tito10047\UX\TwigComponentSdc\TwigComponentSdcBundle;
+use Tito10047\UX\Sdc\SdcBundle;
 
 class TestKernel extends Kernel
 {
@@ -30,7 +30,7 @@ class TestKernel extends Kernel
             new FrameworkBundle(),
             new TwigBundle(),
             new TwigComponentBundle(),
-            new TwigComponentSdcBundle(),
+            new SdcBundle(),
         ];
     }
 
@@ -54,18 +54,18 @@ class TestKernel extends Kernel
         ]);
 
         $configs = array_merge([
-            'component_namespace' => 'Tito10047\\UX\\TwigComponentSdc\\Tests\\Integration\\Fixtures\\Component',
+            'component_namespace' => 'Tito10047\\UX\\Sdc\\Tests\\Integration\\Fixtures\\Component',
             'ux_components_dir' => '%kernel.project_dir%/tests/Integration/Fixtures/Component'
         ], $this->configs);
 
-        $container->loadFromExtension('twig_component_sdc', $configs);
+        $container->loadFromExtension('sdc', $configs);
 
         // Make services public for testing
         $container->addCompilerPass(new class () implements \Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface {
             public function process(ContainerBuilder $container): void
             {
                 foreach ($container->getDefinitions() as $id => $definition) {
-                    if (str_starts_with($id, 'Tito10047\UX\TwigComponentSdc') || str_contains($id, 'twig_component')) {
+                    if (str_starts_with($id, 'Tito10047\UX\Sdc') || str_contains($id, 'twig_component')) {
                         $definition->setPublic(true);
                     }
                 }
@@ -80,11 +80,11 @@ class TestKernel extends Kernel
 
     public function getCacheDir(): string
     {
-        return sys_get_temp_dir() . '/UX/TwigComponentSdc/cache/' . spl_object_hash($this);
+        return sys_get_temp_dir() . '/UX/Sdc/cache/' . spl_object_hash($this);
     }
 
     public function getLogDir(): string
     {
-        return sys_get_temp_dir() . '/UX/TwigComponentSdc/logs/' . spl_object_hash($this);
+        return sys_get_temp_dir() . '/UX/Sdc/logs/' . spl_object_hash($this);
     }
 }

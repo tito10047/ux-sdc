@@ -1,8 +1,8 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\Tests\Integration;
+namespace Tito10047\UX\Sdc\Tests\Integration;
 
-use Tito10047\UX\TwigComponentSdc\Runtime\SdcMetadataRegistry;
+use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 
 class EnvironmentCompilerPassTest extends IntegrationTestCase
 {
@@ -18,7 +18,7 @@ class EnvironmentCompilerPassTest extends IntegrationTestCase
         // V 'prod' prostredí by mal compiler pass bežať a nájsť komponenty
         $this->assertNotNull($metadataRegistry->getMetadata('AutoDiscoveryComponent'), 'Compiler pass should run in prod environment');
         
-        $cachePath = $container->getParameter('kernel.cache_dir') . '/twig_component_sdc_metadata.php';
+        $cachePath = $container->getParameter('kernel.cache_dir') . '/sdc_metadata.php';
         $this->assertFileExists($cachePath);
     }
 
@@ -37,7 +37,7 @@ class EnvironmentCompilerPassTest extends IntegrationTestCase
         // V 'dev' prostredí by compiler pass nemal bežať, takže metadata budú prázdne
         $this->assertNull($metadataRegistry->getMetadata('AutoDiscoveryComponent'), 'Compiler pass should NOT run in dev environment');
         
-        $cachePath = $container->getParameter('kernel.cache_dir') . '/twig_component_sdc_metadata.php';
+        $cachePath = $container->getParameter('kernel.cache_dir') . '/sdc_metadata.php';
         $this->assertFileDoesNotExist($cachePath, 'Cache file should be deleted in dev environment');
     }
 
@@ -47,6 +47,6 @@ class EnvironmentCompilerPassTest extends IntegrationTestCase
         $container = self::getContainer();
 
         // Overíme, či je komponent stále registrovaný v TwigComponent bundle
-        $this->assertTrue($container->has('Tito10047\UX\TwigComponentSdc\Tests\Integration\Fixtures\Component\AutoDiscovery\SdcAutoDiscoveryComponent'));
+        $this->assertTrue($container->has('Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\AutoDiscovery\SdcAutoDiscoveryComponent'));
     }
 }

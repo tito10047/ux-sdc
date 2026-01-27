@@ -1,9 +1,9 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\Tests\Unit\Attribute;
+namespace Tito10047\UX\Sdc\Tests\Unit\Attribute;
 
 use PHPUnit\Framework\TestCase;
-use Tito10047\UX\TwigComponentSdc\Attribute\AsSdcComponent;
+use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
 
 class AsSdcComponentTest extends TestCase

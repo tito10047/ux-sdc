@@ -1,44 +1,44 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\Tests\Unit;
+namespace Tito10047\UX\Sdc\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Tito10047\UX\TwigComponentSdc\TwigComponentSdcBundle;
+use Tito10047\UX\Sdc\SdcBundle;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 
-use Tito10047\UX\TwigComponentSdc\DependencyInjection\TwigComponentSdcExtension;
+use Tito10047\UX\Sdc\DependencyInjection\SdcExtension;
 
-class TwigComponentSdcBundleTest extends TestCase
+class SdcBundleTest extends TestCase
 {
     public function testLoadExtensionSetsParameters(): void
     {
         $container = new ContainerBuilder();
         $container->setParameter('kernel.project_dir', realpath(__DIR__ . '/../..'));
-        $extension = new TwigComponentSdcExtension();
+        $extension = new SdcExtension();
 
         $config = [
             'auto_discovery' => true,
             'ux_components_dir' => '%kernel.project_dir%/tests/Visual/Generated',
-            'component_namespace' => 'Tito10047\\UX\\TwigComponentSdc\\Tests\\Visual\\Generated',
+            'component_namespace' => 'Tito10047\\UX\\Sdc\\Tests\\Visual\\Generated',
             'placeholder' => '<!-- __UX_TWIG_COMPONENT_ASSETS__ -->',
             'stimulus' => ['enabled' => true],
         ];
 
         $extension->load([$config], $container);
 
-        $this->assertTrue($container->hasParameter('twig_component_sdc.auto_discovery'));
-        $this->assertEquals('%kernel.project_dir%/tests/Visual/Generated', $container->getParameter('twig_component_sdc.ux_components_dir'));
-        $this->assertEquals('Tito10047\\UX\\TwigComponentSdc\\Tests\\Visual\\Generated\\', $container->getParameter('twig_component_sdc.component_namespace'));
+        $this->assertTrue($container->hasParameter('sdc.auto_discovery'));
+        $this->assertEquals('%kernel.project_dir%/tests/Visual/Generated', $container->getParameter('sdc.ux_components_dir'));
+        $this->assertEquals('Tito10047\\UX\\Sdc\\Tests\\Visual\\Generated\\', $container->getParameter('sdc.component_namespace'));
     }
 
     public function testPrependAddsConfiguration(): void
     {
         $container = new ContainerBuilder();
         $container->setParameter('kernel.project_dir', '/var/www');
-        $extension = new TwigComponentSdcExtension();
+        $extension = new SdcExtension();
 
-        $container->prependExtensionConfig('twig_component_sdc', [
+        $container->prependExtensionConfig('sdc', [
             'ux_components_dir' => '/var/www/src_component',
             'component_namespace' => 'App\\Component\\'
         ]);

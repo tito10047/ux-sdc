@@ -1,9 +1,9 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\Tests\Unit\Runtime;
+namespace Tito10047\UX\Sdc\Tests\Unit\Runtime;
 
 use PHPUnit\Framework\TestCase;
-use Tito10047\UX\TwigComponentSdc\Runtime\SdcMetadataRegistry;
+use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 
 class SdcMetadataRegistryTest extends TestCase
 {

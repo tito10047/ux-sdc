@@ -11,7 +11,7 @@
 
 namespace App\Component\Component;
 
-use Tito10047\UX\TwigComponentSdc\Attribute\AsSdcComponent;
+use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
 
 #[AsSdcComponent] // No need to define names, templates, or assets. It's all inferred!
 class MyComponent

@@ -1,4 +1,4 @@
-# Development Guidelines for UX\TwigComponentSdc
+# Development Guidelines for UX\Sdc
 
 This project is a Symfony bundle designed to manage CSS and JS assets for Twig components using a component-oriented approach.
 
@@ -20,7 +20,7 @@ For use in a Symfony application, register the bundle in `config/bundles.php`:
 ```php
 return [
     // ...
-    Tito10047\UX\TwigComponentSdc\UX\TwigComponentSdc::class => ['all' => true],
+    Tito10047\UX\Sdc\UX\Sdc::class => ['all' => true],
 ];
 ```
 
@@ -41,17 +41,17 @@ To run the tests, use:
 ### Example Test
 A simple test to verify the bundle initialization:
 ```php
-namespace Tito10047\UX\TwigComponentSdc\Tests;
+namespace Tito10047\UX\Sdc\Tests;
 
 use PHPUnit\Framework\TestCase;
-use Tito10047\UX\TwigComponentSdc\UX\TwigComponentSdc;
+use Tito10047\UX\Sdc\UX\Sdc;
 
-class UX\TwigComponentSdcTest extends TestCase
+class UX\SdcTest extends TestCase
 {
     public function testBundleIsInstantiable(): void
     {
-        $bundle = new UX\TwigComponentSdc();
-        $this->assertInstanceOf(UX\TwigComponentSdc::class, $bundle);
+        $bundle = new UX\Sdc();
+        $this->assertInstanceOf(UX\Sdc::class, $bundle);
     }
 }
 ```

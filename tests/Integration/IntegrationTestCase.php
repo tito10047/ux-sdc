@@ -1,6 +1,6 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\Tests\Integration;
+namespace Tito10047\UX\Sdc\Tests\Integration;
 
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\HttpKernel\KernelInterface;

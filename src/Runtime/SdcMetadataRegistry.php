@@ -1,6 +1,6 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\Runtime;
+namespace Tito10047\UX\Sdc\Runtime;
 
 class SdcMetadataRegistry
 {

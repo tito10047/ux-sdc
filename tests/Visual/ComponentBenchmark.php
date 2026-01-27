@@ -1,9 +1,9 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\Tests\Visual;
+namespace Tito10047\UX\Sdc\Tests\Visual;
 
 use Symfony\Component\Filesystem\Filesystem;
-use Tito10047\UX\TwigComponentSdc\Tests\Visual\ComponentGenerator\ComponentGenerator;
+use Tito10047\UX\Sdc\Tests\Visual\ComponentGenerator\ComponentGenerator;
 use PhpBench\Benchmark\Metadata\Annotations\BeforeMethods;
 
 /**
@@ -75,7 +75,7 @@ class ComponentBenchmark
 			$this->fs->remove($cacheDir);
 		}
 		
-		$benchmarkCacheDir = sys_get_temp_dir() . '/UX/TwigComponentSdc/benchmark/' . $env;
+		$benchmarkCacheDir = sys_get_temp_dir() . '/UX/Sdc/benchmark/' . $env;
 		if (is_dir($benchmarkCacheDir)) {
 			$this->fs->remove($benchmarkCacheDir);
 		}

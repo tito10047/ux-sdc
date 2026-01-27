@@ -1,14 +1,14 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\CompilerPass;
+namespace Tito10047\UX\Sdc\CompilerPass;
 
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
-use Tito10047\UX\TwigComponentSdc\Attribute\Asset;
-use Tito10047\UX\TwigComponentSdc\Attribute\AsSdcComponent;
-use Tito10047\UX\TwigComponentSdc\Runtime\SdcMetadataRegistry;
-use Tito10047\UX\TwigComponentSdc\Service\ComponentMetadataResolver;
+use Tito10047\UX\Sdc\Attribute\Asset;
+use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
+use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
+use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 use ReflectionClass;
 
 final class AssetComponentCompilerPass implements CompilerPassInterface
@@ -31,7 +31,7 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
             return;
         }
 
-        $autoDiscovery = $container->getParameter('twig_component_sdc.auto_discovery');
+        $autoDiscovery = $container->getParameter('sdc.auto_discovery');
         $twigRoots = $this->collectTwigRoots($container);
         
         $resolver = new ComponentMetadataResolver($twigRoots, $autoDiscovery);
@@ -54,8 +54,8 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
             $twigRoots[] = $container->getParameterBag()->resolveValue($container->getParameter('twig.default_path'));
         }
 
-        if ($container->hasParameter('twig_component_sdc.ux_components_dir')) {
-            $uxDir = $container->getParameterBag()->resolveValue($container->getParameter('twig_component_sdc.ux_components_dir'));
+        if ($container->hasParameter('sdc.ux_components_dir')) {
+            $uxDir = $container->getParameterBag()->resolveValue($container->getParameter('sdc.ux_components_dir'));
             if (is_dir($uxDir)) {
                 $twigRoots[] = realpath($uxDir);
             }

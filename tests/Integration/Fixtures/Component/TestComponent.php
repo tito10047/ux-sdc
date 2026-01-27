@@ -1,9 +1,9 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\Tests\Integration\Fixtures\Component;
+namespace Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component;
 
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
-use Tito10047\UX\TwigComponentSdc\Attribute\Asset;
+use Tito10047\UX\Sdc\Attribute\Asset;
 
 #[AsTwigComponent('TestComponent', template: 'components/TestComponent.html.twig')]
 #[Asset(path: 'css/test.css')]

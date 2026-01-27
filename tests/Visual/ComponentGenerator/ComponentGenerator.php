@@ -1,6 +1,6 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\Tests\Visual\ComponentGenerator;
+namespace Tito10047\UX\Sdc\Tests\Visual\ComponentGenerator;
 
 class ComponentGenerator
 {
@@ -10,7 +10,7 @@ class ComponentGenerator
             mkdir($baseDir, 0777, true);
         }
 
-        $namespace = "Tito10047\\UX\\TwigComponentSdc\\Tests\\Visual\\Generated";
+        $namespace = "Tito10047\\UX\\Sdc\\Tests\\Visual\\Generated";
         if ($isSdc) {
             $namespace .= "\\Sdc";
         } else {
@@ -33,7 +33,7 @@ class ComponentGenerator
 namespace $namespace;
 
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
-use Tito10047\UX\TwigComponentSdc\Attribute\AsSdcComponent;
+use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
 
 #[AsTwigComponent('$name')]
 class $name
@@ -44,7 +44,7 @@ PHP;
 
 namespace $namespace;
 
-use Tito10047\UX\TwigComponentSdc\Attribute\AsSdcComponent;
+use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
 
 #[AsSdcComponent('$name')]
 class $name

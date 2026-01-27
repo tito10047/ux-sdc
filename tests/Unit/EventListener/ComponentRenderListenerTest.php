@@ -1,12 +1,12 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\Tests\Unit\EventListener;
+namespace Tito10047\UX\Sdc\Tests\Unit\EventListener;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\UX\TwigComponent\Event\PreCreateForRenderEvent;
-use Tito10047\UX\TwigComponentSdc\Runtime\SdcMetadataRegistry;
-use Tito10047\UX\TwigComponentSdc\EventListener\ComponentRenderListener;
-use Tito10047\UX\TwigComponentSdc\Service\AssetRegistry;
+use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
+use Tito10047\UX\Sdc\EventListener\ComponentRenderListener;
+use Tito10047\UX\Sdc\Service\AssetRegistry;
 
 final class ComponentRenderListenerTest extends TestCase
 {

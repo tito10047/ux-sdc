@@ -1,6 +1,6 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\Tests\Visual;
+namespace Tito10047\UX\Sdc\Tests\Visual;
 
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
@@ -10,7 +10,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\UX\TwigComponent\TwigComponentBundle;
-use Tito10047\UX\TwigComponentSdc\TwigComponentSdcBundle;
+use Tito10047\UX\Sdc\SdcBundle;
 
 class BenchmarkKernel extends Kernel {
 
@@ -29,7 +29,7 @@ class BenchmarkKernel extends Kernel {
 			new FrameworkBundle(),
 			new TwigBundle(),
 			new TwigComponentBundle(),
-			new TwigComponentSdcBundle(),
+			new SdcBundle(),
 		];
 	}
 
@@ -49,14 +49,14 @@ class BenchmarkKernel extends Kernel {
 			'debug'                => false,
 		]);
 
-		$ns  = 'Tito10047\\UX\\TwigComponentSdc\\Tests\\Visual\\Generated\\' . ucfirst($this->type);
+		$ns  = 'Tito10047\\UX\\Sdc\\Tests\\Visual\\Generated\\' . ucfirst($this->type);
 		$dir = __DIR__ . '/Generated/' . ucfirst($this->type);
 
 		$container->loadFromExtension('twig_component', [
 			'anonymous_template_directory' => 'components/',
 		]);
 
-		$container->loadFromExtension('twig_component_sdc', [
+		$container->loadFromExtension('sdc', [
 			'component_namespace' => $ns,
 			'ux_components_dir'   => $dir,
 		]);
@@ -104,6 +104,6 @@ class BenchmarkKernel extends Kernel {
 	}
 
 	public function getCacheDir(): string {
-		return sys_get_temp_dir() . '/UX/TwigComponentSdc/benchmark/' . $this->type;
+		return sys_get_temp_dir() . '/UX/Sdc/benchmark/' . $this->type;
 	}
 }

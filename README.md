@@ -1,9 +1,9 @@
-# UX Twig Component SDC Bundle
+# UX SDC Bundle
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/tito10047/ux-twig-component-sdc/ci.yml?branch=main)](https://github.com/tito10047/ux-twig-component-sdc/actions)
-[![PHP-CS-Fixer](https://img.shields.io/github/actions/workflow/status/tito10047/ux-twig-component-sdc/ci.yml?branch=main&label=code%20style)](https://github.com/tito10047/ux-twig-component-sdc/actions/workflows/ci.yml)
-[![PHPStan](https://img.shields.io/github/actions/workflow/status/tito10047/ux-twig-component-sdc/ci.yml?branch=main&label=phpstan)](https://github.com/tito10047/ux-twig-component-sdc/actions/workflows/ci.yml)
-[![Latest Stable Version](https://img.shields.io/packagist/v/tito10047/ux-twig-component-sdc.svg)](https://packagist.org/packages/tito10047/ux-twig-component-sdc)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/tito10047/ux-sdc/ci.yml?branch=main)](https://github.com/tito10047/ux-sdc/actions)
+[![PHP-CS-Fixer](https://img.shields.io/github/actions/workflow/status/tito10047/ux-sdc/ci.yml?branch=main&label=code%20style)](https://github.com/tito10047/ux-sdc/actions/workflows/ci.yml)
+[![PHPStan](https://img.shields.io/github/actions/workflow/status/tito10047/ux-sdc/ci.yml?branch=main&label=phpstan)](https://github.com/tito10047/ux-sdc/actions/workflows/ci.yml)
+[![Latest Stable Version](https://img.shields.io/packagist/v/tito10047/ux-sdc.svg)](https://packagist.org/packages/tito10047/ux-sdc)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![PHP Version](https://img.shields.io/badge/php-%3E%3D%208.1-8892bf.svg)](https://php.net)
 [![Symfony Version](https://img.shields.io/badge/Symfony-%3E%3D%206.4-black?logo=symfony)](https://symfony.com/)
@@ -21,7 +21,7 @@ Instead of scattering your component files across `src/`, `templates/`, and `ass
 
 Just create a directory for your component. Everything else is handled automatically.
 ```yaml
-twig_component_sdc:
+sdc:
     ux_components_dir: '%kernel.project_dir%/src/Component'
     component_namespace: 'App\Component'
 ```
@@ -39,7 +39,7 @@ src_component/
 ```php
 namespace App\Component\Alert;
 
-use Tito10047\UX\TwigComponentSdc\Attribute\AsSdcComponent;
+use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
 
 #[AsSdcComponent] // No need to define names, templates, or assets. It's all inferred!
 class Alert
@@ -73,7 +73,7 @@ class Alert
 
 1. **Install via Composer:**
 ```bash
-composer require tito10047/ux-twig-component-sdc
+composer require tito10047/ux-sdc
 ```
 
 2. **Register the bundle** (if not done automatically by Symfony Flex):
@@ -81,15 +81,15 @@ composer require tito10047/ux-twig-component-sdc
 // config/bundles.php
 return [
     // ...
-    Tito10047\UX\TwigComponentSdc\TwigComponentSdcBundle::class => ['all' => true],
+    Tito10047\UX\Sdc\SdcBundle::class => ['all' => true],
 ];
 ```
 
 3. **Configure the bundle:**
-Create a configuration file (e.g., `config/packages/twig_component_sdc.yaml`):
+Create a configuration file (e.g., `config/packages/sdc.yaml`):
 
 ```yaml
-twig_component_sdc:
+sdc:
     # Directory where your SDC components are located (default: %kernel.project_dir%/src_component)
     ux_components_dir: '%kernel.project_dir%/src/Component'
     

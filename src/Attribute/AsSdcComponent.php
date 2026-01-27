@@ -1,6 +1,6 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\Attribute;
+namespace Tito10047\UX\Sdc\Attribute;
 
 use Attribute;
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;

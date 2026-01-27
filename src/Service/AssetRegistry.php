@@ -1,6 +1,6 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\Service;
+namespace Tito10047\UX\Sdc\Service;
 
 final class AssetRegistry
 {

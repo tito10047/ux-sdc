@@ -1,16 +1,16 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\DependencyInjection;
+namespace Tito10047\UX\Sdc\DependencyInjection;
 
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 use Symfony\Component\Config\FileLocator;
-use Tito10047\UX\TwigComponentSdc\Runtime\SdcMetadataRegistry;
-use Tito10047\UX\TwigComponentSdc\Service\ComponentMetadataResolver;
+use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
+use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 
-class TwigComponentSdcExtension extends Extension implements PrependExtensionInterface
+class SdcExtension extends Extension implements PrependExtensionInterface
 {
     public function load(array $configs, ContainerBuilder $container): void
     {
@@ -20,38 +20,38 @@ class TwigComponentSdcExtension extends Extension implements PrependExtensionInt
         $loader = new PhpFileLoader($container, new FileLocator(__DIR__ . '/../../config'));
         $loader->load('services.php');
 
-        $container->setParameter('twig_component_sdc.auto_discovery', $config['auto_discovery']);
-        $container->setParameter('twig_component_sdc.ux_components_dir', $config['ux_components_dir']);
+        $container->setParameter('sdc.auto_discovery', $config['auto_discovery']);
+        $container->setParameter('sdc.ux_components_dir', $config['ux_components_dir']);
 
         $this->registerMetadataResolver($container, $config);
 
         $env = $container->hasParameter('kernel.environment') ? $container->getParameter('kernel.environment') : 'prod';
         if ($env === 'dev') {
-            $container->removeDefinition('Tito10047\UX\TwigComponentSdc\EventListener\ComponentRenderListener');
+            $container->removeDefinition('Tito10047\UX\Sdc\EventListener\ComponentRenderListener');
         } else {
-            $container->removeDefinition('Tito10047\UX\TwigComponentSdc\EventListener\DevComponentRenderListener');
+            $container->removeDefinition('Tito10047\UX\Sdc\EventListener\DevComponentRenderListener');
         }
 
-        if ($container->hasDefinition('Tito10047\UX\TwigComponentSdc\EventListener\AssetResponseListener')) {
-            $container->getDefinition('Tito10047\UX\TwigComponentSdc\EventListener\AssetResponseListener')
+        if ($container->hasDefinition('Tito10047\UX\Sdc\EventListener\AssetResponseListener')) {
+            $container->getDefinition('Tito10047\UX\Sdc\EventListener\AssetResponseListener')
                 ->setArgument('$placeholder', $config['placeholder']);
         }
 
-        if ($container->hasDefinition('Tito10047\UX\TwigComponentSdc\Twig\AssetExtension')) {
-            $container->getDefinition('Tito10047\UX\TwigComponentSdc\Twig\AssetExtension')
+        if ($container->hasDefinition('Tito10047\UX\Sdc\Twig\AssetExtension')) {
+            $container->getDefinition('Tito10047\UX\Sdc\Twig\AssetExtension')
                 ->setArgument('$placeholder', $config['placeholder']);
         }
 
-        $container->setParameter('twig_component_sdc.auto_discovery', $config['auto_discovery']);
-        $container->setParameter('twig_component_sdc.ux_components_dir', $config['ux_components_dir']);
-        $container->register('twig_component_sdc.ux_components_dir', 'string')
+        $container->setParameter('sdc.auto_discovery', $config['auto_discovery']);
+        $container->setParameter('sdc.ux_components_dir', $config['ux_components_dir']);
+        $container->register('sdc.ux_components_dir', 'string')
             ->setPublic(true);
 
         $namespace = null;
         if (isset($config['component_namespace'])) {
             $namespace = rtrim((string) $config['component_namespace'], '\\') . '\\';
         }
-        $container->setParameter('twig_component_sdc.component_namespace', $namespace);
+        $container->setParameter('sdc.component_namespace', $namespace);
 
         if (null !== $namespace) {
             $uxComponentsDir = $container->resolveEnvPlaceholders($config['ux_components_dir'], true);
@@ -61,17 +61,17 @@ class TwigComponentSdcExtension extends Extension implements PrependExtensionInt
             }
         }
 
-        $container->setAlias('app.ui_components.dir', 'twig_component_sdc.ux_components_dir');
+        $container->setAlias('app.ui_components.dir', 'sdc.ux_components_dir');
         $container->setParameter('app.ui_components.dir', $config['ux_components_dir']);
 
         $container->register(SdcMetadataRegistry::class)
-            ->setArgument('$cachePath', '%kernel.cache_dir%/twig_component_sdc_metadata.php')
+            ->setArgument('$cachePath', '%kernel.cache_dir%/sdc_metadata.php')
             ->setPublic(true); // Set to true for easier testing in Integration tests
     }
 
     public function prepend(ContainerBuilder $container): void
     {
-        $configs = $container->getExtensionConfig('twig_component_sdc');
+        $configs = $container->getExtensionConfig('sdc');
         
         $config = [];
         foreach ($configs as $c) {

@@ -1,5 +1,5 @@
 {
-    "name": "tito10047/ux-twig-component-sdc",
+    "name": "tito10047/ux-sdc",
     "type": "symfony-bundle",
     "license": "MIT",
     "description": "Acme bundle description",
@@ -25,12 +25,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Tito10047\\UX\\TwigComponentSdc\\": "src/"
+            "Tito10047\\UX\\Sdc\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Tito10047\\UX\\TwigComponentSdc\\Tests\\": "tests/"
+            "Tito10047\\UX\\Sdc\\Tests\\": "tests/"
         }
     }
 }

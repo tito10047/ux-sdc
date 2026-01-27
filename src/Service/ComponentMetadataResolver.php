@@ -1,10 +1,10 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\Service;
+namespace Tito10047\UX\Sdc\Service;
 
 use ReflectionClass;
-use Tito10047\UX\TwigComponentSdc\Attribute\Asset;
-use Tito10047\UX\TwigComponentSdc\Attribute\AsSdcComponent;
+use Tito10047\UX\Sdc\Attribute\Asset;
+use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
 
 class ComponentMetadataResolver
 {

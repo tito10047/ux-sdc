@@ -1,11 +1,11 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\EventListener;
+namespace Tito10047\UX\Sdc\EventListener;
 
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\UX\TwigComponent\Event\PreRenderEvent;
-use Tito10047\UX\TwigComponentSdc\Service\AssetRegistry;
-use Tito10047\UX\TwigComponentSdc\Service\ComponentMetadataResolver;
+use Tito10047\UX\Sdc\Service\AssetRegistry;
+use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 
 final class DevComponentRenderListener
 {

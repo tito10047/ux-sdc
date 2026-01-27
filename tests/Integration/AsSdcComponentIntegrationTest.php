@@ -1,11 +1,11 @@
 <?php
 
-namespace Tito10047\UX\TwigComponentSdc\Tests\Integration;
+namespace Tito10047\UX\Sdc\Tests\Integration;
 
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\UX\TwigComponent\ComponentFactory;
-use Tito10047\UX\TwigComponentSdc\Runtime\SdcMetadataRegistry;
-use Tito10047\UX\TwigComponentSdc\Tests\Integration\Fixtures\Component\SdcComponent;
+use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
+use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\SdcComponent;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 class AsSdcComponentIntegrationTest extends KernelTestCase
