@@ -2,7 +2,7 @@
     "name": "tito10047/ux-sdc",
     "type": "symfony-bundle",
     "license": "MIT",
-    "description": "Acme bundle description",
+    "description": "A performance-optimized SDC implementation for Symfony UX components with automatic discovery and static metadata registry.",
     "minimum-stability": "stable",
     "require": {
         "php": ">=8.1",
