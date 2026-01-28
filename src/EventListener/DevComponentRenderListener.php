@@ -33,6 +33,9 @@ final class DevComponentRenderListener
     public function onPreRender(PreRenderEvent $event): void
     {
         $metadata = $event->getMetadata();
+		if ($metadata->isAnonymous()){
+			return;
+		}
         $componentName = $metadata->getName();
 
         if (isset($this->runtimeMetadata[$componentName])) {
