@@ -4,7 +4,6 @@ namespace Tito10047\UX\Sdc\EventListener;
 
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\UX\TwigComponent\Event\PostMountEvent;
-use Symfony\UX\TwigComponent\Event\PreCreateForRenderEvent;
 use Symfony\UX\TwigComponent\Event\PreRenderEvent;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
@@ -19,11 +18,16 @@ final class ComponentRenderListener
     ) {
     }
 
-    #[AsEventListener(event: PreCreateForRenderEvent::class)]
-    public function onPreCreate(PreCreateForRenderEvent $event): void
+    #[AsEventListener(event: PostMountEvent::class)]
+    public function onPostMount(PostMountEvent $event): void
     {
-        $componentName = $event->getName();
-        $assets = $this->metadataRegistry->getMetadata($componentName);
+        $component = $event->getComponent();
+
+        if ($component instanceof ComponentNamespaceInterface && null !== $this->componentNamespace) {
+            $component->setComponentNamespace($this->componentNamespace);
+        }
+
+        $assets = $this->metadataRegistry->getMetadata($component::class);
 
         if (!$assets) {
             return;
@@ -39,20 +43,11 @@ final class ComponentRenderListener
         }
     }
 
-    #[AsEventListener(event: PostMountEvent::class)]
-    public function onPostMount(PostMountEvent $event): void
-    {
-        $component = $event->getComponent();
-        if ($component instanceof ComponentNamespaceInterface && null !== $this->componentNamespace) {
-            $component->setComponentNamespace($this->componentNamespace);
-        }
-    }
-
     #[AsEventListener(event: PreRenderEvent::class)]
     public function onPreRender(PreRenderEvent $event): void
     {
-        $componentName = $event->getMetadata()->getName();
-        $templatePath = $this->metadataRegistry->getMetadata($componentName . '_template');
+		$component = $event->getComponent();
+        $templatePath = $this->metadataRegistry->getMetadata($component::class . '_template');
 
         if ($templatePath) {
             $event->setTemplate($templatePath);

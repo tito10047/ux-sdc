@@ -37,10 +37,6 @@ return static function (ContainerConfigurator $container): void {
             '%ux_sdc.component_namespace%',
         ])
         ->tag('kernel.event_listener', [
-            'event' => 'Symfony\UX\TwigComponent\Event\PreCreateForRenderEvent',
-            'method' => 'onPreCreate',
-        ])
-        ->tag('kernel.event_listener', [
             'event' => 'Symfony\UX\TwigComponent\Event\PostMountEvent',
             'method' => 'onPostMount',
         ])

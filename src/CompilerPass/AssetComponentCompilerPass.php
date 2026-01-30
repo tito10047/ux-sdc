@@ -93,22 +93,10 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
                 continue;
             }
 
-            $componentName = null;
-            foreach ($tags as $tag) {
-                if (isset($tag['key'])) {
-                    $componentName = $tag['key'];
-                    break;
-                }
-            }
-
-            if (!$componentName) {
-                continue;
-            }
-
-            $assets = $resolver->resolveMetadata($class, $componentName, $componentAssets);
+            $assets = $resolver->resolveMetadata($class, $class, $componentAssets);
 
             if (!empty($assets)) {
-                $componentAssets[$componentName] = $assets;
+                $componentAssets[$class] = $assets;
             }
         }
 

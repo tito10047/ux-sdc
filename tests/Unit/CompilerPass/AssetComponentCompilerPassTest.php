@@ -52,8 +52,8 @@ final class AssetComponentCompilerPassTest extends TestCase
         $this->assertFileExists($this->cachePath);
         $map = require $this->cachePath;
 
-        $this->assertArrayHasKey('test_component', $map);
-        $this->assertSame('test.css', $map['test_component'][0]['path']);
-        $this->assertSame(5, $map['test_component'][0]['priority']);
+        $this->assertArrayHasKey(MockComponent::class, $map);
+        $this->assertSame('test.css', $map[MockComponent::class][0]['path']);
+        $this->assertSame(5, $map[MockComponent::class][0]['priority']);
     }
 }

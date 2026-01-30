@@ -3,6 +3,7 @@
 namespace Tito10047\UX\Sdc\Tests\Integration;
 
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
+use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\AutoDiscovery\AutoDiscoveryComponent;
 
 class EnvironmentCompilerPassTest extends IntegrationTestCase
 {
@@ -16,7 +17,7 @@ class EnvironmentCompilerPassTest extends IntegrationTestCase
         $metadataRegistry = $container->get(SdcMetadataRegistry::class);
 
         // V 'prod' prostredí by mal compiler pass bežať a nájsť komponenty
-        $this->assertNotNull($metadataRegistry->getMetadata('AutoDiscoveryComponent'), 'Compiler pass should run in prod environment');
+        $this->assertNotNull($metadataRegistry->getMetadata(AutoDiscoveryComponent::class), 'Compiler pass should run in prod environment');
 
         $cachePath = $container->getParameter('kernel.cache_dir') . '/sdc_metadata.php';
         $this->assertFileExists($cachePath);

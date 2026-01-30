@@ -11,7 +11,7 @@ class SdcMetadataRegistry
     ) {
     }
 
-    public function getMetadata(string $componentName): array|string|null
+    public function getMetadata(string $componentFccn): array|string|null
     {
         if (null === $this->metadata) {
             if (file_exists($this->cachePath)) {
@@ -21,6 +21,6 @@ class SdcMetadataRegistry
             }
         }
 
-        return $this->metadata[$componentName] ?? null;
+        return $this->metadata[$componentFccn] ?? null;
     }
 }

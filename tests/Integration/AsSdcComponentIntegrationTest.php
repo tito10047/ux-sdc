@@ -7,6 +7,7 @@ use Symfony\UX\TwigComponent\ComponentFactory;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\SdcComponent;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\SdcComponentWithAsset;
 
 class AsSdcComponentIntegrationTest extends KernelTestCase
 {
@@ -40,7 +41,7 @@ class AsSdcComponentIntegrationTest extends KernelTestCase
 
         /** @var SdcMetadataRegistry $metadataRegistry */
         $metadataRegistry = $container->get(SdcMetadataRegistry::class);
-        $assets = $metadataRegistry->getMetadata('SdcComponent');
+        $assets = $metadataRegistry->getMetadata(SdcComponent::class);
 
         $this->assertCount(2, $assets);
 
@@ -59,7 +60,7 @@ class AsSdcComponentIntegrationTest extends KernelTestCase
 
         /** @var SdcMetadataRegistry $metadataRegistry */
         $metadataRegistry = $container->get(SdcMetadataRegistry::class);
-        $assets = $metadataRegistry->getMetadata('SdcComponentWithAsset');
+        $assets = $metadataRegistry->getMetadata(SdcComponentWithAsset::class);
 
         $this->assertCount(3, $assets);
 

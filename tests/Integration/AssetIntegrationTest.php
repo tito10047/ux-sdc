@@ -10,6 +10,7 @@ use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\EventListener\AssetResponseListener;
+use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\TestComponent;
 use Twig\Environment;
 
 class AssetIntegrationTest extends IntegrationTestCase
@@ -22,8 +23,8 @@ class AssetIntegrationTest extends IntegrationTestCase
         /** @var SdcMetadataRegistry $metadataRegistry */
         $metadataRegistry = $container->get(SdcMetadataRegistry::class);
 
-        $this->assertNotNull($metadataRegistry->getMetadata('TestComponent'));
-        $assets = $metadataRegistry->getMetadata('TestComponent');
+        $this->assertNotNull($metadataRegistry->getMetadata(TestComponent::class));
+        $assets = $metadataRegistry->getMetadata(TestComponent::class);
         $this->assertCount(2, $assets);
 
         $paths = array_column($assets, 'path');
