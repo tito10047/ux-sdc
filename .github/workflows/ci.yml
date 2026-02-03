@@ -110,3 +110,23 @@ jobs:
             -   name: Run E2E tests
                 run: |
                     ./my-bundle/tests_e2e/run_e2e.sh
+
+    tests-no-maker:
+        name: "Tests without Maker (PHP 8.5, Symfony 8.0.*)"
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Checkout
+                uses: actions/checkout@v4
+            -   name: "Install PHP"
+                uses: "shivammathur/setup-php@v2"
+                with:
+                    php-version: "8.5"
+                    ini-values: memory_limit=-1
+            -   name: "Configure Symfony"
+                run: 'composer config extra.symfony.require "8.0.*"'
+            -   name: "Install highest dependencies"
+                run: composer update --no-interaction --no-progress
+            -   name: "Remove MakerBundle"
+                run: composer remove --dev symfony/maker-bundle --no-interaction
+            -   name: Execute tests via PHPUnit
+                run: vendor/bin/phpunit

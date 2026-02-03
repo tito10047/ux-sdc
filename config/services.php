@@ -1,5 +1,6 @@
 <?php
 
+use Symfony\Bundle\MakerBundle\MakerBundle;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
@@ -9,6 +10,7 @@ use Tito10047\UX\Sdc\EventListener\ComponentRenderListener;
 use Tito10047\UX\Sdc\EventListener\DevComponentRenderListener;
 use Tito10047\UX\Sdc\Twig\AssetExtension;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
+use Tito10047\UX\Sdc\Maker\MakeSdcComponent;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 
@@ -63,6 +65,15 @@ return static function (ContainerConfigurator $container): void {
     $services->set(AssetExtension::class)
         ->args(['$placeholder' => '<!-- __UX_TWIG_COMPONENT_ASSETS__ -->'])
         ->tag('twig.extension');
+
+    if (class_exists(MakerBundle::class)) {
+        $services->set(MakeSdcComponent::class)
+            ->args([
+                '%ux_sdc.ux_components_dir%',
+                '%ux_sdc.component_namespace%',
+            ])
+            ->tag('maker.command');
+    }
 
     $services = $container->services();
 

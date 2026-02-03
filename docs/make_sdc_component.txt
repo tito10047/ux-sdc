@@ -1,0 +1,10 @@
+The <info>make:sdc-component</info> command generates a new Single Directory Component (SDC).
+
+It creates:
+- A PHP class in the component directory
+- A Twig template
+- A CSS file
+- (Optional) A Stimulus controller
+
+Example:
+<info>php bin/console make:sdc-component Alert</info>

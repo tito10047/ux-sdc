@@ -84,6 +84,7 @@ In the `Alert.html.twig` template, you can then use the automatically generated 
 * **Performance First:** * **Compiler Pass:** All file discovery happens at build time. Zero reflection in production.
 * **Response Post-processing:** Assets are injected at the end of the request.
 * **HTTP Preload:** Automatic generation of `Link` headers to trigger early browser downloads.
+* **Maker Command:** Quickly generate new SDC components with all necessary files using `php bin/console make:sdc-component`.
 
 
 
@@ -107,23 +108,29 @@ return [
 ```
 
 3. **Configure the bundle:**
-Create a configuration file (e.g., `config/packages/sdc.yaml`):
-
+Create a configuration files:
+```json
+/*composer.json*/
+{
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/",
+            "App\\Component\\": "src_component/"
+        }
+    }
+}
+```
 ```yaml
+#config/packages/stimulus.yaml 
+stimulus:
+    controller_paths:
+        - '%kernel.project_dir%/assets/controllers'
+```
+```yaml
+#config/packages/ux_sdc.yaml
 ux_sdc:
-    # Directory where your SDC components are located (default: %kernel.project_dir%/src_component)
-    ux_components_dir: '%kernel.project_dir%/src/Component'
-    
-    # PHP Namespace for your components (required for auto-registration)
+    ux_components_dir: '%kernel.project_dir%/src_component'
     component_namespace: 'App\Component'
-    
-    # Enable/disable auto-discovery of .twig, .css, and .js files (default: true)
-    auto_discovery: true
-    
-    # Custom placeholder for asset injection (optional)
-    # placeholder: '<!-- __UX_TWIG_COMPONENT_ASSETS__ -->'
-    
-    # Stimulus integration (auto-registers component directory in Stimulus)
     stimulus:
         enabled: true
 ```
@@ -136,6 +143,20 @@ ux_sdc:
     {{ render_component_assets() }}
 </head>
 ```
+
+## Usage
+
+### Generating Components
+
+You can use the built-in maker command to create a new component:
+
+`php bin/console make:sdc-component UI\Alert`
+
+This will create:
+- `src/Component/UI/Alert/Alert.php` (PHP logic)
+- `src/Component/UI/Alert/Alert.html.twig` (Twig template)
+- `src/Component/UI/Alert/Alert.css` (CSS styles)
+- (Optional) `src/Component/Alert/Alert_controller.js` (Stimulus controller)
 
 ---
 
