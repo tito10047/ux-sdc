@@ -112,4 +112,30 @@ class MakeSdcComponentTest extends IntegrationTestCase
         $phpContent = file_get_contents($baseDir . '/UI/Alert/Alert.php');
         $this->assertStringContainsString('namespace Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\UI\Alert;', $phpContent);
     }
+
+    public function testMakeSdcComponentNoInteractionNoStimulus(): void
+    {
+        self::bootKernel();
+        $application = new Application(self::$kernel);
+
+        $command = $application->find('make:sdc-component');
+        $tester = new CommandTester($command);
+
+        // Name is passed as argument, no stimulus option
+        $tester->execute([
+            'name' => 'Alert',
+        ], [
+            'interactive' => false,
+        ]);
+
+        $tester->assertCommandIsSuccessful();
+
+        $baseDir = self::getContainer()->getParameter('ux_sdc.ux_components_dir');
+        $this->assertFileExists($baseDir . '/Alert/Alert.php');
+        $this->assertFileExists($baseDir . '/Alert/Alert.html.twig');
+        $this->assertFileDoesNotExist($baseDir . '/Alert/Alert_controller.js');
+
+        $twigContent = file_get_contents($baseDir . '/Alert/Alert.html.twig');
+        $this->assertStringNotContainsString('stimulus_controller', $twigContent);
+    }
 }

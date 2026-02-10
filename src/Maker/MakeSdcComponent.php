@@ -59,7 +59,14 @@ final class MakeSdcComponent extends AbstractMaker
             $name = $io->ask('The name of the component (e.g. Alert or UI:Alert)', null);
         }
 
-        $withStimulus = $input->getOption('stimulus') || $io->confirm('Do you want to generate a Stimulus controller?', true);
+        if ($input->getOption('stimulus')) {
+            $withStimulus = true;
+        } elseif (!$input->isInteractive()) {
+            // In non-interactive mode, do NOT generate Stimulus unless explicitly requested
+            $withStimulus = false;
+        } else {
+            $withStimulus = $io->confirm('Do you want to generate a Stimulus controller?', true);
+        }
 
         $name = str_replace(['/', ':'], '\\', $name);
         $parts = explode('\\', $name);
