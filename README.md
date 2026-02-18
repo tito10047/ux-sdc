@@ -80,6 +80,7 @@ In the `Alert.html.twig` template, you can then use the automatically generated 
 * **Smart Template Mapping:** Forget `template: 'components/Alert.html.twig'`. If the template is in the same folder as your class, it's found automatically.
 * **Asset Orchestration:** CSS and JS files in your component folder are collected during rendering and injected into the `<head>`.
 * **Automatic Stimulus Controllers:** By using the `Stimulus` trait and `ComponentNamespaceInterface`, your component automatically gets a `controller` variable representing its Stimulus controller name based on its namespace.
+* **Support for Live Components:** Works seamlessly with `#[AsLiveComponent]` and `#[Asset]` attributes for modern, reactive interfaces.
 * **No "Phantom" Controllers:** Load component-specific CSS via **AssetMapper** without the need for empty Stimulus controllers just for imports.
 * **Performance First:** * **Compiler Pass:** All file discovery happens at build time. Zero reflection in production.
 * **Response Post-processing:** Assets are injected at the end of the request.
@@ -145,6 +146,24 @@ ux_sdc:
 ```
 
 ## Usage
+
+### Live Components
+
+The bundle also supports **Live Components**. You can use the `#[AsLiveComponent]` attribute together with `#[Asset]` or rely on autodiscovery:
+
+```php
+namespace App\Component\Search;
+
+use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
+use Tito10047\UX\Sdc\Attribute\Asset;
+
+#[AsLiveComponent]
+#[Asset] // Automatically discovers Search.css and Search.js in the same directory
+class Search
+{
+    // ... logic
+}
+```
 
 ### Generating Components
 
