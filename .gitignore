@@ -9,3 +9,4 @@ z
 /.php-cs-fixer.cache
 e2e-test/
 tests/Visual/Generated
+/config/reference.php
