@@ -12,6 +12,7 @@
 namespace Tito10047\UX\Sdc\EventListener;
 
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\UX\TwigComponent\ComponentAttributes;
 use Symfony\UX\TwigComponent\Event\PostMountEvent;
 use Symfony\UX\TwigComponent\Event\PreRenderEvent;
@@ -35,7 +36,26 @@ final class DevComponentRenderListener
     #[AsEventListener(event: PostMountEvent::class)]
     public function onPostMount(PostMountEvent $event): void
     {
-        $this->setComponentNamespace($event->getComponent());
+        $this->setNamespace($event->getComponent());
+    }
+
+    #[AsEventListener(event: ControllerEvent::class)]
+    public function onKernelController(ControllerEvent $event): void
+    {
+        $controller = $event->getController();
+
+        if (\is_array($controller)) {
+            $controller = $controller[0];
+        }
+
+        $this->setNamespace($controller);
+    }
+
+    private function setNamespace(object $component): void
+    {
+        if ($component instanceof ComponentNamespaceInterface && null !== $this->componentNamespace) {
+            $component->setComponentNamespace($this->componentNamespace);
+        }
     }
 
     #[AsEventListener(event: PreRenderEvent::class)]

@@ -149,21 +149,54 @@ ux_sdc:
 
 ### Live Components
 
-The bundle also supports **Live Components**. You can use the `#[AsLiveComponent]` attribute together with `#[Asset]` or rely on autodiscovery:
+The bundle also supports **Live Components**. It handles both initial rendering and AJAX updates automatically.
+
+#### How it works with Live Components:
+1. **Initial Render:** Assets are collected and injected into the `<head>` just like with regular Twig components.
+2. **AJAX Updates:** When a Live Component is updated via AJAX, the bundle identifies the request and ensures the component's namespace is correctly set (if `ComponentNamespaceInterface` is implemented). This allows the `Stimulus` trait to generate the correct Stimulus controller name even during standalone Live Component requests.
+3. **Dynamic Asset Loading:** Asset attributes (`data-sdc-css` and `data-sdc-js`) are injected into the component's root element. These are used by the bundle's built-in Stimulus loader to dynamically load missing styles or scripts when a component appears on the page via AJAX.
+
+To enable dynamic loading, you must add the bundle's Stimulus controller to your base template (ideally on the `<body>` element):
+
+```twig
+<body {{ stimulus_controller(sdc_loader_controller) }}>
+    {# ... #}
+</body>
+```
+
+#### Usage with Live Components:
+To get full support (including the `controller` variable in Twig), your Live Component should implement 
+`ComponentNamespaceInterface` and use the `Stimulus` trait:
 
 ```php
 namespace App\Component\Search;
 
 use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
+use Symfony\UX\LiveComponent\DefaultActionTrait;
 use Tito10047\UX\Sdc\Attribute\Asset;
+use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
+use Tito10047\UX\Sdc\Twig\Stimulus;
 
 #[AsLiveComponent]
-#[Asset] // Automatically discovers Search.css and Search.js in the same directory
-class Search
+#[Asset] // Automatically discovers Search.css and Search.js
+class Search implements ComponentNamespaceInterface
 {
+    use DefaultActionTrait;
+    use Stimulus;
+
     // ... logic
 }
 ```
+
+In your `Search.html.twig`:
+```twig
+<div {{ attributes }} {{ stimulus_controller(controller) }}>
+   <!-- ... -->
+</div>
+```
+
+> [!IMPORTANT]
+> Ensure you have <body {{ stimulus_controller(sdc_loader_controller) }}> in your base template.
 
 ### Generating Components
 

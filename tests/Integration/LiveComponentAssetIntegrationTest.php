@@ -50,30 +50,37 @@ class LiveComponentAssetIntegrationTest extends KernelTestCase
             self::markTestSkipped('symfony/ux-live-component is not installed.');
         }
 
-        $testCase = new class ('test') extends KernelTestCase {
-            use InteractsWithLiveComponents;
-
-            protected static function getKernelClass(): string
-            {
-                return TestKernel::class;
-            }
-
-            public function doTest(): void
-            {
-                self::bootKernel();
-
-                $testComponent = $this->createLiveComponent(
-                    name: 'LiveComponentWithAsset',
-                );
-
-                $rendered = (string) $testComponent->render();
-
-                $this->assertStringContainsString('Live Component With Asset', $rendered);
-                $this->assertStringContainsString('data-sdc-css="LiveComponentWithAsset.css"', $rendered);
-                $this->assertStringContainsString('data-sdc-js="LiveComponentWithAsset.js"', $rendered);
-            }
-        };
-
+        $testCase = new LiveComponentTestCase('test');
         $testCase->doTest();
+    }
+}
+
+/**
+ * Internal class to avoid anonymous class issues in Symfony 6.4.
+ * @internal
+ */
+class LiveComponentTestCase extends KernelTestCase
+{
+    use InteractsWithLiveComponents;
+
+    protected static function getKernelClass(): string
+    {
+        return TestKernel::class;
+    }
+
+    public function doTest(): void
+    {
+        self::bootKernel();
+
+        $testComponent = $this->createLiveComponent(
+            name: 'LiveComponentWithAsset',
+        );
+
+        $rendered = (string) $testComponent->render();
+
+        $this->assertStringContainsString('Live Component With Asset', $rendered);
+        $this->assertStringContainsString('data-sdc-css="LiveComponentWithAsset.css"', $rendered);
+        $this->assertStringContainsString('data-sdc-js="LiveComponentWithAsset.js"', $rendered);
+        $this->assertStringContainsString('controller: LiveComponentWithAsset', $rendered);
     }
 }

@@ -13,6 +13,7 @@ namespace Tito10047\UX\Sdc\EventListener;
 
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\UX\TwigComponent\ComponentAttributes;
+use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\UX\TwigComponent\Event\PostMountEvent;
 use Symfony\UX\TwigComponent\Event\PreRenderEvent;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
@@ -35,7 +36,7 @@ final class ComponentRenderListener
     {
         $component = $event->getComponent();
 
-        $this->setComponentNamespace($component);
+        $this->setNamespace($component);
 
         $assets = $this->metadataRegistry->getMetadata($component::class);
 
@@ -44,6 +45,25 @@ final class ComponentRenderListener
         }
 
         $this->addAssets($assets);
+    }
+
+    #[AsEventListener(event: ControllerEvent::class)]
+    public function onKernelController(ControllerEvent $event): void
+    {
+        $controller = $event->getController();
+
+        if (\is_array($controller)) {
+            $controller = $controller[0];
+        }
+
+        $this->setNamespace($controller);
+    }
+
+    private function setNamespace(object $component): void
+    {
+        if ($component instanceof ComponentNamespaceInterface && null !== $this->componentNamespace) {
+            $component->setComponentNamespace($this->componentNamespace);
+        }
     }
 
     #[AsEventListener(event: PreRenderEvent::class)]
