@@ -12,6 +12,7 @@
 namespace Tito10047\UX\Sdc\EventListener;
 
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+use Symfony\UX\TwigComponent\ComponentAttributes;
 use Symfony\UX\TwigComponent\Event\PostMountEvent;
 use Symfony\UX\TwigComponent\Event\PreRenderEvent;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
@@ -20,6 +21,8 @@ use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
 
 final class ComponentRenderListener
 {
+    use ComponentRenderTrait;
+
     public function __construct(
         private SdcMetadataRegistry $metadataRegistry,
         private AssetRegistry $assetRegistry,
@@ -32,9 +35,7 @@ final class ComponentRenderListener
     {
         $component = $event->getComponent();
 
-        if ($component instanceof ComponentNamespaceInterface && null !== $this->componentNamespace) {
-            $component->setComponentNamespace($this->componentNamespace);
-        }
+        $this->setComponentNamespace($component);
 
         $assets = $this->metadataRegistry->getMetadata($component::class);
 
@@ -42,14 +43,7 @@ final class ComponentRenderListener
             return;
         }
 
-        foreach ($assets as $asset) {
-            $this->assetRegistry->addAsset(
-                $asset['path'],
-                $asset['type'] ?: (str_ends_with($asset['path'], '.css') ? 'css' : 'js'),
-                $asset['priority'],
-                $asset['attributes']
-            );
-        }
+        $this->addAssets($assets);
     }
 
     #[AsEventListener(event: PreRenderEvent::class)]
@@ -61,5 +55,13 @@ final class ComponentRenderListener
         if ($templatePath) {
             $event->setTemplate($templatePath);
         }
+
+        // Inject data-sdc-css and data-sdc-js attributes so they render via {{ attributes }}
+        $assets = $this->metadataRegistry->getMetadata($component::class);
+        if (!$assets) {
+            return;
+        }
+
+        $this->injectAssetAttributes($event, $assets);
     }
 }

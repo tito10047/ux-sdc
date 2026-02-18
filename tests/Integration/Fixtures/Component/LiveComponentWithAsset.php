@@ -12,10 +12,12 @@
 namespace Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component;
 
 use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
+use Symfony\UX\LiveComponent\DefaultActionTrait;
 use Tito10047\UX\Sdc\Attribute\Asset;
 
 #[AsLiveComponent('LiveComponentWithAsset')]
 #[Asset]
 class LiveComponentWithAsset
 {
+    use DefaultActionTrait;
 }

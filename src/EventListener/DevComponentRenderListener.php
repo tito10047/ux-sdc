@@ -12,6 +12,7 @@
 namespace Tito10047\UX\Sdc\EventListener;
 
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+use Symfony\UX\TwigComponent\ComponentAttributes;
 use Symfony\UX\TwigComponent\Event\PostMountEvent;
 use Symfony\UX\TwigComponent\Event\PreRenderEvent;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
@@ -20,6 +21,8 @@ use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
 
 final class DevComponentRenderListener
 {
+    use ComponentRenderTrait;
+
     private array $runtimeMetadata = [];
 
     public function __construct(
@@ -32,10 +35,7 @@ final class DevComponentRenderListener
     #[AsEventListener(event: PostMountEvent::class)]
     public function onPostMount(PostMountEvent $event): void
     {
-        $component = $event->getComponent();
-        if ($component instanceof ComponentNamespaceInterface && null !== $this->componentNamespace) {
-            $component->setComponentNamespace($this->componentNamespace);
-        }
+        $this->setComponentNamespace($event->getComponent());
     }
 
     #[AsEventListener(event: PreRenderEvent::class)]
@@ -55,14 +55,10 @@ final class DevComponentRenderListener
             $this->runtimeMetadata[$componentName] = $assets;
         }
 
-        foreach ($assets as $asset) {
-            $this->assetRegistry->addAsset(
-                $asset['path'],
-                $asset['type'] ?: (str_ends_with($asset['path'], '.css') ? 'css' : 'js'),
-                $asset['priority'],
-                $asset['attributes']
-            );
-        }
+        $this->addAssets($assets);
+
+        // Inject data-sdc-css and data-sdc-js into attributes bag for dynamic loading on live updates
+        $this->injectAssetAttributes($event, $assets);
 
         $templatePath = $this->runtimeMetadata[$componentName . '_template'] ?? null;
         if (is_string($templatePath)) {

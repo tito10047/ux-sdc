@@ -3,13 +3,21 @@
     "type": "symfony-bundle",
     "license": "MIT",
     "description": "A performance-optimized SDC implementation for Symfony UX components with automatic discovery and static metadata registry.",
+    "keywords": [
+        "symfony bundle",
+        "sdc",
+        "css",
+        "bundle",
+        "symfony",
+        "symfony-ux"
+    ],
     "minimum-stability": "stable",
     "require": {
         "php": ">=8.1",
-        "symfony/framework-bundle": "^6.4|^7.0|^8.0",
-        "symfony/asset-mapper": "^6.4|^7.0|^8.0",
-        "symfony/ux-twig-component": "^2.13",
         "symfony/asset": "^6.4|^7.0|^8.0",
+        "symfony/asset-mapper": "^6.4|^7.0|^8.0",
+        "symfony/framework-bundle": "^6.4|^7.0|^8.0",
+        "symfony/ux-twig-component": "^2.13",
         "symfony/web-link": "^6.4|^7.0|^8.0"
     },
     "require-dev": {
@@ -18,8 +26,11 @@
         "phpstan/phpstan": "^2.0",
         "phpstan/phpstan-symfony": "^2.0",
         "phpunit/phpunit": "^10.5",
+        "symfony/browser-kit": "^8.0",
         "symfony/maker-bundle": "^1.65",
-        "symfony/twig-bundle": "^6.4|^7.0|^8.0"
+        "symfony/stimulus-bundle": "^2.32",
+        "symfony/twig-bundle": "^6.4|^7.0|^8.0",
+        "symfony/ux-live-component": "^2.32"
     },
     "config": {
         "sort-packages": true

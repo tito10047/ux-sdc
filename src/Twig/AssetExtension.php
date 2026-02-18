@@ -11,10 +11,12 @@
 
 namespace Tito10047\UX\Sdc\Twig;
 
+use Tito10047\UX\Sdc\UxSdcBundle;
 use Twig\Extension\AbstractExtension;
+use Twig\Extension\GlobalsInterface;
 use Twig\TwigFunction;
 
-final class AssetExtension extends AbstractExtension
+final class AssetExtension extends AbstractExtension implements GlobalsInterface
 {
     public function __construct(
         private string $placeholder = '<!-- __UX_TWIG_COMPONENT_ASSETS__ -->'
@@ -31,5 +33,12 @@ final class AssetExtension extends AbstractExtension
     public function renderAssets(): string
     {
         return $this->placeholder;
+    }
+
+    public function getGlobals(): array
+    {
+        return [
+            'sdc_loader_controller' => UxSdcBundle::STIMULUS_CONTROLLER,
+        ];
     }
 }
