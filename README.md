@@ -153,10 +153,12 @@ The bundle also supports **Live Components**. It handles both initial rendering 
 
 #### How it works with Live Components:
 1. **Initial Render:** Assets are collected and injected into the `<head>` just like with regular Twig components.
-2. **AJAX Updates:** When a Live Component is updated via AJAX, the bundle identifies the request and ensures the component's namespace is correctly set (if `ComponentNamespaceInterface` is implemented). This allows the `Stimulus` trait to generate the correct Stimulus controller name even during standalone Live Component requests.
-3. **Dynamic Asset Loading:** Asset attributes (`data-sdc-css` and `data-sdc-js`) are injected into the component's root element. These are used by the bundle's built-in Stimulus loader to dynamically load missing styles or scripts when a component appears on the page via AJAX.
+2. **AJAX Updates:** When a Live Component is updated via AJAX, the bundle identifies the request and sends asset paths via HTTP headers (`X-SDC-Assets-CSS` and `X-SDC-Assets-JS`) to the browser.
+3. **Dynamic Loading:** The bundle includes a Stimulus controller that listens for Live Component events and dynamically injects any missing assets into the `<head>` of the document.
 
-To enable dynamic loading, you must add the bundle's Stimulus controller to your base template (ideally on the `<body>` element):
+#### Enabling Dynamic Asset Loading
+
+To enable dynamic loading of assets during Live Component updates, you must add the bundle's Stimulus controller to your base template (ideally on the `<body>` element):
 
 ```twig
 <body {{ stimulus_controller(sdc_loader_controller) }}>
@@ -190,13 +192,17 @@ class Search implements ComponentNamespaceInterface
 
 In your `Search.html.twig`:
 ```twig
-<div {{ attributes }} {{ stimulus_controller(controller) }}>
+<div
+    {{ attributes.defaults({
+        class: 'wizard [ l-container ]',
+        'data-controller': controller,
+        ('data-' ~ controller ~ '-sound-value'): asset('sound/stamp-102627.mp3'),
+        ('data-' ~ controller ~ '-intensities-value'): intensityMap|json_encode
+    }) }}
+>
    <!-- ... -->
 </div>
 ```
-
-> [!IMPORTANT]
-> Ensure you have <body {{ stimulus_controller(sdc_loader_controller) }}> in your base template.
 
 ### Generating Components
 
