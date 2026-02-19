@@ -180,7 +180,7 @@ use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
 use Tito10047\UX\Sdc\Twig\Stimulus;
 
 #[AsLiveComponent]
-#[Asset] // Automatically discovers Search.css and Search.js
+#[Asset] // Automatically discovers Search.css and Search_controller.js
 class Search implements ComponentNamespaceInterface
 {
     use DefaultActionTrait;
