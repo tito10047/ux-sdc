@@ -7,61 +7,37 @@
 // application.register('sdc-loader', SdcLoaderController);
 
 import { Controller } from '@hotwired/stimulus';
+import { getComponent } from '@symfony/ux-live-component';
+
 
 export default class extends Controller {
   connect() {
-    this._onLiveRenderFinished = this._onLiveRenderFinished.bind(this);
-    document.addEventListener('live:render:finished', this._onLiveRenderFinished);
-
-    // Handle initial page load (e.g. Turbo or plain)
-    this._processElement(document.documentElement);
+    this._onLiveConnect = this._onLiveConnect.bind(this);
+    document.addEventListener('live:connect', this._onLiveConnect, true);
   }
 
   disconnect() {
-    document.removeEventListener('live:render:finished', this._onLiveRenderFinished);
+    document.removeEventListener('live:connect', this._onLiveConnect, true);
   }
 
-  _onLiveRenderFinished(event) {
-    const el = event?.detail?.component?.element || event.target || null;
-    const response = event?.detail?.response || null;
+  _onLiveConnect(event) {
+    const component = event.detail.component;
 
-    if (response) {
-      const css = response.headers.get('X-SDC-Assets-CSS');
-      const js = response.headers.get('X-SDC-Assets-JS');
+    // Zavesíme sa na interný hook 'render:started'
+    // Tento hook má prístup k response skôr, ako sa prepíše DOM
+    component.on('render:started', (html, { response }) => {
+      if (response) {
+        const css = response.headers.get('X-SDC-Assets-CSS');
+        const js = response.headers.get('X-SDC-Assets-JS');
 
-      if (css) {
-        this._ensureAssets(css.split(',').map(s => s.trim()).filter(Boolean), 'css');
+        if (css) {
+          this._ensureAssets(css.split(',').map(s => s.trim()).filter(Boolean), 'css');
+        }
+        if (js) {
+          this._ensureAssets(js.split(',').map(s => s.trim()).filter(Boolean), 'js');
+        }
       }
-      if (js) {
-        this._ensureAssets(js.split(',').map(s => s.trim()).filter(Boolean), 'js');
-      }
-    }
-
-    if (el) {
-      this._processElement(el);
-    }
-  }
-
-  _processElement(root) {
-    const elements = [];
-    if (root instanceof Element) {
-      elements.push(root);
-      elements.push(...root.querySelectorAll('[data-sdc-css], [data-sdc-js]'));
-    }
-
-    for (const el of elements) {
-      const css = el.getAttribute('data-sdc-css');
-      const js = el.getAttribute('data-sdc-js');
-
-      if (css) {
-        const list = css.split(',').map(s => s.trim()).filter(Boolean);
-        this._ensureAssets(list, 'css');
-      }
-      if (js) {
-        const list = js.split(',').map(s => s.trim()).filter(Boolean);
-        this._ensureAssets(list, 'js');
-      }
-    }
+    });
   }
 
   _ensureAssets(list, type) {
