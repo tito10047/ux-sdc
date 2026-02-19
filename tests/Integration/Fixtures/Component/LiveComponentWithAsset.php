@@ -12,10 +12,22 @@
 namespace Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component;
 
 use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
+use Symfony\UX\LiveComponent\DefaultActionTrait;
 use Tito10047\UX\Sdc\Attribute\Asset;
+use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
+use Tito10047\UX\Sdc\Twig\Stimulus;
 
-#[AsLiveComponent('LiveComponentWithAsset')]
-#[Asset]
-class LiveComponentWithAsset
-{
+if (trait_exists(\Symfony\UX\LiveComponent\DefaultActionTrait::class)) {
+    #[AsLiveComponent('LiveComponentWithAsset')]
+    #[Asset]
+    class LiveComponentWithAsset implements ComponentNamespaceInterface
+    {
+        use \Symfony\UX\LiveComponent\DefaultActionTrait;
+        use Stimulus;
+    }
+} else {
+    class LiveComponentWithAsset implements ComponentNamespaceInterface
+    {
+        use Stimulus;
+    }
 }

@@ -19,6 +19,9 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\Routing\RouteCollection;
 use Symfony\UX\TwigComponent\TwigComponentBundle;
+use Symfony\UX\LiveComponent\LiveComponentBundle;
+use Symfony\UX\StimulusBundle\StimulusBundle;
+use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
 use Tito10047\UX\Sdc\UxSdcBundle;
 
 class TestKernel extends Kernel
@@ -53,7 +56,22 @@ class TestKernel extends Kernel
             $bundles[] = new \Symfony\Bundle\MakerBundle\MakerBundle();
         }
 
+        if (class_exists(LiveComponentBundle::class)) {
+            $bundles[] = new LiveComponentBundle();
+        }
+
+        if (class_exists(StimulusBundle::class)) {
+            $bundles[] = new StimulusBundle();
+        }
+
         return $bundles;
+    }
+
+    protected function configureRoutes(RoutingConfigurator $routes): void
+    {
+        if (class_exists(LiveComponentBundle::class)) {
+            $routes->import('@LiveComponentBundle/config/routes.php');
+        }
     }
 
     protected function configureContainer(ContainerBuilder $container, LoaderInterface $loader): void
@@ -61,10 +79,11 @@ class TestKernel extends Kernel
         $container->setParameter('kernel.environment', $this->getEnvironment());
         $container->loadFromExtension('framework', [
             'secret'               => 'test_secret',
-            'test'                 => true,
             'http_method_override' => false,
             'php_errors'           => ['log' => true],
             'router'               => ['utf8' => true],
+            'session'              => ['storage_factory_id' => 'session.storage.factory.mock_file'],
+            'test'                 => true,
         ]);
 
         $container->loadFromExtension('twig', [
@@ -74,6 +93,12 @@ class TestKernel extends Kernel
         $container->loadFromExtension('twig_component', [
             'anonymous_template_directory' => 'components/',
         ]);
+
+        if (class_exists(LiveComponentBundle::class)) {
+            $container->loadFromExtension('live_component', [
+                'secret' => 'test_secret',
+            ]);
+        }
 
         $configs = array_merge([
             'component_namespace' => 'Tito10047\\UX\\Sdc\\Tests\\Integration\\Fixtures\\Component',

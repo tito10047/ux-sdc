@@ -1,0 +1,25 @@
+{
+  "name": "@tito10047/ux-sdc",
+  "description": "SDC for Symfony UX Twig components",
+  "version": "1.0.0",
+  "license": "MIT",
+  "symfony": {
+    "controllers": {
+      "sdc_loader": {
+        "main": "controllers/sdc_loader_controller.js",
+        "webpackMode": "eager",
+        "fetch": "eager",
+        "enabled": true
+      }
+    },
+    "importmap": {
+      "@hotwired/stimulus": "^3.0.0"
+    }
+  },
+  "peerDependencies": {
+    "@hotwired/stimulus": "^3.0.0"
+  },
+  "devDependencies": {
+    "@hotwired/stimulus": "^3.0.0"
+  }
+}

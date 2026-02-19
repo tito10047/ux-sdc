@@ -11,11 +11,14 @@
 
 namespace Tito10047\UX\Sdc\DependencyInjection;
 
+use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 use Symfony\Component\Config\FileLocator;
+use Symfony\Component\HttpKernel\KernelEvents;
+use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 
@@ -78,6 +81,23 @@ class SdcExtension extends Extension implements PrependExtensionInterface
         $container->setAlias('app.ui_components.dir', 'ux_sdc.ux_components_dir');
         $container->setParameter('app.ui_components.dir', $config['ux_components_dir']);
 
+        if (class_exists(AsLiveComponent::class)) {
+            $listeners = [
+                'Tito10047\UX\Sdc\EventListener\ComponentRenderListener',
+                'Tito10047\UX\Sdc\EventListener\DevComponentRenderListener',
+            ];
+
+            foreach ($listeners as $listener) {
+                if ($container->hasDefinition($listener)) {
+                    $container->getDefinition($listener)
+                        ->addTag('kernel.event_listener', [
+                            'event' => KernelEvents::CONTROLLER,
+                            'method' => 'onKernelController',
+                        ]);
+                }
+            }
+        }
+
         $container->register(SdcMetadataRegistry::class)
             ->setArgument('$cachePath', '%kernel.cache_dir%/sdc_metadata.php')
             ->setPublic(true); // Set to true for easier testing in Integration tests
@@ -101,11 +121,15 @@ class SdcExtension extends Extension implements PrependExtensionInterface
             ],
         ]);
 
+        $paths = [
+            $uxComponentsDir,
+        ];
+        if ($this->isAssetMapperAvailable($container)) {
+            $paths[__DIR__.'/../../assets/controllers'] = '@tito10047/ux-sdc';
+        }
         $container->prependExtensionConfig('framework', [
             'asset_mapper' => [
-                'paths' => [
-                    $uxComponentsDir,
-                ],
+                'paths' => $paths,
             ],
         ]);
 
@@ -166,5 +190,23 @@ class SdcExtension extends Extension implements PrependExtensionInterface
         };
 
         $loader->doRegister($namespace, $resource);
+    }
+    private function isAssetMapperAvailable(ContainerBuilder $container): bool
+    {
+        if (!interface_exists(AssetMapperInterface::class)) {
+            return false;
+        }
+
+        // check that FrameworkBundle 6.3 or higher is installed
+        if (!$container->hasParameter('kernel.bundles_metadata')) {
+            return false;
+        }
+
+        $bundlesMetadata = $container->getParameter('kernel.bundles_metadata');
+        if (!isset($bundlesMetadata['FrameworkBundle'])) {
+            return false;
+        }
+
+        return is_file($bundlesMetadata['FrameworkBundle']['path'].'/Resources/config/asset_mapper.php');
     }
 }

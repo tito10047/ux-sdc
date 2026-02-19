@@ -149,20 +149,59 @@ ux_sdc:
 
 ### Live Components
 
-The bundle also supports **Live Components**. You can use the `#[AsLiveComponent]` attribute together with `#[Asset]` or rely on autodiscovery:
+The bundle also supports **Live Components**. It handles both initial rendering and AJAX updates automatically.
+
+#### How it works with Live Components:
+1. **Initial Render:** Assets are collected and injected into the `<head>` just like with regular Twig components.
+2. **AJAX Updates:** When a Live Component is updated via AJAX, the bundle identifies the request and sends asset paths via HTTP headers (`X-SDC-Assets-CSS` and `X-SDC-Assets-JS`) to the browser.
+3. **Dynamic Loading:** The bundle includes a Stimulus controller that listens for Live Component events and dynamically injects any missing assets into the `<head>` of the document.
+
+#### Enabling Dynamic Asset Loading
+
+To enable dynamic loading of assets during Live Component updates, you must add the bundle's Stimulus controller to your base template (ideally on the `<body>` element):
+
+```twig
+<body {{ stimulus_controller(sdc_loader_controller) }}>
+    {# ... #}
+</body>
+```
+
+#### Usage with Live Components:
+To get full support (including the `controller` variable in Twig), your Live Component should implement 
+`ComponentNamespaceInterface` and use the `Stimulus` trait:
 
 ```php
 namespace App\Component\Search;
 
 use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
+use Symfony\UX\LiveComponent\DefaultActionTrait;
 use Tito10047\UX\Sdc\Attribute\Asset;
+use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
+use Tito10047\UX\Sdc\Twig\Stimulus;
 
 #[AsLiveComponent]
-#[Asset] // Automatically discovers Search.css and Search.js in the same directory
-class Search
+#[Asset] // Automatically discovers Search.css and Search_controller.js
+class Search implements ComponentNamespaceInterface
 {
+    use DefaultActionTrait;
+    use Stimulus;
+
     // ... logic
 }
+```
+
+In your `Search.html.twig`:
+```twig
+<div
+    {{ attributes.defaults({
+        class: 'wizard [ l-container ]',
+        'data-controller': controller,
+        ('data-' ~ controller ~ '-sound-value'): asset('sound/stamp-102627.mp3'),
+        ('data-' ~ controller ~ '-intensities-value'): intensityMap|json_encode
+    }) }}
+>
+   <!-- ... -->
+</div>
 ```
 
 ### Generating Components
