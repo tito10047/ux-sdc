@@ -35,39 +35,4 @@ trait ComponentRenderTrait
             );
         }
     }
-
-    private function injectAssetAttributes(PreRenderEvent $event, array $assets): void
-    {
-        $css = [];
-        $js = [];
-        foreach ($assets as $asset) {
-            $type = $asset['type'] ?: (str_ends_with($asset['path'], '.css') ? 'css' : 'js');
-            if ('css' === $type) {
-                $css[] = $asset['path'];
-            } elseif ('js' === $type) {
-                $js[] = $asset['path'];
-            }
-        }
-
-        if (!$css && !$js) {
-            return;
-        }
-
-        $variables = $event->getVariables();
-        $attributesVar = $event->getMetadata()->getAttributesVar();
-        $bag = $variables[$attributesVar] ?? null;
-        if ($bag instanceof ComponentAttributes) {
-            $extra = [];
-            if ($css) {
-                $extra['data-sdc-css'] = implode(',', array_unique($css));
-            }
-            if ($js) {
-                $extra['data-sdc-js'] = implode(',', array_unique($js));
-            }
-            if ($extra) {
-                $variables[$attributesVar] = $bag->defaults($extra);
-                $event->setVariables($variables);
-            }
-        }
-    }
 }

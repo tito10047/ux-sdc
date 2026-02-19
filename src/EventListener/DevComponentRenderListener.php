@@ -77,9 +77,6 @@ final class DevComponentRenderListener
 
         $this->addAssets($assets);
 
-        // Inject data-sdc-css and data-sdc-js into attributes bag for dynamic loading on live updates
-        $this->injectAssetAttributes($event, $assets);
-
         $templatePath = $this->runtimeMetadata[$componentName . '_template'] ?? null;
         if (is_string($templatePath)) {
             $event->setTemplate($templatePath);

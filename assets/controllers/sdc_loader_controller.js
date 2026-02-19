@@ -23,8 +23,23 @@ export default class extends Controller {
 
   _onLiveRenderFinished(event) {
     const el = event?.detail?.component?.element || event.target || null;
-    if (!el) return;
-    this._processElement(el);
+    const response = event?.detail?.response || null;
+
+    if (response) {
+      const css = response.headers.get('X-SDC-Assets-CSS');
+      const js = response.headers.get('X-SDC-Assets-JS');
+
+      if (css) {
+        this._ensureAssets(css.split(',').map(s => s.trim()).filter(Boolean), 'css');
+      }
+      if (js) {
+        this._ensureAssets(js.split(',').map(s => s.trim()).filter(Boolean), 'js');
+      }
+    }
+
+    if (el) {
+      this._processElement(el);
+    }
   }
 
   _processElement(root) {

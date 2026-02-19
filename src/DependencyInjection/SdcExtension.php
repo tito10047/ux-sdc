@@ -198,6 +198,10 @@ class SdcExtension extends Extension implements PrependExtensionInterface
 		}
 
 		// check that FrameworkBundle 6.3 or higher is installed
+        if (!$container->hasParameter('kernel.bundles_metadata')) {
+            return false;
+        }
+
 		$bundlesMetadata = $container->getParameter('kernel.bundles_metadata');
 		if (!isset($bundlesMetadata['FrameworkBundle'])) {
 			return false;

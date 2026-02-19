@@ -76,11 +76,14 @@ class LiveComponentTestCase extends KernelTestCase
             name: 'LiveComponentWithAsset',
         );
 
-        $rendered = (string) $testComponent->render();
+        $response = $testComponent->render();
+        $rendered = (string) $response;
 
         $this->assertStringContainsString('Live Component With Asset', $rendered);
-        $this->assertStringContainsString('data-sdc-css="LiveComponentWithAsset.css"', $rendered);
-        $this->assertStringContainsString('data-sdc-js="LiveComponentWithAsset.js"', $rendered);
         $this->assertStringContainsString('controller: LiveComponentWithAsset', $rendered);
+
+        $response = $testComponent->response();
+        $this->assertStringContainsString('LiveComponentWithAsset.css', $response->headers->get('X-SDC-Assets-CSS'));
+        $this->assertStringContainsString('LiveComponentWithAsset.js', $response->headers->get('X-SDC-Assets-JS'));
     }
 }

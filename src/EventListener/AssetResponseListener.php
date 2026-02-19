@@ -31,11 +31,42 @@ final class AssetResponseListener
     #[AsEventListener(event: KernelEvents::RESPONSE)]
     public function onKernelResponse(ResponseEvent $event): void
     {
+        $response = $event->getResponse();
+
+        if ($this->isLiveComponentRequest($event)) {
+            $assets = $this->assetRegistry->getSortedAssets();
+            if (empty($assets)) {
+                return;
+            }
+
+            $css = [];
+            $js = [];
+
+            foreach ($assets as $asset) {
+                $mappedAsset = $this->assetMapper->getAsset($asset['path']);
+                $path = $mappedAsset ? $mappedAsset->publicPath : $asset['path'];
+
+                if ($asset['type'] === 'css' || ('' === $asset['type'] && str_ends_with($path, '.css'))) {
+                    $css[] = $path;
+                } elseif ($asset['type'] === 'js' || ('' === $asset['type'] && str_ends_with($path, '.js'))) {
+                    $js[] = $path;
+                }
+            }
+
+            if ($css) {
+                $response->headers->set('X-SDC-Assets-CSS', implode(',', array_unique($css)));
+            }
+            if ($js) {
+                $response->headers->set('X-SDC-Assets-JS', implode(',', array_unique($js)));
+            }
+
+            return;
+        }
+
         if (!$event->isMainRequest()) {
             return;
         }
 
-        $response = $event->getResponse();
         $content = $response->getContent();
 
         if (false === $content || !str_contains($content, $this->placeholder)) {
@@ -78,5 +109,13 @@ final class AssetResponseListener
             }
             $event->getRequest()->attributes->set('_links', $linkProvider);
         }
+    }
+
+    private function isLiveComponentRequest(ResponseEvent $event): bool
+    {
+        $request = $event->getRequest();
+
+        return 'application/vnd.live-component+html' === $request->headers->get('Accept')
+            || 'application/vnd.live-component+html' === $event->getResponse()->headers->get('Content-Type');
     }
 }

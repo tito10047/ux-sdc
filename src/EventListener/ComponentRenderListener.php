@@ -82,6 +82,6 @@ final class ComponentRenderListener
             return;
         }
 
-        $this->injectAssetAttributes($event, $assets);
+        $this->addAssets($assets);
     }
 }
