@@ -11,6 +11,7 @@
 
 namespace Tito10047\UX\Sdc\DependencyInjection;
 
+use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
@@ -120,11 +121,15 @@ class SdcExtension extends Extension implements PrependExtensionInterface
             ],
         ]);
 
+		$paths=[
+			$uxComponentsDir,
+		];
+		if ($this->isAssetMapperAvailable($container)){
+			$paths[__DIR__.'/../../assets/controllers'] = '@tito10047/ux-sdc';
+		}
         $container->prependExtensionConfig('framework', [
             'asset_mapper' => [
-                'paths' => [
-                    $uxComponentsDir,
-                ],
+                'paths' => $paths,
             ],
         ]);
 
@@ -186,4 +191,18 @@ class SdcExtension extends Extension implements PrependExtensionInterface
 
         $loader->doRegister($namespace, $resource);
     }
+	private function isAssetMapperAvailable(ContainerBuilder $container): bool
+	{
+		if (!interface_exists(AssetMapperInterface::class)) {
+			return false;
+		}
+
+		// check that FrameworkBundle 6.3 or higher is installed
+		$bundlesMetadata = $container->getParameter('kernel.bundles_metadata');
+		if (!isset($bundlesMetadata['FrameworkBundle'])) {
+			return false;
+		}
+
+		return is_file($bundlesMetadata['FrameworkBundle']['path'].'/Resources/config/asset_mapper.php');
+	}
 }
