@@ -12,7 +12,6 @@
 namespace Tito10047\UX\Sdc\Tests\Integration;
 
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
-use Symfony\UX\LiveComponent\Test\InteractsWithLiveComponents;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\LiveComponentWithAsset;
 
@@ -46,44 +45,41 @@ class LiveComponentAssetIntegrationTest extends KernelTestCase
 
     public function testCanRenderAndInteract(): void
     {
-        if (!trait_exists(InteractsWithLiveComponents::class)) {
+        if (!trait_exists(\Symfony\UX\LiveComponent\Test\InteractsWithLiveComponents::class)) {
             self::markTestSkipped('symfony/ux-live-component is not installed.');
         }
 
-        $testCase = new LiveComponentTestCase('test');
+        $testCase = new class('test') extends KernelTestCase {
+            use \Symfony\UX\LiveComponent\Test\InteractsWithLiveComponents;
+
+            protected static function getKernelClass(): string
+            {
+                return TestKernel::class;
+            }
+
+            public function test(): void
+            {
+            }
+
+            public function doTest(): void
+            {
+                self::bootKernel();
+
+                $testComponent = $this->createLiveComponent(
+                    name: 'LiveComponentWithAsset',
+                );
+
+                $response = $testComponent->render();
+                $rendered = (string) $response;
+
+                $this->assertStringContainsString('Live Component With Asset', $rendered);
+                $this->assertStringContainsString('controller: LiveComponentWithAsset', $rendered);
+
+                $response = $testComponent->response();
+                $this->assertStringContainsString('/assets/LiveComponentWithAsset-maoG0wF.css', $response->headers->get('X-SDC-Assets-CSS'));
+                $this->assertStringContainsString('/assets/LiveComponentWithAsset-maoG0wF.js', $response->headers->get('X-SDC-Assets-JS'));
+            }
+        };
         $testCase->doTest();
-    }
-}
-
-/**
- * Internal class to avoid anonymous class issues in Symfony 6.4.
- * @internal
- */
-class LiveComponentTestCase extends KernelTestCase
-{
-    use InteractsWithLiveComponents;
-
-    protected static function getKernelClass(): string
-    {
-        return TestKernel::class;
-    }
-
-    public function doTest(): void
-    {
-        self::bootKernel();
-
-        $testComponent = $this->createLiveComponent(
-            name: 'LiveComponentWithAsset',
-        );
-
-        $response = $testComponent->render();
-        $rendered = (string) $response;
-
-        $this->assertStringContainsString('Live Component With Asset', $rendered);
-        $this->assertStringContainsString('controller: LiveComponentWithAsset', $rendered);
-
-        $response = $testComponent->response();
-        $this->assertStringContainsString('/assets/LiveComponentWithAsset-maoG0wF.css', $response->headers->get('X-SDC-Assets-CSS'));
-        $this->assertStringContainsString('/assets/LiveComponentWithAsset-maoG0wF.js', $response->headers->get('X-SDC-Assets-JS'));
     }
 }

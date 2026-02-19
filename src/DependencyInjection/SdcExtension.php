@@ -121,12 +121,12 @@ class SdcExtension extends Extension implements PrependExtensionInterface
             ],
         ]);
 
-		$paths=[
-			$uxComponentsDir,
-		];
-		if ($this->isAssetMapperAvailable($container)){
-			$paths[__DIR__.'/../../assets/controllers'] = '@tito10047/ux-sdc';
-		}
+        $paths = [
+            $uxComponentsDir,
+        ];
+        if ($this->isAssetMapperAvailable($container)) {
+            $paths[__DIR__.'/../../assets/controllers'] = '@tito10047/ux-sdc';
+        }
         $container->prependExtensionConfig('framework', [
             'asset_mapper' => [
                 'paths' => $paths,
@@ -191,22 +191,22 @@ class SdcExtension extends Extension implements PrependExtensionInterface
 
         $loader->doRegister($namespace, $resource);
     }
-	private function isAssetMapperAvailable(ContainerBuilder $container): bool
-	{
-		if (!interface_exists(AssetMapperInterface::class)) {
-			return false;
-		}
+    private function isAssetMapperAvailable(ContainerBuilder $container): bool
+    {
+        if (!interface_exists(AssetMapperInterface::class)) {
+            return false;
+        }
 
-		// check that FrameworkBundle 6.3 or higher is installed
+        // check that FrameworkBundle 6.3 or higher is installed
         if (!$container->hasParameter('kernel.bundles_metadata')) {
             return false;
         }
 
-		$bundlesMetadata = $container->getParameter('kernel.bundles_metadata');
-		if (!isset($bundlesMetadata['FrameworkBundle'])) {
-			return false;
-		}
+        $bundlesMetadata = $container->getParameter('kernel.bundles_metadata');
+        if (!isset($bundlesMetadata['FrameworkBundle'])) {
+            return false;
+        }
 
-		return is_file($bundlesMetadata['FrameworkBundle']['path'].'/Resources/config/asset_mapper.php');
-	}
+        return is_file($bundlesMetadata['FrameworkBundle']['path'].'/Resources/config/asset_mapper.php');
+    }
 }
