@@ -117,7 +117,8 @@ class SdcExtension extends Extension implements PrependExtensionInterface
 
         $container->prependExtensionConfig('twig', [
             'paths' => [
-                $uxComponentsDir => null,
+                rtrim($uxComponentsDir, DIRECTORY_SEPARATOR) => null,
+                $uxComponentsDir.DIRECTORY_SEPARATOR => 'component',
             ],
         ]);
 
