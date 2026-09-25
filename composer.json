@@ -17,7 +17,7 @@
         "symfony/asset": "^6.4|^7.0|^8.0",
         "symfony/asset-mapper": "^6.4|^7.0|^8.0",
         "symfony/framework-bundle": "^6.4|^7.0|^8.0",
-        "symfony/ux-twig-component": "^2.13",
+        "symfony/ux-twig-component": "^2.13|^3.0",
         "symfony/web-link": "^6.4|^7.0|^8.0"
     },
     "require-dev": {
@@ -28,9 +28,9 @@
         "phpunit/phpunit": "^10.5",
         "symfony/browser-kit": "^6.4|^7.0|^8.0",
         "symfony/maker-bundle": "^1.65",
-        "symfony/stimulus-bundle": "^2.32",
+        "symfony/stimulus-bundle": "^2.32|^3.0",
         "symfony/twig-bundle": "^6.4|^7.0|^8.0",
-        "symfony/ux-live-component": "^2.32"
+        "symfony/ux-live-component": "^2.32|^3.0"
     },
     "config": {
         "sort-packages": true

@@ -111,6 +111,31 @@ jobs:
                 run: |
                     ./my-bundle/tests_e2e/run_e2e.sh ${{ github.head_ref || github.ref_name }}
 
+    tests-lowest-ux:
+        name: "Tests (UX 2.x, PHP 8.4, Symfony 7.4.*)"
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Checkout
+                uses: actions/checkout@v4
+            -   name: "Install PHP"
+                uses: "shivammathur/setup-php@v2"
+                with:
+                    php-version: "8.4"
+                    ini-values: memory_limit=-1
+            -   name: "Configure Symfony"
+                run: 'composer config extra.symfony.require "7.4.*"'
+            # The bundle supports symfony/ux-twig-component ^2.13|^3.0. The other
+            # jobs resolve to the highest, so without this one the 2.x half of
+            # that range stops being tested the day UX 3 came out.
+            -   name: "Pin Symfony UX to 2.x"
+                run: |
+                    composer require --no-update "symfony/ux-twig-component:^2.13"
+                    composer require --no-update --dev "symfony/ux-live-component:^2.32" "symfony/stimulus-bundle:^2.32"
+            -   name: "Install dependencies"
+                run: composer update --no-interaction --no-progress
+            -   name: Execute tests via PHPUnit
+                run: vendor/bin/phpunit
+
     tests-no-maker:
         name: "Tests without Maker (PHP 8.5, Symfony 8.0.*)"
         runs-on: ubuntu-latest
