@@ -59,11 +59,6 @@ class SdcExtension extends Extension implements PrependExtensionInterface
                 ->setArgument('$placeholder', $config['placeholder']);
         }
 
-        $container->setParameter('ux_sdc.auto_discovery', $config['auto_discovery']);
-        $container->setParameter('ux_sdc.ux_components_dir', $config['ux_components_dir']);
-        $container->register('ux_sdc.ux_components_dir', 'string')
-            ->setPublic(true);
-
         $namespace = null;
         if (isset($config['component_namespace'])) {
             $namespace = rtrim((string) $config['component_namespace'], '\\') . '\\';
@@ -78,7 +73,14 @@ class SdcExtension extends Extension implements PrependExtensionInterface
             }
         }
 
-        $container->setAlias('app.ui_components.dir', 'ux_sdc.ux_components_dir');
+        // A convenience alias of ux_sdc.ux_components_dir, for applications that
+        // want to point their own configuration at the same directory.
+        //
+        // A parameter, and only a parameter. There used to be a service of this
+        // name here too, registered with "string" as its class: nothing ever
+        // instantiated it, but `lint:container` walks every definition and died
+        // on 'class "string" does not exist', which took away the one command
+        // that tells an application whether its container is sound.
         $container->setParameter('app.ui_components.dir', $config['ux_components_dir']);
 
         if (class_exists(AsLiveComponent::class)) {
