@@ -29,6 +29,24 @@ A significant advantage of this architecture is the ability to place Symfony con
 
 Because the code is highly granular and strictly structured, AI tools work exceptionally well within this architecture, easily generating robust and creative design implementations.
 
+## AI Agent Skill
+
+An agent skill for this bundle is available at **[tito10047/ux-sdc-skills](https://github.com/tito10047/ux-sdc-skills)**. It teaches coding agents how SDC components are discovered, how their assets reach the browser, and which traps the bundle sets — instead of letting them guess from the package name.
+
+```
+/plugin marketplace add tito10047/ux-sdc-skills
+/plugin install ux-sdc-skills
+```
+
+For agents other than Claude Code, the skill is a plain directory of Markdown following the [agentskills.io](https://agentskills.io) layout; `AGENTS.md`, `CLAUDE.md` and `llms.txt` are provided as well.
+
+It covers the recommended project structure and the `make:sdc-component --action` page workflow, asset discovery and injection, Stimulus controller naming, Live Component asset headers, and the differences between the `dev` and `prod` pipelines — plus a set of failure modes with their root causes, including several that are not documented here:
+
+- The bundle prepends `stimulus.controller_paths`, which suppresses StimulusBundle's default value. Unless your application declares `%kernel.project_dir%/assets/controllers` in `config/packages/stimulus.yaml`, your own Stimulus controllers silently stop being registered.
+- Routes on co-located `--action` controllers reach the router through autoconfiguration, which requires `controllers: { resource: routing.controllers }` in `config/routes.yaml`. That loader arrived in Symfony 7.4; on earlier versions add an explicit routing resource for the component directory, or every generated page returns 404.
+- `ux_components_dir` is registered as an AssetMapper path so component CSS can be served, which also maps the component `.html.twig` files — `asset-map:compile` writes them into `public/assets/`. Add `*/src_component/*.html.twig` to `framework.asset_mapper.excluded_patterns`. (`.php` files are skipped by AssetMapper itself.)
+- Use exactly one component attribute per class. `#[AsSdcComponent]` does not need `#[AsTwigComponent]`, and `#[AsLiveComponent]` does not need `#[AsSdcComponent]`; stacking two fails the container with *"another component already has this name"*.
+
 ## The Concept
 
 This bundle is inspired by the architectural challenges discussed in **["A Better Architecture for Your Symfony UX Twig Components"](https://hugo.alliau.me/blog/posts/a-better-architecture-for-your-symfony-ux-twig-components)** by **Hugo Alliaume**.
