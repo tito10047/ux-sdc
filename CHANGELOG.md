@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A Flex recipe is proposed to `symfony/recipes-contrib` (`tito10047/ux-sdc`
+  1.0): it registers the bundle, creates `config/packages/ux_sdc.yaml`
+  (`src_component/` ↔ `App\Component`), the `config/routes/ux_sdc.yaml` route
+  import and the `src_component/` directory, and adds
+  `{{ render_component_assets() }}` after `{{ importmap() }}` in
+  `templates/base.html.twig`. The Composer PSR-4 entry and the loader controller
+  on `<body>` stay manual; the recipe prints both. Until it is merged, follow
+  *Installation › Without the recipe* in the README.
 - A web profiler panel (*UX SDC*), in debug with the profiler enabled: the
   components a request rendered and the assets each contributed (discovered,
   `#[Asset]`, `#[AsSdcComponent]`), how the response got them (tags at the
@@ -128,6 +136,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `symfony/twig-bundle` is now a dependency (it was only required in
+  development). The bundle never worked without TwigBundle, and
+  `symfony/ux-twig-component` does not install it either: `composer require
+  tito10047/ux-sdc` on a bare `symfony/skeleton` failed in Flex's first
+  console command with *The TwigBundle is not registered in your application*.
 - README rewritten against the current code: every example verified in a Flex-style
   application; one consistent `App\Component\` ↔ `src_component/` mapping; the
   component name (`<twig:Alert:Alert />`), `#[Asset]` and the events actually

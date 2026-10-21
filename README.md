@@ -34,7 +34,7 @@ It is used in production on [mostka.sk](https://mostka.sk/),
 ## Requirements
 
 - PHP 8.1 or later
-- Symfony 6.4, 7.x or 8.x, with TwigBundle
+- Symfony 6.4, 7.x or 8.x, with TwigBundle (installed with the bundle)
 - `symfony/ux-twig-component` 2.20+ or 3.x
 - AssetMapper — component assets are served through it (Webpack Encore is not supported)
 - Optional: `symfony/stimulus-bundle` for component Stimulus controllers,
@@ -42,17 +42,57 @@ It is used in production on [mostka.sk](https://mostka.sk/),
   `make:sdc-component`
 
 A Flex application created with `symfony new --webapp` has all of them except
-`symfony/ux-twig-component`, which is installed with this bundle.
+`symfony/ux-twig-component`, which is installed with this bundle, as are
+TwigBundle and AssetMapper.
 
 ## Installation
-
-**1. Install the bundle.**
 
 ```bash
 composer require tito10047/ux-sdc
 ```
 
-Symfony Flex registers the bundle. Without Flex, add it to `config/bundles.php`:
+A Flex recipe for the bundle is proposed to
+[symfony/recipes-contrib](https://github.com/symfony/recipes-contrib). Once it is
+available — and with contrib recipes allowed
+(`composer config extra.symfony.allow-contrib true`) — it:
+
+- registers the bundle;
+- creates `config/packages/ux_sdc.yaml` with `ux_components_dir` and
+  `component_namespace` (`src_component/` and `App\Component`);
+- creates `config/routes/ux_sdc.yaml`, the import of the routes of the component
+  directory;
+- creates the `src_component/` directory;
+- adds `{{ render_component_assets() }}` after `{{ importmap('app') }}` in
+  `templates/base.html.twig`, and removes it again with `composer remove`.
+
+Flex also enables the bundle's loader controller in `assets/controllers.json`.
+Two steps are left to you, and the recipe prints them:
+
+1. Map the namespace to the directory in `composer.json`, then run
+   `composer dump-autoload`:
+
+   ```json
+   {
+       "autoload": {
+           "psr-4": {
+               "App\\": "src/",
+               "App\\Component\\": "src_component/"
+           }
+       }
+   }
+   ```
+
+2. Only for Live Components, Turbo Frames or Turbo Streams: attach the loader
+   controller to `<body>`, see [Live Components](#live-components).
+
+Then [create a component](#your-first-component).
+
+### Without the recipe
+
+Without Flex, or before the recipe is available, do what it does by hand.
+
+**1. Register the bundle** in `config/bundles.php` (Flex does it even without the
+recipe):
 
 ```php
 return [
@@ -61,19 +101,8 @@ return [
 ];
 ```
 
-**2. Map a namespace to the component directory** in `composer.json`, then
-run `composer dump-autoload`:
-
-```json
-{
-    "autoload": {
-        "psr-4": {
-            "App\\": "src/",
-            "App\\Component\\": "src_component/"
-        }
-    }
-}
-```
+**2. Map a namespace to the component directory** in `composer.json` and run
+`composer dump-autoload`, as above.
 
 **3. Point the bundle at the same pair** in `config/packages/ux_sdc.yaml`:
 
@@ -104,14 +133,17 @@ AssetMapper, and a debug container picks it up as soon as it is created.
 ```
 
 `render_component_assets()` prints a placeholder. When the response is sent, it is
-replaced with the tags of the components rendered on the page. Put it last in
-`<head>`, so component styles come after the application's own — and in any case
-**after `{{ importmap() }}`**: component scripts are ES modules (see
+replaced with the tags of the components rendered on the page. Put it **after
+`{{ importmap() }}`**: component scripts are ES modules (see
 [Scripts are ES modules](#scripts-are-es-modules)), and an import map has to come
 before every module script of the page. In debug, the bundle logs a warning when
-it finds the import map after the placeholder.
+it finds the import map after the placeholder. Right after the import map, as the
+recipe puts it, component styles also come after the application's own. The recipe
+puts it inside `{% block javascripts %}`, next to the import map; a template that
+overrides that block keeps it with `{{ parent() }}`, as it has to for the import
+map anyway.
 
-For Live Components, also add the loader controller to `<body>` — see
+For Live Components and Turbo, also add the loader controller to `<body>` — see
 [Live Components](#live-components).
 
 **5. Import the routes of the component directory**, for `#[Route]` controllers
@@ -789,7 +821,8 @@ final class HomepageAction extends AbstractController
   When there is no template to extend, or it has neither block, the maker stops
   and says so.
 - **Route loading.** The route is loaded by the bundle's route import,
-  `config/routes/ux_sdc.yaml` from [Installation](#installation), step 5, or on
+  `config/routes/ux_sdc.yaml` (created by the recipe, or step 5 of
+  [Without the recipe](#without-the-recipe)), or on
   Symfony 7.4+ by `resource: routing.controllers` in `config/routes.yaml`. The
   maker reminds you of the import. `ux_sdc.routing.enabled: false` turns off both
   (see [Configuration reference](#configuration-reference)); the directory can
