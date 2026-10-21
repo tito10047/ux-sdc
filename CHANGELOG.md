@@ -84,6 +84,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and later were not affected. PHP 8.1 with Symfony 6.4 is now part of the CI
   test matrix, so the lowest supported versions are actually tested.
 
+- The lowest supported `symfony/ux-twig-component` is now 2.20 (`^2.20|^3.0`,
+  was `^2.13|^3.0`). The bundle calls `ComponentMetadata::isAnonymous()`, which
+  TwigComponent added in 2.20; on 2.13–2.19 every component rendered without the
+  metadata cache (the default in debug) failed with "Call to undefined method".
+  CI now has a `--prefer-lowest` job, and every job installs the Symfony version
+  its name states — before, all of them silently got the newest one.
+
 - Without the metadata cache (`metadata_cache: false`, the default in debug), the
   co-located files of a component in a directory added through `twig.paths`
   were not found, although the build-time cache found them: the two pipelines

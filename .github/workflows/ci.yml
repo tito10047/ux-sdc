@@ -38,9 +38,19 @@ jobs:
                 run: composer update --no-interaction --no-progress
             -   name: "Run PHPStan"
                 run: vendor/bin/phpstan analyse --configuration=phpstan.neon --no-progress
+    # Every job that names a Symfony version pins it with SYMFONY_REQUIRE, which
+    # symfony/flex (`tools: flex`) applies to every package of symfony/symfony
+    # during `composer update`. Without Flex the variable means nothing and a job
+    # gets the newest Symfony its PHP allows, whatever its name says. The
+    # "Check the Symfony version" step fails a job that ends up elsewhere.
+    #
+    # Symfony versions: 6.4 and 7.4 (LTS) and the current stable 8.x. A minor
+    # that is out of maintenance is replaced by its successor, not kept.
     tests:
         name: "Tests (PHP ${{ matrix.php-version }}, Symfony ${{ matrix.symfony }})"
         runs-on: ${{ matrix.operating-system }}
+        env:
+            SYMFONY_REQUIRE: ${{ matrix.symfony }}
         strategy:
             fail-fast: false
             matrix:
@@ -52,7 +62,7 @@ jobs:
                 symfony:
                     - '6.4.*'
                     - '7.4.*'
-                    - '8.0.*'
+                    - '8.1.*'
                 operating-system:
                     - "ubuntu-latest"
                 # composer.json allows PHP 8.1, which only Symfony 6.4 still
@@ -63,13 +73,12 @@ jobs:
                     -   php-version: "8.1"
                         symfony: '6.4.*'
                         operating-system: "ubuntu-latest"
+                # Symfony 8 needs PHP 8.4.
                 exclude:
                     -   php-version: "8.2"
-                        symfony: '8.0.*'
-                        operating-system: "ubuntu-latest"
+                        symfony: '8.1.*'
                     -   php-version: "8.3"
-                        symfony: '8.0.*'
-                        operating-system: "ubuntu-latest"
+                        symfony: '8.1.*'
         steps:
             -   name: Checkout
                 uses: actions/checkout@v4
@@ -79,9 +88,7 @@ jobs:
                     coverage: "pcov"
                     php-version: "${{ matrix.php-version }}"
                     ini-values: memory_limit=-1
-                    tools: php-coveralls
-            -   name: "Configure Symfony"
-                run: 'composer config extra.symfony.require "${{ matrix.symfony }}"'
+                    tools: flex, php-coveralls
             -   name: Get composer cache directory
                 id: composer-cache
                 run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
@@ -94,6 +101,15 @@ jobs:
             -   name: "Install highest dependencies"
                 run: |
                     composer update --no-interaction --no-progress
+            -   &check-symfony-version
+                name: "Check the Symfony version"
+                run: |
+                    installed=$(composer show symfony/http-kernel --format=json | jq -r '.versions[0]')
+                    echo "symfony/http-kernel $installed, SYMFONY_REQUIRE $SYMFONY_REQUIRE"
+                    if [[ "$installed" != "v${SYMFONY_REQUIRE%.\*}."* ]]; then
+                        echo "::error::Symfony $SYMFONY_REQUIRE was asked for, $installed is installed."
+                        exit 1
+                    fi
             -   name: Execute tests via PHPUnit
                 run: vendor/bin/phpunit --coverage-clover build/reports/clover.xml
             -   name: Upload coverage results to Coveralls
@@ -102,6 +118,29 @@ jobs:
                 run: |
                     php-coveralls --coverage_clover=build/reports/clover.xml --json_path=build/reports/coveralls-upload.json -v
                 continue-on-error: true
+
+    # The lowest version of every dependency composer.json allows, on the lowest
+    # PHP and Symfony: keeps the lower bounds of composer.json honest.
+    tests-lowest:
+        name: "Tests (lowest dependencies, PHP 8.1, Symfony 6.4.*)"
+        runs-on: ubuntu-latest
+        env:
+            SYMFONY_REQUIRE: '6.4.*'
+        steps:
+            -   name: Checkout
+                uses: actions/checkout@v4
+            -   name: "Install PHP"
+                uses: "shivammathur/setup-php@v2"
+                with:
+                    php-version: "8.1"
+                    ini-values: memory_limit=-1
+                    tools: flex
+            -   name: "Install lowest dependencies"
+                run: composer update --prefer-lowest --prefer-stable --no-interaction --no-progress
+            -   *check-symfony-version
+            -   name: Execute tests via PHPUnit
+                run: vendor/bin/phpunit
+
     e2e-tests:
         name: "E2E Test"
         runs-on: ubuntu-latest
@@ -116,38 +155,55 @@ jobs:
                     php-version: '8.2'
                     extensions: mbstring, xml, ctype, iconv
                     tools: composer
+            # Through the environment: a branch name is chosen by whoever opens
+            # the pull request, and an expression in `run` lands in the script as code.
             -   name: Run E2E tests
-                run: |
-                    ./my-bundle/tests_e2e/run_e2e.sh ${{ github.head_ref || github.ref_name }}
+                env:
+                    BRANCH: ${{ github.head_ref || github.ref_name }}
+                run: ./my-bundle/tests_e2e/run_e2e.sh "$BRANCH"
 
+    # The bundle supports symfony/ux-twig-component ^2.20|^3.0. The matrix gets
+    # UX 2.x wherever UX 3 cannot install — PHP below 8.4, or Symfony 6.4 — and
+    # UX 3 everywhere else. UX 2 on Symfony 8 is the one combination left, and
+    # without this job the 2.x half of the range stops being tested on the
+    # Symfony an application upgrades to first.
     tests-lowest-ux:
-        name: "Tests (UX 2.x, PHP 8.4, Symfony 7.4.*)"
+        name: "Tests (UX 2.x, PHP 8.5, Symfony 8.1.*)"
         runs-on: ubuntu-latest
+        env:
+            SYMFONY_REQUIRE: '8.1.*'
         steps:
             -   name: Checkout
                 uses: actions/checkout@v4
             -   name: "Install PHP"
                 uses: "shivammathur/setup-php@v2"
                 with:
-                    php-version: "8.4"
+                    php-version: "8.5"
                     ini-values: memory_limit=-1
-            -   name: "Configure Symfony"
-                run: 'composer config extra.symfony.require "7.4.*"'
-            # The bundle supports symfony/ux-twig-component ^2.13|^3.0. The other
-            # jobs resolve to the highest, so without this one the 2.x half of
-            # that range stops being tested the day UX 3 came out.
+                    tools: flex
             -   name: "Pin Symfony UX to 2.x"
                 run: |
-                    composer require --no-update "symfony/ux-twig-component:^2.13"
+                    composer require --no-update "symfony/ux-twig-component:^2.20"
                     composer require --no-update --dev "symfony/ux-live-component:^2.32" "symfony/stimulus-bundle:^2.32"
             -   name: "Install dependencies"
                 run: composer update --no-interaction --no-progress
+            -   *check-symfony-version
+            -   name: "Check the Symfony UX version"
+                run: |
+                    installed=$(composer show symfony/ux-twig-component --format=json | jq -r '.versions[0]')
+                    echo "symfony/ux-twig-component $installed"
+                    if [[ "$installed" != v2.* ]]; then
+                        echo "::error::Symfony UX 2.x was asked for, $installed is installed."
+                        exit 1
+                    fi
             -   name: Execute tests via PHPUnit
                 run: vendor/bin/phpunit
 
     tests-no-maker:
-        name: "Tests without Maker (PHP 8.5, Symfony 8.0.*)"
+        name: "Tests without Maker (PHP 8.5, Symfony 8.1.*)"
         runs-on: ubuntu-latest
+        env:
+            SYMFONY_REQUIRE: '8.1.*'
         steps:
             -   name: Checkout
                 uses: actions/checkout@v4
@@ -156,18 +212,20 @@ jobs:
                 with:
                     php-version: "8.5"
                     ini-values: memory_limit=-1
-            -   name: "Configure Symfony"
-                run: 'composer config extra.symfony.require "8.0.*"'
+                    tools: flex
             -   name: "Install highest dependencies"
                 run: composer update --no-interaction --no-progress
             -   name: "Remove MakerBundle"
                 run: composer remove --dev symfony/maker-bundle --no-interaction
+            -   *check-symfony-version
             -   name: Execute tests via PHPUnit
                 run: vendor/bin/phpunit
 
     tests-no-live-component:
-        name: "Tests without LiveComponent (PHP 8.5, Symfony 8.0.*)"
+        name: "Tests without LiveComponent (PHP 8.5, Symfony 8.1.*)"
         runs-on: ubuntu-latest
+        env:
+            SYMFONY_REQUIRE: '8.1.*'
         steps:
             -   name: Checkout
                 uses: actions/checkout@v4
@@ -176,11 +234,11 @@ jobs:
                 with:
                     php-version: "8.5"
                     ini-values: memory_limit=-1
-            -   name: "Configure Symfony"
-                run: 'composer config extra.symfony.require "8.0.*"'
+                    tools: flex
             -   name: "Install highest dependencies"
                 run: composer update --no-interaction --no-progress
             -   name: "Remove LiveComponent"
                 run: composer remove --dev symfony/ux-live-component symfony/stimulus-bundle --no-interaction
+            -   *check-symfony-version
             -   name: Execute tests via PHPUnit
                 run: vendor/bin/phpunit

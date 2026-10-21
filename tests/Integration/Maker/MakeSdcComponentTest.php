@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Integration\Maker;
+namespace Tito10047\UX\Sdc\Tests\Integration\Maker;
 
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;

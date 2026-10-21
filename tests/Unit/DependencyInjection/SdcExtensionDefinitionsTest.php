@@ -14,6 +14,8 @@ namespace Tito10047\UX\Sdc\Tests\Unit\DependencyInjection;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Tito10047\UX\Sdc\DependencyInjection\SdcExtension;
+use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\AutoDiscovery\AutoDiscoveryComponent;
+use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\TestComponent;
 
 /**
  * Guards what `lint:container` checks in an application that installs this
@@ -33,6 +35,11 @@ class SdcExtensionDefinitionsTest extends TestCase
         $container = $this->buildContainer();
 
         $this->assertNotEmpty($container->getDefinitions(), 'The extension registered nothing at all.');
+
+        // The component directory is scanned too, so its classes are among the
+        // definitions checked below — top level and nested alike.
+        $this->assertTrue($container->hasDefinition(TestComponent::class), 'The component directory was not scanned.');
+        $this->assertTrue($container->hasDefinition(AutoDiscoveryComponent::class), 'Nested component directories were not scanned.');
 
         foreach ($container->getDefinitions() as $id => $definition) {
             $class = $definition->getClass();
@@ -91,8 +98,9 @@ class SdcExtensionDefinitionsTest extends TestCase
 
         (new SdcExtension())->load([[
             'auto_discovery' => true,
-            'ux_components_dir' => '%kernel.project_dir%/tests/Visual/Generated',
-            'component_namespace' => 'Tito10047\\UX\\Sdc\\Tests\\Visual\\Generated',
+            // Committed fixtures, so that every checkout scans the same components.
+            'ux_components_dir' => '%kernel.project_dir%/tests/Integration/Fixtures/Component',
+            'component_namespace' => 'Tito10047\\UX\\Sdc\\Tests\\Integration\\Fixtures\\Component',
             'placeholder' => '<!-- __UX_TWIG_COMPONENT_ASSETS__ -->',
             'stimulus' => ['enabled' => true],
         ]], $container);

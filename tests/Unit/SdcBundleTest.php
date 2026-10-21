@@ -57,8 +57,8 @@ class SdcBundleTest extends TestCase
 
         $config = [
             'auto_discovery' => true,
-            'ux_components_dir' => '%kernel.project_dir%/tests/Visual/Generated',
-            'component_namespace' => 'Tito10047\\UX\\Sdc\\Tests\\Visual\\Generated',
+            'ux_components_dir' => '%kernel.project_dir%/tests/Integration/Fixtures/Component',
+            'component_namespace' => 'Tito10047\\UX\\Sdc\\Tests\\Integration\\Fixtures\\Component',
             'placeholder' => '<!-- __UX_TWIG_COMPONENT_ASSETS__ -->',
             'stimulus' => ['enabled' => true],
         ];
@@ -66,8 +66,8 @@ class SdcBundleTest extends TestCase
         $extension->load([$config], $container);
 
         $this->assertTrue($container->hasParameter('ux_sdc.auto_discovery'));
-        $this->assertEquals('%kernel.project_dir%/tests/Visual/Generated', $container->getParameter('ux_sdc.ux_components_dir'));
-        $this->assertEquals('Tito10047\\UX\\Sdc\\Tests\\Visual\\Generated\\', $container->getParameter('ux_sdc.component_namespace'));
+        $this->assertEquals('%kernel.project_dir%/tests/Integration/Fixtures/Component', $container->getParameter('ux_sdc.ux_components_dir'));
+        $this->assertEquals('Tito10047\\UX\\Sdc\\Tests\\Integration\\Fixtures\\Component\\', $container->getParameter('ux_sdc.component_namespace'));
     }
 
     public function testPrependAddsConfiguration(): void

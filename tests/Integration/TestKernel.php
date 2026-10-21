@@ -18,6 +18,8 @@ use Symfony\Bundle\TwigBundle\TwigBundle;
 use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\Filesystem\Exception\IOException;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\UX\TwigComponent\TwigComponentBundle;
 use Symfony\UX\LiveComponent\LiveComponentBundle;
@@ -29,7 +31,19 @@ class TestKernel extends Kernel
 {
     use MicroKernelTrait;
 
+    /**
+     * Runs older than this are left over from a process that never reached its
+     * shutdown functions (killed, Ctrl+C) and are removed by the next run.
+     */
+    private const STALE_RUN_TTL = 86400;
+
+    /** Holds the cache and log directories of every kernel of this process. */
+    private static ?string $runDir = null;
+
     private array $configs = [];
+
+    /** Own directory of this kernel, so two kernels never share a container. */
+    private readonly string $varDir;
 
     /**
      * @param array      $frameworkConfig loaded as a separate framework config, the way an application's own config/packages/framework.yaml would be
@@ -50,6 +64,7 @@ class TestKernel extends Kernel
         }
         parent::__construct($environment ?? 'test', $debug);
         $this->configs = $configs;
+        $this->varDir = self::runDir().'/'.bin2hex(random_bytes(8));
     }
 
     public function registerBundles(): iterable
@@ -154,11 +169,60 @@ class TestKernel extends Kernel
 
     public function getCacheDir(): string
     {
-        return sys_get_temp_dir() . '/UX/Sdc/cache/' . spl_object_hash($this);
+        return $this->varDir.'/cache';
     }
 
     public function getLogDir(): string
     {
-        return sys_get_temp_dir() . '/UX/Sdc/logs/' . spl_object_hash($this);
+        return $this->varDir.'/log';
+    }
+
+    /**
+     * One directory per PHPUnit process, removed when the process ends.
+     *
+     * Kernels are created all over the test suite — by KernelTestCase, by
+     * WebTestCase, and directly — and a container can outlive the test that
+     * booted it, so no single test knows when a kernel's cache is safe to drop.
+     * The process does: by the time it shuts down, nothing reads them anymore.
+     * The process ID and a random suffix keep parallel runs apart.
+     */
+    private static function runDir(): string
+    {
+        if (null !== self::$runDir) {
+            return self::$runDir;
+        }
+
+        $root = sys_get_temp_dir().'/ux-sdc-tests';
+        self::removeStaleRuns($root);
+
+        $pid = getmypid();
+        $runDir = $root.'/'.$pid.'-'.bin2hex(random_bytes(4));
+
+        register_shutdown_function(static function () use ($runDir, $pid): void {
+            // A forked child inherits this function; only the process that owns the directory removes it.
+            if (getmypid() === $pid) {
+                (new Filesystem())->remove($runDir);
+            }
+        });
+
+        return self::$runDir = $runDir;
+    }
+
+    private static function removeStaleRuns(string $root): void
+    {
+        $filesystem = new Filesystem();
+
+        foreach (glob($root.'/*', \GLOB_ONLYDIR | \GLOB_NOSORT) ?: [] as $dir) {
+            $modified = @filemtime($dir);
+            if (false === $modified || $modified > time() - self::STALE_RUN_TTL) {
+                continue;
+            }
+
+            try {
+                $filesystem->remove($dir);
+            } catch (IOException) {
+                // Best effort: another run may be removing the same directory.
+            }
+        }
     }
 }
