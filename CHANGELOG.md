@@ -18,6 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `kernel.reset`, so Symfony's `services_resetter` clears it between requests.
   Classic PHP-FPM setups were not affected. `AssetRegistry::clear()` still
   exists and behaves as before.
+- The bundled `sdc-loader` Stimulus controller no longer breaks applications
+  that do not have `symfony/ux-live-component` installed. It is registered in
+  every application, but imported `@symfony/ux-live-component` (without using
+  it), so the browser failed with *Failed to resolve module specifier*. The
+  controller now has no dependency besides Stimulus. While at it, it no longer
+  hooks into the same Live Component twice when the component reconnects,
+  removes its hooks on `disconnect()`, recognises an asset already on the page
+  by its resolved URL instead of a suffix match, and loads injected scripts in
+  the order the server sent them.
 
 ## [0.4.0] - 2026-10-02
 
