@@ -45,6 +45,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `make:sdc-component --route-path=PATH --layout=TEMPLATE`: the path of the
   `--action` route and the template the page extends, instead of the derived and
   detected ones. Either option implies `--action`.
+- Route import `type: ux_sdc` (`config/routes/ux_sdc.yaml` with `resource: .`,
+  `type: ux_sdc`): loads the `#[Route]` attributes of the classes in
+  `ux_components_dir`, such as the pages of `make:sdc-component --action`, on
+  every supported Symfony version. Until now they were loaded only on Symfony
+  7.4+ through `resource: routing.controllers`, and an application on 6.4–7.3 had
+  to import the directory by path. A route imported by both, or also by such a
+  path import, is registered once. Before the directory exists the import loads
+  nothing (and the routes appear once it is created); without
+  `component_namespace` it loads nothing either.
+- `ux_sdc.routing.enabled` (default `true`; `routing: false` is a shorthand):
+  `false` makes the `ux_sdc` import load nothing and keeps the component classes
+  out of `resource: routing.controllers` (Symfony 7.4+). An import of the
+  directory written by the application itself is not affected.
 
 ### Changed
 
@@ -122,8 +135,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     of `/en` for every page, and the route name follows `make:controller`
     (`app_blog_blog_post` instead of `app.blogpost`);
   - the controller is a `final` invokable `AbstractController` with a
-    `Response` return type imported, and the maker prints what the application
-    needs for its route to be loaded.
+    `Response` return type imported, and the maker prints the route import the
+    application needs (`type: ux_sdc`, or the directory import when
+    `ux_sdc.routing.enabled` is off).
 - **Behaviour change:** `make:sdc-component` stops, before writing anything, when
   `component_namespace` is not set (it used to assume `App\Component`), when
   Composer does not autoload it, or when Composer maps it to another directory

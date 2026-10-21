@@ -16,6 +16,8 @@ use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\MakerBundle\Exception\RuntimeCommandException;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\HttpKernel\Kernel;
+use Symfony\Component\Routing\Loader\AttributeServicesLoader;
 use Tito10047\UX\Sdc\Tests\Integration\FunctionalTestCase;
 
 /**
@@ -77,18 +79,37 @@ final class MakeSdcComponentActionTest extends FunctionalTestCase
     }
 
     /**
-     * The whole point: generated, then requested, with nothing edited in between.
+     * @return iterable<string, array{string, array{0: string, 1: string|null}}>
      */
-    #[DataProvider('provideApplicationLayouts')]
-    public function testGeneratedPageRendersThroughTheKernel(string $templates): void
+    public static function provideApplicationsAndRouteImports(): iterable
     {
+        foreach (self::provideApplicationLayouts() as $name => [$templates]) {
+            // config/routes/ux_sdc.yaml, the import the maker prints.
+            yield $name.', bundle route import' => [$templates, ['.', 'ux_sdc']];
+        }
+
+        // The config/routes.yaml of a Flex application created with Symfony 7.4+.
+        yield 'Flex skeleton, routing.controllers' => [self::FLEX, ['routing.controllers', null]];
+    }
+
+    /**
+     * The whole point: generated, then requested, with nothing edited in between.
+     *
+     * @param array{0: string, 1: string|null} $routeImport
+     */
+    #[DataProvider('provideApplicationsAndRouteImports')]
+    public function testGeneratedPageRendersThroughTheKernel(string $templates, array $routeImport): void
+    {
+        if ('routing.controllers' === $routeImport[0] && !class_exists(AttributeServicesLoader::class)) {
+            self::markTestSkipped('"resource: routing.controllers" exists from Symfony 7.4 on.');
+        }
+
         $this->runMaker($templates, ['name' => 'Page:Homepage', '--action' => true])->assertCommandIsSuccessful();
         self::ensureKernelShutdown();
 
-        // The routes.yaml entry the maker prints for applications that need one.
         $client = self::createClient([
             'twig' => ['default_path' => $templates],
-            'attribute_routes' => [self::NAMESPACE => self::COMPONENT_DIR],
+            'route_imports' => [$routeImport],
         ]);
         $client->request('GET', '/homepage');
 
@@ -179,10 +200,24 @@ final class MakeSdcComponentActionTest extends FunctionalTestCase
         $display = $this->runMaker(self::FLEX, ['name' => 'Page:Homepage', '--action' => true])->getDisplay();
 
         $this->assertStringContainsString('The page is served at /homepage (route app_homepage) once its route is loaded.', $display);
+        $this->assertStringContainsString('# config/routes/ux_sdc.yaml', $display);
+        $this->assertStringContainsString('type: ux_sdc', $display);
+        $this->assertSame(Kernel::VERSION_ID >= 70400, str_contains($display, 'resource: routing.controllers'));
+    }
+
+    public function testSuccessMessageWithRoutingDisabledTellsToImportTheDirectory(): void
+    {
+        self::bootKernel(['twig' => ['default_path' => self::FLEX], 'configs' => ['routing' => false]]);
+        $tester = new CommandTester((new Application(self::$kernel))->find('make:sdc-component'));
+        $tester->execute(['name' => 'Page:Homepage', '--action' => true], ['interactive' => false]);
+
+        $display = $tester->getDisplay();
+        $this->assertStringContainsString('"ux_sdc.routing.enabled" is off', $display);
         // Relative to config/, where routes.yaml is.
         $this->assertStringContainsString('path: ../tests/Integration/Fixtures/Component/', $display);
         $this->assertStringContainsString('namespace: '.self::NAMESPACE, $display);
         $this->assertStringContainsString('type: attribute', $display);
+        $this->assertStringNotContainsString('type: ux_sdc', $display);
     }
 
     /**

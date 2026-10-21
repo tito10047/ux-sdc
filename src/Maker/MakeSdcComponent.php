@@ -51,11 +51,13 @@ final class MakeSdcComponent extends AbstractMaker
 
     /**
      * @param \Closure(): Environment $twig
+     * @param bool                    $routing "ux_sdc.routing.enabled": whether the bundle loads the routes of the component directory
      */
     public function __construct(
         private string $uxComponentsDir,
         private ?string $componentNamespace,
         private \Closure $twig,
+        private bool $routing = true,
     ) {
     }
 
@@ -351,36 +353,43 @@ EOF
     }
 
     /**
-     * What it takes for the route of the action to be loaded. The bundle loads
-     * no routes itself, so this depends on the application's config/routes.yaml.
+     * What it takes for the route of the action to be loaded: an import in the
+     * application's routes, which the bundle cannot add by itself.
      *
      * @return list<string>
      */
     private function describeRouting(string $routePath, string $routeName, string $projectDir): array
     {
-        $import = [
-            '',
-            '    <comment># config/routes.yaml</comment>',
-            '    components:',
-            '        resource:',
-            \sprintf('            path: %s/', Path::makeRelative($this->uxComponentsDir, $projectDir . '/config')),
-            \sprintf('            namespace: %s', rtrim((string) $this->componentNamespace, '\\')),
-            '        type: attribute',
-            '',
-        ];
-
         $lines = [\sprintf('The page is served at <info>%s</info> (route <info>%s</info>) once its route is loaded.', $routePath, $routeName)];
 
-        if (Kernel::VERSION_ID >= 70400) {
-            $lines[] = 'A config/routes.yaml with "resource: routing.controllers", the default since Symfony 7.4, loads it.';
-            $lines[] = 'One that imports ../src/Controller/ by path does not; import the component directory as well:';
+        if (!$this->routing) {
+            // The application loads the directory itself, or nothing does.
+            $lines[] = '"ux_sdc.routing.enabled" is off, so the bundle loads no routes. Import the component directory in config/routes.yaml:';
+            $import = [
+                '    <comment># config/routes.yaml</comment>',
+                '    components:',
+                '        resource:',
+                \sprintf('            path: %s/', Path::makeRelative($this->uxComponentsDir, $projectDir . '/config')),
+                \sprintf('            namespace: %s', rtrim((string) $this->componentNamespace, '\\')),
+                '        type: attribute',
+            ];
         } else {
-            $lines[] = 'Import the component directory in config/routes.yaml, or the page returns 404:';
+            $lines[] = Kernel::VERSION_ID >= 70400
+                ? 'A config/routes.yaml with "resource: routing.controllers", the default since Symfony 7.4, loads it, and so does the route import of the bundle. Without either, add the import:'
+                : 'The route import of the bundle loads it. If the application does not have it yet, add it:';
+            $import = [
+                '    <comment># config/routes/ux_sdc.yaml</comment>',
+                '    ux_sdc:',
+                '        resource: .',
+                '        type: ux_sdc',
+            ];
         }
 
         return [
             ...$lines,
+            '',
             ...$import,
+            '',
             \sprintf('Check with <info>php bin/console debug:router %s</info>', $routeName),
         ];
     }

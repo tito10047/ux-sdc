@@ -33,6 +33,7 @@ class Configuration implements ConfigurationInterface
                     ->info('PHP namespace mapped to ux_components_dir (PSR-4), e.g. "App\\Component". When set, the classes in that directory are registered as autowired and autoconfigured services, and Stimulus controller names are derived relative to it. Null registers nothing: the application registers its components itself.')
                 ->end()
                 ->append($this->stimulusNode())
+                ->append($this->routingNode())
                 ->booleanNode('auto_discovery')
                     ->defaultTrue()
                     ->info('Load the CSS, JS and Twig template named after a component class and sitting next to it (Alert.php: Alert.css, Alert.js, Alert.html.twig) without declaring them. Assets declared with #[AsSdcComponent] or #[Asset] are loaded either way.')
@@ -69,6 +70,20 @@ class Configuration implements ConfigurationInterface
         // canBeDisabled() only takes a description of its "enabled" node from Symfony 7.3 on.
         $node->find('enabled')
             ->info('Add ux_components_dir to the Stimulus controller paths, next to those of the application (assets/controllers by default), so that a *_controller.js next to a component is registered as a controller.');
+
+        return $node;
+    }
+
+    private function routingNode(): ArrayNodeDefinition
+    {
+        $node = (new TreeBuilder('routing'))->getRootNode();
+        $node
+            ->info('Routes of the #[Route] controllers in ux_components_dir, such as those make:sdc-component --action generates. Accepts false as a shorthand for "enabled: false". Takes effect only with component_namespace set.')
+            ->canBeDisabled();
+
+        // canBeDisabled() only takes a description of its "enabled" node from Symfony 7.3 on.
+        $node->find('enabled')
+            ->info('Load those routes through the "ux_sdc" route import (resource: ., type: ux_sdc) and, on Symfony 7.4+, through "resource: routing.controllers". Off: the import loads nothing and the classes are left out of routing.controllers; an import of the directory the application writes itself still works.');
 
         return $node;
     }

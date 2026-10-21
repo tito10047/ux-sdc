@@ -16,6 +16,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
 use Symfony\Component\HttpKernel\Bundle\Bundle;
 use Tito10047\UX\Sdc\CompilerPass\AssetComponentCompilerPass;
+use Tito10047\UX\Sdc\CompilerPass\ComponentRoutesCompilerPass;
 use Tito10047\UX\Sdc\CompilerPass\SdcComponentAttributePass;
 use Tito10047\UX\Sdc\CompilerPass\StimulusControllerPathsCompilerPass;
 use Tito10047\UX\Sdc\DependencyInjection\SdcExtension;
@@ -51,5 +52,6 @@ class SdcBundle extends Bundle
         $container->addCompilerPass(new SdcComponentAttributePass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, SdcComponentAttributePass::PRIORITY);
         $container->addCompilerPass(new AssetComponentCompilerPass());
         $container->addCompilerPass(new StimulusControllerPathsCompilerPass());
+        $container->addCompilerPass(new ComponentRoutesCompilerPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, ComponentRoutesCompilerPass::PRIORITY);
     }
 }

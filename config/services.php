@@ -12,7 +12,9 @@ use Tito10047\UX\Sdc\EventListener\DevComponentRenderListener;
 use Tito10047\UX\Sdc\Twig\AssetExtension;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Tito10047\UX\Sdc\Maker\MakeSdcComponent;
+use Tito10047\UX\Sdc\Routing\ComponentRouteLoader;
 
+use function Symfony\Component\DependencyInjection\Loader\Configurator\abstract_arg;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service_closure;
 
@@ -109,6 +111,16 @@ return static function (ContainerConfigurator $container): void {
         ->args(['$placeholder' => '<!-- __UX_TWIG_COMPONENT_ASSETS__ -->'])
         ->tag('twig.extension');
 
+    // Registered whether or not the bundle contributes routes: an application
+    // importing "type: ux_sdc" keeps working with "ux_sdc.routing.enabled: false"
+    // or without a component namespace, and the import then loads nothing.
+    $services->set(ComponentRouteLoader::class)
+        ->args([
+            abstract_arg('ux_components_dir, absolute, or null'),
+            abstract_arg('component_namespace, or null'),
+        ])
+        ->tag('routing.loader');
+
     if (class_exists(MakerBundle::class)) {
         $services->set(MakeSdcComponent::class)
             ->args([
@@ -118,6 +130,7 @@ return static function (ContainerConfigurator $container): void {
                 // created (a configured path that does not exist) would take the whole
                 // maker down with it.
                 service_closure('twig'),
+                '%ux_sdc.routing.enabled%',
             ])
             ->tag('maker.command');
     }

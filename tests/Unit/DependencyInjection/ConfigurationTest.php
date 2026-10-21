@@ -29,6 +29,7 @@ class ConfigurationTest extends TestCase
         $this->assertEquals('%kernel.project_dir%/src_component', $config['ux_components_dir']);
         $this->assertNull($config['component_namespace']);
         $this->assertTrue($config['stimulus']['enabled']);
+        $this->assertTrue($config['routing']['enabled']);
         $this->assertTrue($config['auto_discovery']);
         $this->assertSame('auto', $config['metadata_cache']);
         $this->assertEquals('<!-- __UX_TWIG_COMPONENT_ASSETS__ -->', $config['placeholder']);
@@ -45,11 +46,13 @@ class ConfigurationTest extends TestCase
             'stimulus' => [
                 'enabled' => false,
             ],
+            'routing' => false,
         ]]);
 
         $this->assertEquals('%kernel.project_dir%/custom_dir', $config['ux_components_dir']);
         $this->assertEquals('My\\Custom\\Namespace\\', $config['component_namespace']);
         $this->assertFalse($config['stimulus']['enabled']);
+        $this->assertFalse($config['routing']['enabled']);
     }
 
     /**

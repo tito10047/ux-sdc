@@ -109,6 +109,22 @@ replaced with the tags of the components rendered on the page. Put it last in
 For Live Components, also add the loader controller to `<body>` — see
 [Live Components](#live-components).
 
+**5. Import the routes of the component directory**, for `#[Route]` controllers
+next to components, such as the pages `make:sdc-component --action` generates:
+
+```yaml
+# config/routes/ux_sdc.yaml
+ux_sdc:
+    resource: .
+    type: ux_sdc
+```
+
+A bundle cannot add routes to an application by itself — the router loads only
+what `config/routes*` imports — so this file is the one step that is about
+routing. On Symfony 7.4 and later it is not needed when `config/routes.yaml` has
+`resource: routing.controllers`, the default of applications created with 7.4+.
+Having both does no harm: a route imported twice is registered once.
+
 Nothing else is needed: the bundle adds `ux_components_dir` to Twig's paths,
 AssetMapper's paths (with its `*.twig` files excluded, so templates are not
 published to `public/assets/`) and StimulusBundle's controller paths, next to the
@@ -469,30 +485,14 @@ final class HomepageAction extends AbstractController
   that is `base.html.twig` and `body`. Choose another template with `--layout`.
   When there is no template to extend, or it has neither block, the maker stops
   and says so.
-- **The route has to be loaded.** The bundle does not load routes itself; the
-  maker prints what your application needs. On Symfony 7.4 and later, a
-  `config/routes.yaml` with the `routing.controllers` resource — the default of
-  new 7.4+ applications — loads it with no further configuration, because the
-  bundle registers the controller as an autoconfigured service:
-
-  ```yaml
-  controllers:
-      resource: routing.controllers
-  ```
-
-  On Symfony 6.4 to 7.3, or with a `routes.yaml` that imports `../src/Controller/`
-  by path, import the component directory as well, or the page returns 404:
-
-  ```yaml
-  # config/routes.yaml
-  components:
-      resource:
-          path: ../src_component/
-          namespace: App\Component
-      type: attribute
-  ```
-
-  Check with `php bin/console debug:router app_homepage`.
+- **Route loading.** The route is loaded by the bundle's route import,
+  `config/routes/ux_sdc.yaml` from [Installation](#installation), step 5, or on
+  Symfony 7.4+ by `resource: routing.controllers` in `config/routes.yaml`. The
+  maker reminds you of the import. `ux_sdc.routing.enabled: false` turns off both
+  (see [Configuration reference](#configuration-reference)); the directory can
+  then still be imported like any other, with `resource: {path: ../src_component/,
+  namespace: App\Component}` and `type: attribute`. Check with
+  `php bin/console debug:router app_homepage`.
 
 ### Organizing components
 
@@ -528,6 +528,14 @@ ux_sdc:
     stimulus:
         # Add ux_components_dir to the Stimulus controller paths, next to those of
         # the application. "stimulus: false" is a shorthand for "enabled: false".
+        enabled: true
+
+    routing:
+        # Load the #[Route] attributes of the classes in ux_components_dir: through
+        # the "type: ux_sdc" route import, and on Symfony 7.4+ through
+        # "resource: routing.controllers". false: neither loads them; an import of
+        # the directory you write yourself still does. "routing: false" is a
+        # shorthand for "enabled: false". Needs component_namespace.
         enabled: true
 
     # Find Alert.html.twig, Alert.css and Alert.js next to Alert.php. Assets

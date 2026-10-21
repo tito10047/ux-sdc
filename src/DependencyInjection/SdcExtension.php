@@ -23,9 +23,11 @@ use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Config\FileLocator;
 use Tito10047\UX\Sdc\CompilerPass\AssetComponentCompilerPass;
+use Tito10047\UX\Sdc\CompilerPass\ComponentRoutesCompilerPass;
 use Tito10047\UX\Sdc\CompilerPass\StimulusControllerPathsCompilerPass;
 use Tito10047\UX\Sdc\EventListener\ComponentRenderListener;
 use Tito10047\UX\Sdc\EventListener\DevComponentRenderListener;
+use Tito10047\UX\Sdc\Routing\ComponentRouteLoader;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 
@@ -78,15 +80,17 @@ class SdcExtension extends Extension implements PrependExtensionInterface
         }
         $container->setParameter('ux_sdc.component_namespace', $namespace);
 
-        if (null !== $namespace) {
-            $uxComponentsDir = $container->resolveEnvPlaceholders($config['ux_components_dir'], true);
+        $uxComponentsDir = $container->resolveEnvPlaceholders($config['ux_components_dir'], true);
 
+        if (null !== $namespace) {
             // Not created yet: prepend() makes the container track the
             // directory, so that it is rebuilt once the directory exists.
             if (file_exists($uxComponentsDir)) {
                 $this->registerClasses($container, $namespace, $uxComponentsDir);
             }
         }
+
+        $this->configureRouting($container, $namespace, $this->isConfigEnabled($container, $config['routing']), $uxComponentsDir);
 
         // A convenience alias of ux_sdc.ux_components_dir, for applications that
         // want to point their own configuration at the same directory.
@@ -167,6 +171,25 @@ class SdcExtension extends Extension implements PrependExtensionInterface
                 ],
             ]);
         }
+    }
+
+    /**
+     * The "ux_sdc" route import loads the component directory when routing is
+     * enabled and there is a component namespace — without one, the bundle
+     * registers no component classes to route. Otherwise it loads nothing, and
+     * with routing disabled ComponentRoutesCompilerPass also keeps the classes
+     * of the namespace out of Symfony 7.4's `resource: routing.controllers`.
+     */
+    private function configureRouting(ContainerBuilder $container, ?string $namespace, bool $enabled, string $uxComponentsDir): void
+    {
+        $routed = $enabled && null !== $namespace;
+
+        $container->getDefinition(ComponentRouteLoader::class)
+            ->replaceArgument(0, $routed ? $this->filesystemPath($container, $uxComponentsDir) : null)
+            ->replaceArgument(1, $routed ? $namespace : null);
+
+        $container->setParameter('ux_sdc.routing.enabled', $enabled);
+        $container->setParameter(ComponentRoutesCompilerPass::DISABLED_NAMESPACE_PARAMETER, $routed ? null : $namespace);
     }
 
     /**
