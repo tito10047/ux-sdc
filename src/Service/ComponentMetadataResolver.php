@@ -15,11 +15,30 @@ use ReflectionClass;
 use Tito10047\UX\Sdc\Attribute\Asset;
 use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
 
+/**
+ * Resolves the assets and template co-located with a component class.
+ *
+ * `SdcMetadata` is the flat map dumped to `sdc_metadata.php`: the component class
+ * (or name) maps to its assets, `<class>_template` maps to its template path.
+ *
+ * @phpstan-import-type SdcAsset from AssetRegistry
+ * @phpstan-type SdcMetadata array<string, list<SdcAsset>|string>
+ */
 class ComponentMetadataResolver
 {
+    /**
+     * @var list<string>
+     */
     private array $resolvedRoots = [];
+
+    /**
+     * @var array<string, array{assets: list<SdcAsset>, template: ?string}>
+     */
     private array $classCache = [];
 
+    /**
+     * @param array<string> $twigRoots
+     */
     public function __construct(
         private array $twigRoots,
         private bool $autoDiscoveryEnabled
@@ -32,6 +51,13 @@ class ComponentMetadataResolver
         }
     }
 
+    /**
+     * @param SdcMetadata $allMetadata receives the `<componentName>_template` entry, if any
+     *
+     * @param-out SdcMetadata $allMetadata
+     *
+     * @return list<SdcAsset>
+     */
     public function resolveMetadata(string $class, string $componentName, array &$allMetadata = []): array
     {
         if (isset($this->classCache[$class])) {
@@ -49,9 +75,11 @@ class ComponentMetadataResolver
         $reflectionClass = new ReflectionClass($class);
         $assets = $this->collectExplicitAssets($reflectionClass);
         $template = null;
+        $fileName = $reflectionClass->getFileName();
 
-        if ($this->autoDiscoveryEnabled) {
-            $dir = dirname($reflectionClass->getFileName());
+        // Internal classes have no file, hence no siblings to discover.
+        if ($this->autoDiscoveryEnabled && false !== $fileName) {
+            $dir = dirname($fileName);
             $baseName = $reflectionClass->getShortName();
             $basePath = $dir . DIRECTORY_SEPARATOR . $baseName;
 
@@ -88,56 +116,46 @@ class ComponentMetadataResolver
         return $assets;
     }
 
+    /**
+     * @param ReflectionClass<object> $reflectionClass
+     *
+     * @return list<SdcAsset>
+     */
     private function collectExplicitAssets(ReflectionClass $reflectionClass): array
     {
-        $attributes = $reflectionClass->getAttributes();
-        if (empty($attributes)) {
-            return [];
-        }
-
         $assets = [];
 
-        foreach ($attributes as $attribute) {
-            $attributeName = $attribute->getName();
-
-            if ($attributeName === Asset::class) {
-                /** @var Asset $asset */
-                $asset = $attribute->newInstance();
-                if ($asset->path) {
-                    $assets[] = [
-                        'path' => $asset->path,
-                        'type' => $asset->type ?? '',
-                        'priority' => $asset->priority,
-                        'attributes' => $asset->attributes,
-                    ];
-                }
+        foreach ($reflectionClass->getAttributes(Asset::class) as $attribute) {
+            $asset = $attribute->newInstance();
+            if ($asset->path) {
+                $assets[] = [
+                    'path' => $asset->path,
+                    'type' => $asset->type ?? '',
+                    'priority' => $asset->priority,
+                    'attributes' => $asset->attributes,
+                ];
             }
         }
 
-        foreach ($attributes as $attribute) {
-            $attributeName = $attribute->getName();
+        foreach ($reflectionClass->getAttributes(AsSdcComponent::class) as $attribute) {
+            $sdcComponent = $attribute->newInstance();
 
-            if ($attributeName === AsSdcComponent::class) {
-                /** @var AsSdcComponent $sdcComponent */
-                $sdcComponent = $attribute->newInstance();
+            if ($sdcComponent->css) {
+                $assets[] = [
+                    'path' => $sdcComponent->css,
+                    'type' => 'css',
+                    'priority' => 0,
+                    'attributes' => [],
+                ];
+            }
 
-                if ($sdcComponent->css) {
-                    $assets[] = [
-                        'path' => $sdcComponent->css,
-                        'type' => 'css',
-                        'priority' => 0,
-                        'attributes' => [],
-                    ];
-                }
-
-                if ($sdcComponent->js) {
-                    $assets[] = [
-                        'path' => $sdcComponent->js,
-                        'type' => 'js',
-                        'priority' => 0,
-                        'attributes' => [],
-                    ];
-                }
+            if ($sdcComponent->js) {
+                $assets[] = [
+                    'path' => $sdcComponent->js,
+                    'type' => 'js',
+                    'priority' => 0,
+                    'attributes' => [],
+                ];
             }
         }
 

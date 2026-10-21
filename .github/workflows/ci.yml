@@ -17,10 +17,12 @@ jobs:
                 uses: shivammathur/setup-php@v2
                 with:
                     php-version: '8.2'
-                    tools: php-cs-fixer
+            # Use the php-cs-fixer version pinned in composer.json, not whatever
+            # the latest global release is, so local and CI results agree.
+            -   name: "Install dependencies"
+                run: composer update --no-interaction --no-progress
             -   name: Check CS
-                run: php-cs-fixer fix --dry-run --diff
-                continue-on-error: true
+                run: vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php --dry-run --diff
     phpstan:
         name: "Static Analysis"
         runs-on: ubuntu-latest
@@ -35,8 +37,7 @@ jobs:
             -   name: "Install dependencies"
                 run: composer update --no-interaction --no-progress
             -   name: "Run PHPStan"
-                run: vendor/bin/phpstan analyse
-                continue-on-error: true
+                run: vendor/bin/phpstan analyse --configuration=phpstan.neon --no-progress
     tests:
         name: "Tests (PHP ${{ matrix.php-version }}, Symfony ${{ matrix.symfony }})"
         runs-on: ${{ matrix.operating-system }}

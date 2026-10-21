@@ -156,11 +156,14 @@ class SdcExtension extends Extension implements PrependExtensionInterface
         }
     }
 
+    /**
+     * @param array<string, mixed> $config
+     */
     private function registerMetadataResolver(ContainerBuilder $container, array $config): void
     {
         $twigRoots = [];
         if ($container->hasParameter('kernel.project_dir')) {
-            $twigRoots[] = $container->getParameter('kernel.project_dir') . '/src_component';
+            $twigRoots[] = '%kernel.project_dir%/src_component';
         }
 
         if ($container->hasParameter('twig.default_path')) {

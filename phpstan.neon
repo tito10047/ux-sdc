@@ -1,0 +1,11 @@
+includes:
+    - vendor/phpstan/phpstan-symfony/extension.neon
+
+parameters:
+    level: 8
+    paths:
+        - src
+        # PHPStan only analyses a trait in the context of a class using it, and
+        # nothing in src/ uses the public Stimulus trait. This fixture is its
+        # minimal consumer, listed so the trait is analysed instead of skipped.
+        - tests/Integration/Fixtures/Component/StimulusComponent.php

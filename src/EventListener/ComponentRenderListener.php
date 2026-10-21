@@ -40,7 +40,7 @@ final class ComponentRenderListener
 
         $assets = $this->metadataRegistry->getMetadata($component::class);
 
-        if (!$assets) {
+        if (!\is_array($assets) || [] === $assets) {
             return;
         }
 
@@ -56,7 +56,10 @@ final class ComponentRenderListener
             $controller = $controller[0];
         }
 
-        $this->setNamespace($controller);
+        // Static callables ("Class::method", [Class::class, 'method']) have no instance to configure.
+        if (\is_object($controller)) {
+            $this->setNamespace($controller);
+        }
     }
 
     private function setNamespace(object $component): void
@@ -72,13 +75,13 @@ final class ComponentRenderListener
         $component = $event->getComponent();
         $templatePath = $this->metadataRegistry->getMetadata($component::class . '_template');
 
-        if ($templatePath) {
+        if (\is_string($templatePath) && '' !== $templatePath) {
             $event->setTemplate($templatePath);
         }
 
         // Inject data-sdc-css and data-sdc-js attributes so they render via {{ attributes }}
         $assets = $this->metadataRegistry->getMetadata($component::class);
-        if (!$assets) {
+        if (!\is_array($assets) || [] === $assets) {
             return;
         }
 

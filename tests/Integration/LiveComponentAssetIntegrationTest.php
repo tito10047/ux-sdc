@@ -49,7 +49,7 @@ class LiveComponentAssetIntegrationTest extends KernelTestCase
             self::markTestSkipped('symfony/ux-live-component is not installed.');
         }
 
-        $testCase = new class('test') extends KernelTestCase {
+        $testCase = new class ('test') extends KernelTestCase {
             use \Symfony\UX\LiveComponent\Test\InteractsWithLiveComponents;
 
             protected static function getKernelClass(): string

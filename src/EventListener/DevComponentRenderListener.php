@@ -20,10 +20,16 @@ use Tito10047\UX\Sdc\Service\AssetRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
 
+/**
+ * @phpstan-import-type SdcMetadata from ComponentMetadataResolver
+ */
 final class DevComponentRenderListener
 {
     use ComponentRenderTrait;
 
+    /**
+     * @var SdcMetadata
+     */
     private array $runtimeMetadata = [];
 
     public function __construct(
@@ -48,7 +54,10 @@ final class DevComponentRenderListener
             $controller = $controller[0];
         }
 
-        $this->setNamespace($controller);
+        // Static callables ("Class::method", [Class::class, 'method']) have no instance to configure.
+        if (\is_object($controller)) {
+            $this->setNamespace($controller);
+        }
     }
 
     private function setNamespace(object $component): void
@@ -67,9 +76,8 @@ final class DevComponentRenderListener
         }
         $componentName = $metadata->getName();
 
-        if (isset($this->runtimeMetadata[$componentName])) {
-            $assets = $this->runtimeMetadata[$componentName];
-        } else {
+        $assets = $this->runtimeMetadata[$componentName] ?? null;
+        if (!\is_array($assets)) {
             $componentClass = $metadata->getClass();
             $assets = $this->metadataResolver->resolveMetadata($componentClass, $componentName, $this->runtimeMetadata);
             $this->runtimeMetadata[$componentName] = $assets;

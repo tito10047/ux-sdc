@@ -13,8 +13,12 @@ namespace Tito10047\UX\Sdc\EventListener;
 
 use Symfony\UX\TwigComponent\ComponentAttributes;
 use Symfony\UX\TwigComponent\Event\PreRenderEvent;
+use Tito10047\UX\Sdc\Service\AssetRegistry;
 use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
 
+/**
+ * @phpstan-import-type SdcAsset from AssetRegistry
+ */
 trait ComponentRenderTrait
 {
     private function setComponentNamespace(object $component): void
@@ -24,6 +28,9 @@ trait ComponentRenderTrait
         }
     }
 
+    /**
+     * @param list<SdcAsset> $assets
+     */
     private function addAssets(array $assets): void
     {
         foreach ($assets as $asset) {

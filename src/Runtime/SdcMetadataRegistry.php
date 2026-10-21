@@ -11,8 +11,18 @@
 
 namespace Tito10047\UX\Sdc\Runtime;
 
+use Tito10047\UX\Sdc\Service\AssetRegistry;
+use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
+
+/**
+ * @phpstan-import-type SdcAsset from AssetRegistry
+ * @phpstan-import-type SdcMetadata from ComponentMetadataResolver
+ */
 class SdcMetadataRegistry
 {
+    /**
+     * @var SdcMetadata|null
+     */
     private ?array $metadata = null;
 
     public function __construct(
@@ -20,6 +30,9 @@ class SdcMetadataRegistry
     ) {
     }
 
+    /**
+     * @return list<SdcAsset>|string|null assets for a component class, the template path for a `<class>_template` key
+     */
     public function getMetadata(string $componentFccn): array|string|null
     {
         if (null === $this->metadata) {

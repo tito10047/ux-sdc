@@ -49,7 +49,8 @@ final class MakeSdcComponent extends AbstractMaker
             ->addArgument('name', InputArgument::OPTIONAL, 'The name of the component (e.g. <alternate>Alert</alternate>)')
             ->addOption('stimulus', null, InputOption::VALUE_NONE, 'Whether to generate a Stimulus controller')
             ->addOption('action', null, InputOption::VALUE_NONE, 'Whether to generate an action class and template')
-            ->setHelp(<<<EOF
+            ->setHelp(
+                <<<EOF
 The <info>make:sdc-component</info> command generates a new Single Directory Component (SDC).
 
 It creates:

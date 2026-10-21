@@ -11,10 +11,17 @@
 
 namespace Tito10047\UX\Sdc\Service;
 
+/**
+ * Shape of a single asset, shared by the metadata resolver, the compiled metadata
+ * cache and this registry. In resolved metadata `type` may be an empty string,
+ * meaning "infer it from the path"; entries stored here always carry a type.
+ *
+ * @phpstan-type SdcAsset array{path: string, type: string, priority: int, attributes: array<string, mixed>}
+ */
 final class AssetRegistry
 {
     /**
-     * @var array<string, array{path: string, type: string, priority: int, attributes: array<string, mixed>}>
+     * @var array<string, SdcAsset>
      */
     private array $assets = [];
 
@@ -44,7 +51,7 @@ final class AssetRegistry
     }
 
     /**
-     * @return array<int, array{path: string, type: string, priority: int, attributes: array<string, mixed>}>
+     * @return list<SdcAsset>
      */
     public function getSortedAssets(): array
     {

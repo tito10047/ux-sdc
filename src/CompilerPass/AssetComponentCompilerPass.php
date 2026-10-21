@@ -20,6 +20,9 @@ use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 use ReflectionClass;
 
+/**
+ * @phpstan-import-type SdcMetadata from ComponentMetadataResolver
+ */
 final class AssetComponentCompilerPass implements CompilerPassInterface
 {
     public function process(ContainerBuilder $container): void
@@ -40,7 +43,8 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
             return;
         }
 
-        $autoDiscovery = $container->getParameter('ux_sdc.auto_discovery');
+        // Validated as a boolean node by the bundle configuration.
+        $autoDiscovery = (bool) $container->getParameter('ux_sdc.auto_discovery');
         $twigRoots = $this->collectTwigRoots($container);
 
         $resolver = new ComponentMetadataResolver($twigRoots, $autoDiscovery);
@@ -49,13 +53,16 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
         $this->dumpCache($cachePath, $componentAssets);
     }
 
+    /**
+     * @return list<string> existing directories, as real paths
+     */
     private function collectTwigRoots(ContainerBuilder $container): array
     {
         $twigRoots = [];
         if ($container->hasParameter('kernel.project_dir')) {
             $defaultDir = $container->getParameterBag()->resolveValue('%kernel.project_dir%/src_component');
             if (is_dir($defaultDir)) {
-                $twigRoots[] = realpath($defaultDir);
+                $twigRoots[] = $defaultDir;
             }
         }
 
@@ -66,7 +73,7 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
         if ($container->hasParameter('ux_sdc.ux_components_dir')) {
             $uxDir = $container->getParameterBag()->resolveValue($container->getParameter('ux_sdc.ux_components_dir'));
             if (is_dir($uxDir)) {
-                $twigRoots[] = realpath($uxDir);
+                $twigRoots[] = $uxDir;
             }
         }
 
@@ -86,9 +93,24 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
             }
         }
 
-        return array_unique(array_map('realpath', array_filter($twigRoots)));
+        $realRoots = [];
+        foreach ($twigRoots as $root) {
+            if (!\is_string($root) || '' === $root) {
+                continue;
+            }
+
+            $realRoot = realpath($root);
+            if (false !== $realRoot) {
+                $realRoots[] = $realRoot;
+            }
+        }
+
+        return array_values(array_unique($realRoots));
     }
 
+    /**
+     * @return SdcMetadata
+     */
     private function processTaggedServices(ContainerBuilder $container, ComponentMetadataResolver $resolver): array
     {
         $componentAssets = [];
@@ -112,6 +134,9 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
         return $componentAssets;
     }
 
+    /**
+     * @param SdcMetadata $data
+     */
     private function dumpCache(string $path, array $data): void
     {
         $directory = dirname($path);
