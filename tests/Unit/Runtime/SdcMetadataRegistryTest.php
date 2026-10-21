@@ -22,7 +22,7 @@ class SdcMetadataRegistryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->cachePath = sys_get_temp_dir() . '/sdc_metadata_test.php';
+        $this->cachePath = sys_get_temp_dir().'/'.uniqid('ux-sdc-registry-', true).'.php';
         if (file_exists($this->cachePath)) {
             unlink($this->cachePath);
         }

@@ -18,6 +18,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\Routing\Loader\AttributeServicesLoader;
+use Symfony\UX\StimulusBundle\StimulusBundle;
 use Tito10047\UX\Sdc\Tests\Integration\FunctionalTestCase;
 
 /**
@@ -184,7 +185,8 @@ final class MakeSdcComponentActionTest extends FunctionalTestCase
         $tester = new CommandTester((new Application(self::$kernel))->find('make:sdc-component'));
         $tester->setInputs([
             'Page:Homepage', // Component name
-            'n',             // Stimulus?
+            // Stimulus? Only asked with StimulusBundle.
+            ...(class_exists(StimulusBundle::class) ? ['n'] : []),
             'y',             // Action?
         ]);
 

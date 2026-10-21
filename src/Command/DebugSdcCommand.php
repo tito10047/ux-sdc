@@ -298,8 +298,10 @@ final class DebugSdcCommand extends Command
     }
 
     /**
-     * In the list, the name of a controller that is there, or a flagged one
-     * the template expects; in detail, the name whatever its state.
+     * In the list, the name of a controller that is there or that the template
+     * uses, flagged when it is not there; in detail, the name whatever its
+     * state. Without StimulusBundle whether it is there is not known, and
+     * nothing is flagged.
      */
     private function formatStimulusController(ComponentReport $report, bool $detailed): string
     {
@@ -314,14 +316,21 @@ final class DebugSdcCommand extends Command
         }
 
         $name = OutputFormatter::escape($controller['name']);
-        $missing = false === $controller['registered'];
 
-        if ($missing && $controller['used']) {
-            return self::PROBLEM . $name . ($detailed ? ' <comment>(no such controller)</comment>' : '');
+        if (true === $controller['registered']) {
+            return $name;
         }
 
-        if (!$missing) {
-            return $name;
+        if (null === $controller['registered']) {
+            if ($detailed) {
+                return $name . ' <comment>(not checked without StimulusBundle)</comment>';
+            }
+
+            return $controller['used'] ? $name : '-';
+        }
+
+        if ($controller['used']) {
+            return self::PROBLEM . $name . ($detailed ? ' <comment>(no such controller)</comment>' : '');
         }
 
         return $detailed ? $name . ' <comment>(no such controller, not used by the template)</comment>' : '-';

@@ -22,7 +22,7 @@ final class ComponentRenderListenerTest extends TestCase
 {
     public function testOnPostMountAddsAssetsToRegistry(): void
     {
-        $cachePath = sys_get_temp_dir() . '/listener_test_metadata.php';
+        $cachePath = sys_get_temp_dir().'/'.uniqid('ux-sdc-listener-', true).'.php';
         $component = new class () {};
         $componentClass = $component::class;
         $data = [

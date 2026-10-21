@@ -51,13 +51,15 @@ final class MakeSdcComponent extends AbstractMaker
 
     /**
      * @param \Closure(): Environment $twig
-     * @param bool                    $routing "ux_sdc.routing.enabled": whether the bundle loads the routes of the component directory
+     * @param bool                    $routing        "ux_sdc.routing.enabled": whether the bundle loads the routes of the component directory
+     * @param bool                    $stimulusBundle whether StimulusBundle is installed: the template of a component with a Stimulus controller calls its stimulus_controller()
      */
     public function __construct(
         private string $uxComponentsDir,
         private ?string $componentNamespace,
         private \Closure $twig,
         private bool $routing = true,
+        private bool $stimulusBundle = true,
     ) {
     }
 
@@ -75,7 +77,7 @@ final class MakeSdcComponent extends AbstractMaker
     {
         $command
             ->addArgument('name', InputArgument::OPTIONAL, 'The name of the component (e.g. <alternate>Alert</alternate>)')
-            ->addOption('stimulus', null, InputOption::VALUE_NONE, 'Whether to generate a Stimulus controller')
+            ->addOption('stimulus', null, InputOption::VALUE_NONE, 'Whether to generate a Stimulus controller (needs symfony/stimulus-bundle)')
             ->addOption('action', null, InputOption::VALUE_NONE, 'Whether to generate an action class and template')
             ->addOption('route-path', null, InputOption::VALUE_REQUIRED, 'Path of the action route (implies --action; default: derived from the name)')
             ->addOption('layout', null, InputOption::VALUE_REQUIRED, 'Template the action template extends (implies --action; default: layout.html.twig, else base.html.twig)')
@@ -120,7 +122,16 @@ EOF
         }
 
         if ($input->getOption('stimulus')) {
+            if (!$this->stimulusBundle) {
+                throw new RuntimeCommandException('--stimulus generates a template that calls stimulus_controller(), a Twig function of StimulusBundle, which is not installed. Run "composer require symfony/stimulus-bundle" first, or leave --stimulus out.');
+            }
             $withStimulus = true;
+        } elseif (!$this->stimulusBundle) {
+            // Not offered: the template would call stimulus_controller(), which StimulusBundle provides.
+            $withStimulus = false;
+            if ($input->isInteractive()) {
+                $io->note('No Stimulus controller is offered: symfony/stimulus-bundle is not installed.');
+            }
         } elseif (!$input->isInteractive()) {
             // In non-interactive mode, do NOT generate Stimulus unless explicitly requested
             $withStimulus = false;

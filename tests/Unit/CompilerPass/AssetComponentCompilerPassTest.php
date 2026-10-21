@@ -37,7 +37,7 @@ final class AssetComponentCompilerPassTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->cachePath = sys_get_temp_dir() . '/compiler_pass_test_metadata.php';
+        $this->cachePath = sys_get_temp_dir().'/'.uniqid('ux-sdc-compiler-pass-', true).'.php';
         if (file_exists($this->cachePath)) {
             unlink($this->cachePath);
         }

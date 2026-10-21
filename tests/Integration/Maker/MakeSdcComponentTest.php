@@ -17,6 +17,7 @@ use Symfony\Bundle\MakerBundle\Exception\RuntimeCommandException;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\UX\StimulusBundle\AssetMapper\ControllersMapGenerator;
+use Symfony\UX\StimulusBundle\StimulusBundle;
 use Symfony\UX\TwigComponent\ComponentRendererInterface;
 use Tito10047\UX\Sdc\Tests\Integration\IntegrationTestCase;
 
@@ -67,7 +68,8 @@ class MakeSdcComponentTest extends IntegrationTestCase
 
         $tester->setInputs([
             'UI\Alert', // Component name
-            'y',     // Generate stimulus controller?
+            // Generate stimulus controller? Only asked with StimulusBundle.
+            ...(self::hasStimulusBundle() ? ['y'] : []),
         ]);
 
         $tester->execute([]);
@@ -79,7 +81,12 @@ class MakeSdcComponentTest extends IntegrationTestCase
         $this->assertFileExists($baseDir . '/UI/Alert/Alert.php');
         $this->assertFileExists($baseDir . '/UI/Alert/Alert.html.twig');
         $this->assertFileExists($baseDir . '/UI/Alert/Alert.css');
-        $this->assertFileExists($baseDir . '/UI/Alert/Alert_controller.js');
+        if (self::hasStimulusBundle()) {
+            $this->assertFileExists($baseDir . '/UI/Alert/Alert_controller.js');
+        } else {
+            $this->assertFileDoesNotExist($baseDir . '/UI/Alert/Alert_controller.js');
+            $this->assertStringContainsString('No Stimulus controller is offered', $display);
+        }
 
         $phpContent = file_get_contents($baseDir . '/UI/Alert/Alert.php');
         $this->assertStringContainsString('namespace Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\UI\Alert;', $phpContent);
@@ -91,7 +98,7 @@ class MakeSdcComponentTest extends IntegrationTestCase
         $this->assertStringNotContainsString('Stimulus', $phpContent);
 
         $twigContent = file_get_contents($baseDir . '/UI/Alert/Alert.html.twig');
-        $this->assertStringContainsString('<div {{ attributes.defaults({class:"alert"}).defaults(stimulus_controller(controller)) }}>', $twigContent);
+        $this->assertStringContainsString(self::hasStimulusBundle() ? '<div {{ attributes.defaults({class:"alert"}).defaults(stimulus_controller(controller)) }}>' : '<div {{ attributes.defaults({class:"alert"}) }}>', $twigContent);
 
         $cssContent = file_get_contents($baseDir . '/UI/Alert/Alert.css');
         $this->assertStringContainsString('@layer components {', $cssContent);
@@ -106,8 +113,8 @@ class MakeSdcComponentTest extends IntegrationTestCase
      */
     public function testGeneratedComponentRendersItsStimulusController(): void
     {
-        if (!class_exists(ControllersMapGenerator::class)) {
-            self::markTestSkipped('symfony/stimulus-bundle is not installed.');
+        if (!self::hasStimulusBundle()) {
+            self::markTestSkipped('symfony/stimulus-bundle is not installed; testStimulusOptionNeedsStimulusBundle covers its absence.');
         }
 
         self::bootKernel();
@@ -130,6 +137,29 @@ class MakeSdcComponentTest extends IntegrationTestCase
         $this->assertStringContainsString('data-controller="UI--Alert--Alert"', $html);
     }
 
+    /**
+     * Without StimulusBundle the template of the controller would call a Twig
+     * function that does not exist, and the component would not render.
+     */
+    public function testStimulusOptionNeedsStimulusBundle(): void
+    {
+        if (self::hasStimulusBundle()) {
+            self::markTestSkipped('Only without symfony/stimulus-bundle installed, as in the "Tests without LiveComponent" CI job.');
+        }
+
+        self::bootKernel();
+        $tester = new CommandTester((new Application(self::$kernel))->find('make:sdc-component'));
+
+        try {
+            $tester->execute(['name' => 'UI:Alert', '--stimulus' => true], ['interactive' => false]);
+            $this->fail('The maker generated a Stimulus controller without StimulusBundle.');
+        } catch (RuntimeCommandException $e) {
+            $this->assertStringContainsString('Run "composer require symfony/stimulus-bundle" first, or leave --stimulus out.', $e->getMessage());
+        }
+
+        $this->assertDirectoryDoesNotExist(\dirname(__DIR__).'/Fixtures/Component/UI');
+    }
+
     public function testMakeSdcComponentWithColonSeparator(): void
     {
         self::bootKernel();
@@ -140,7 +170,8 @@ class MakeSdcComponentTest extends IntegrationTestCase
 
         $tester->setInputs([
             'UI:Alert', // Component name with colon
-            'n',     // Generate stimulus controller?
+            // Generate stimulus controller? Only asked with StimulusBundle.
+            ...(self::hasStimulusBundle() ? ['n'] : []),
         ]);
 
         $tester->execute([]);
@@ -180,6 +211,11 @@ class MakeSdcComponentTest extends IntegrationTestCase
 
         $twigContent = file_get_contents($baseDir . '/Alert/Alert.html.twig');
         $this->assertStringNotContainsString('stimulus_controller', $twigContent);
+    }
+
+    private static function hasStimulusBundle(): bool
+    {
+        return class_exists(StimulusBundle::class);
     }
 
     /**

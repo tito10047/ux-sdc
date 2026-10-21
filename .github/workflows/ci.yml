@@ -23,6 +23,12 @@ jobs:
                 run: composer update --no-interaction --no-progress
             -   name: Check CS
                 run: vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.dist.php --dry-run --diff
+    # Against the newest dependencies, the ones a development checkout gets: code
+    # that supports several Symfony versions (SdcComponentAttributePass) is
+    # written to be analysed against the newest one. On an older PHP, Composer
+    # would resolve older Symfony and UX, and the analysis would differ from the
+    # one run locally. The PHP versions the code has to run on are set in
+    # phpstan.neon (phpVersion), not by the PHP that runs PHPStan.
     phpstan:
         name: "Static Analysis"
         runs-on: ubuntu-latest
@@ -32,7 +38,7 @@ jobs:
             -   name: "Install PHP"
                 uses: "shivammathur/setup-php@v2"
                 with:
-                    php-version: "8.3"
+                    php-version: "8.5"
                     ini-values: memory_limit=-1
             -   name: "Install dependencies"
                 run: composer update --no-interaction --no-progress

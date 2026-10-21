@@ -176,6 +176,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Composer does not autoload it, or when Composer maps it to another directory
   than `ux_components_dir`. It used to write the class in one directory and its
   template and assets in another, where nothing found them.
+- **Behaviour change:** without `symfony/stimulus-bundle`, `make:sdc-component`
+  no longer asks whether to generate a Stimulus controller, and `--stimulus`
+  stops before writing anything. The generated template called
+  `stimulus_controller()`, a Twig function of StimulusBundle, so the component
+  failed to render.
 
 ### Fixed
 

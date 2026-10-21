@@ -18,6 +18,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Exception\InvalidArgumentException;
 use Symfony\Component\Console\Tester\CommandCompletionTester;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\UX\StimulusBundle\StimulusBundle;
 use Tito10047\UX\Sdc\Tests\Integration\Fixtures\DebugSdc\Alert\Alert;
 use Tito10047\UX\Sdc\Tests\Integration\Fixtures\DebugSdc\Broken\Broken;
 use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Library\Badge\Badge;
@@ -33,6 +34,10 @@ use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Library\Badge\Badge;
  *
  * Every case runs with both metadata pipelines: they must describe the
  * components the same way.
+ *
+ * StimulusBundle is optional (CI runs the suite without it): when it is not
+ * installed, whether a Stimulus controller exists is not known, so it is
+ * reported as such and never flagged.
  */
 final class DebugSdcCommandTest extends IntegrationTestCase
 {
@@ -77,7 +82,7 @@ final class DebugSdcCommandTest extends IntegrationTestCase
                 'mapped' => true,
             ],
         ], $alert['assets']);
-        $this->assertSame(['name' => 'Alert--Alert', 'set_by_component' => false, 'used' => true, 'registered' => true], $alert['stimulus_controller']);
+        $this->assertSame(['name' => 'Alert--Alert', 'set_by_component' => false, 'used' => true, 'registered' => self::hasStimulusBundle() ? true : null], $alert['stimulus_controller']);
         $this->assertSame([['name' => 'debug_sdc_alert', 'path' => '/debug-sdc/alert']], $alert['routes']);
         $this->assertSame([], $alert['problems']);
     }
@@ -121,6 +126,10 @@ final class DebugSdcCommandTest extends IntegrationTestCase
     #[DataProvider('metadataCache')]
     public function testFlagsAStimulusControllerTheTemplateUsesButDoesNotExist(bool $metadataCache): void
     {
+        if (!self::hasStimulusBundle()) {
+            self::markTestSkipped('Whether a controller exists is only known from StimulusBundle; testDoesNotCheckStimulusControllersWithoutStimulusBundle covers its absence.');
+        }
+
         $components = $this->json($metadataCache);
 
         $this->assertSame(['name' => 'Controlled--Controlled', 'set_by_component' => false, 'used' => true, 'registered' => false], $components['Controlled:Controlled']['stimulus_controller']);
@@ -130,6 +139,35 @@ final class DebugSdcCommandTest extends IntegrationTestCase
 
         $this->assertSame(['name' => 'Quiet--Quiet', 'set_by_component' => false, 'used' => false, 'registered' => false], $components['Quiet:Quiet']['stimulus_controller']);
         $this->assertSame([], $components['Quiet:Quiet']['problems']);
+    }
+
+    /**
+     * Without StimulusBundle the controller name is still reported, as not
+     * checked: a template that uses it is not flagged, and the list shows the
+     * name only where the template uses it.
+     */
+    #[DataProvider('metadataCache')]
+    public function testDoesNotCheckStimulusControllersWithoutStimulusBundle(bool $metadataCache): void
+    {
+        if (self::hasStimulusBundle()) {
+            self::markTestSkipped('Only without symfony/stimulus-bundle installed, as in the "Tests without LiveComponent" CI job.');
+        }
+
+        $components = $this->json($metadataCache);
+
+        $this->assertSame(['name' => 'Controlled--Controlled', 'set_by_component' => false, 'used' => true, 'registered' => null], $components['Controlled:Controlled']['stimulus_controller']);
+        $this->assertSame([], $components['Controlled:Controlled']['problems']);
+        $this->assertSame(['name' => 'Quiet--Quiet', 'set_by_component' => false, 'used' => false, 'registered' => null], $components['Quiet:Quiet']['stimulus_controller']);
+        $this->assertSame([], $components['Quiet:Quiet']['problems']);
+
+        $display = $this->execute($metadataCache, [])->getDisplay();
+        $this->assertMatchesRegularExpression('~^\s+Controlled:Controlled\s+Controlled/Controlled\.html\.twig \(co-located\)\s+-\s+-\s+Controlled--Controlled\s*$~m', $display);
+        $this->assertMatchesRegularExpression('~^\s+Quiet:Quiet\s+Quiet/Quiet\.html\.twig \(co-located\)\s+-\s+-\s+-\s*$~m', $display);
+
+        $tester = $this->execute($metadataCache, ['name' => 'Controlled:Controlled']);
+        $tester->assertCommandIsSuccessful();
+        $this->assertMatchesRegularExpression('~^\s+Stimulus controller\s+Controlled--Controlled \(not checked without StimulusBundle\)\s*$~m', $tester->getDisplay());
+        $this->assertStringContainsString('[OK] No problems found.', $tester->getDisplay());
     }
 
     /**
@@ -216,7 +254,9 @@ final class DebugSdcCommandTest extends IntegrationTestCase
         $this->assertMatchesRegularExpression('~^\s+Alert:Alert\s+Alert/Alert\.html\.twig \(co-located\)\s+Alert/Alert\.css\s+Alert/Alert\.js\s+Alert--Alert\s*$~m', $display);
         $this->assertMatchesRegularExpression('~^\s+⚠ Broken:Broken\s+⚠ /Broken/Broken\.html\.twig \(default\)\s+https://cdn\.example\.com/broken\.css \(#\[Asset\]\)\s+⚠ https://cdn\.example\.com/broken\.woff2 \(#\[Asset\]\)\s+-\s*$~m', $display);
         $this->assertMatchesRegularExpression('~^\s+⚠ missing/broken\.css \(#\[AsSdcComponent\]\)\s*$~m', $display);
-        $this->assertMatchesRegularExpression('~^\s+⚠ Controlled:Controlled\s+Controlled/Controlled\.html\.twig \(co-located\)\s+-\s+-\s+⚠ Controlled--Controlled\s*$~m', $display);
+        $this->assertMatchesRegularExpression(self::hasStimulusBundle()
+            ? '~^\s+⚠ Controlled:Controlled\s+Controlled/Controlled\.html\.twig \(co-located\)\s+-\s+-\s+⚠ Controlled--Controlled\s*$~m'
+            : '~^\s+Controlled:Controlled\s+Controlled/Controlled\.html\.twig \(co-located\)\s+-\s+-\s+Controlled--Controlled\s*$~m', $display);
         $this->assertMatchesRegularExpression('~^\s+⚠ Explicit:Explicit\s+⚠ debug_sdc/missing\.html\.twig \(explicit\)~m', $display);
         $this->assertMatchesRegularExpression('~^\s+Quiet:Quiet\s+Quiet/Quiet\.html\.twig \(co-located\)\s+-\s+-\s+-\s*$~m', $display);
         $this->assertMatchesRegularExpression('~^\s+Notice:Notice\s+Notice/Notice\.html\.twig \(anonymous\)\s+Notice/Notice\.css\s+-\s+-\s*$~m', $display);
@@ -225,7 +265,8 @@ final class DebugSdcCommandTest extends IntegrationTestCase
         $this->assertStringContainsString('Broken:Broken (' . Broken::class . ')', $display);
         $this->assertStringContainsString('Card (components/Card.html.twig)', $display);
         $this->assertStringNotContainsString('Alert:Alert (' . Alert::class . ')', $display, 'A component without problems has no section.');
-        $this->assertStringContainsString('[WARNING] 8 problems found.', $display);
+        // The missing controller of Controlled:Controlled is one of them only with StimulusBundle.
+        $this->assertStringContainsString(\sprintf('[WARNING] %d problems found.', self::hasStimulusBundle() ? 8 : 7), $display);
         $this->assertStringContainsString($metadataCache ? 'Metadata from the build-time cache' : 'Metadata resolved from the files next to each class', $display);
     }
 
@@ -258,6 +299,7 @@ final class DebugSdcCommandTest extends IntegrationTestCase
         $this->assertStringContainsString('Alert/Alert.css → ' . $assetMapper->getPublicPath('Alert/Alert.css') . ' (discovered)', $display);
         $this->assertStringContainsString('Alert/Alert.js → ' . $assetMapper->getPublicPath('Alert/Alert.js') . ' (discovered)', $display);
         $this->assertMatchesRegularExpression('~^\s+Routes\s+debug_sdc_alert \(/debug-sdc/alert\)\s*$~m', $display);
+        $this->assertMatchesRegularExpression(self::hasStimulusBundle() ? '/^\s+Stimulus controller\s+Alert--Alert\s*$/m' : '/^\s+Stimulus controller\s+Alert--Alert \(not checked without StimulusBundle\)\s*$/m', $display);
         $this->assertStringContainsString('[OK] No problems found.', $display);
     }
 
@@ -311,6 +353,11 @@ final class DebugSdcCommandTest extends IntegrationTestCase
 
         $this->assertSame(['Alert:Alert', 'Broken:Broken', 'Card', 'Controlled:Controlled', 'Explicit:Explicit', 'LibraryBadge', 'Notice:Notice', 'Quiet:Quiet'], $tester->complete(['']));
         $this->assertSame(['txt', 'json'], $tester->complete(['--format', '']));
+    }
+
+    private static function hasStimulusBundle(): bool
+    {
+        return class_exists(StimulusBundle::class);
     }
 
     /**

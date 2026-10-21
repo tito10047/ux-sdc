@@ -3,6 +3,7 @@
 use Symfony\Bundle\MakerBundle\MakerBundle;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
+use Symfony\UX\StimulusBundle\StimulusBundle;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
@@ -170,6 +171,7 @@ return static function (ContainerConfigurator $container): void {
                 // maker down with it.
                 service_closure('twig'),
                 '%ux_sdc.routing.enabled%',
+                class_exists(StimulusBundle::class),
             ])
             ->tag('maker.command');
     }

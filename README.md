@@ -462,7 +462,7 @@ src_component/UI/Alert/
 | Option | Effect |
 |--------|--------|
 | `name` | Component name; `:` or `/` separate directories (`UI:Alert`, `UI/Alert`). Asked for when omitted. |
-| `--stimulus` | Also generate `<Name>_controller.js`. Without the option, asked interactively (default yes); never generated with `--no-interaction`. |
+| `--stimulus` | Also generate `<Name>_controller.js`. Without the option, asked interactively (default yes); never generated with `--no-interaction`. Needs `symfony/stimulus-bundle` (the template calls its `stimulus_controller()`): without it the option fails and the question is not asked. |
 | `--action` | Also generate a page controller and its template (see below). Without the option, asked interactively (default no). |
 | `--route-path=PATH` | Path of the page's route, instead of the one derived from the name. Implies `--action`. |
 | `--layout=TEMPLATE` | Template the page extends, instead of the one detected. Implies `--action`. |
@@ -657,7 +657,8 @@ Legacy:Old (App\Component\Legacy\Old)
 It flags (⚠) a file next to a class that is outside every Twig or AssetMapper
 path, an asset path the asset map does not know, an asset of a type other than
 `css`/`js`, a missing template, and a template that uses `{{ controller }}`
-when StimulusBundle has no controller of that name. It reads the metadata from
+when StimulusBundle has no controller of that name (without StimulusBundle the
+controller is shown as not checked). It reads the metadata from
 where the pages do — the build-time cache with `metadata_cache: true` — so it
 also shows a cache that predates a file you just added.
 
