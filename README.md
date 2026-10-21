@@ -198,16 +198,22 @@ component until the worker restarts.
 ### Where components can live
 
 Co-located files — the `.css`, `.js` and `.html.twig` next to a component class —
-are supported for components **inside `ux_components_dir`**. The bundle registers
-that directory both as a Twig path and as an AssetMapper path, so a file in it has a
-name Twig and AssetMapper agree on (`Alert/Alert.css` for
-`src_component/Alert/Alert.css`).
+are loaded by the name they have where they are served from:
+
+* the template by its **Twig name**, relative to the Twig path it sits in;
+* the stylesheet and script by their **AssetMapper logical path**, relative to the
+  AssetMapper path they sit in.
+
+`ux_components_dir` is set up for this out of the box: the bundle registers it both
+as a Twig path and as an AssetMapper path, so `src_component/Alert/Alert.css` is
+`Alert/Alert.css` and `src_component/Alert/Alert.html.twig` is
+`Alert/Alert.html.twig`. This is where single-directory components belong.
 
 Every Twig component is processed, wherever its class lives, but a co-located file
-outside every Twig path is **not loaded**: there is no name to load it by. A class
-in `src/Twig/Components/` with `Alert.css` next to it therefore gets no stylesheet.
-Either move the component into `ux_components_dir`, or reference the file explicitly
-by its AssetMapper logical path:
+without such a name is **not loaded**. A class in `src/Twig/Components/` with
+`Alert.css` next to it therefore gets no stylesheet. Either move the component into
+`ux_components_dir`, or reference the file explicitly by its AssetMapper logical
+path:
 
 ```php
 #[AsTwigComponent]
@@ -215,10 +221,39 @@ by its AssetMapper logical path:
 final class Alert {}
 ```
 
-A file under another Twig path (for example `templates/`) is resolved relative to
-that path. That is fine for a template, but a stylesheet or script resolved that way
-loads only if the same directory is also an AssetMapper path; this layout is not
-supported.
+A directory of your own works too, as long as it is both kinds of path. The names
+follow each path's namespace, and the two namespaces are independent:
+
+```yaml
+# config/packages/twig.yaml
+twig:
+    paths:
+        '%kernel.project_dir%/lib/ui': ui          # lib/ui/Badge/Badge.html.twig → @ui/Badge/Badge.html.twig
+
+# config/packages/asset_mapper.yaml
+framework:
+    asset_mapper:
+        paths:
+            lib/ui: ui                              # lib/ui/Badge/Badge.css → ui/Badge/Badge.css
+        # Keep the templates out of public/assets/; the bundle does this for ux_components_dir only.
+        excluded_patterns:
+            - '%kernel.project_dir%/lib/ui/*.twig'
+```
+
+(The classes in it have to be registered as services, like any other code outside
+`ux_components_dir`.) A directory that is only a Twig path — `templates/`, for
+example — gets its templates found, but its stylesheets and scripts cannot be
+served and are left out.
+
+A template named explicitly always wins over the one next to the class:
+
+```php
+#[AsSdcComponent(template: 'components/alert.html.twig')] // Alert.html.twig next to the class is ignored
+final class Alert {}
+```
+
+The same goes for `#[AsTwigComponent]`, `#[AsLiveComponent]` and a `twig.component`
+service tag with a `template`. The component's CSS and JS are still discovered.
 
 ### Diagnostics
 
@@ -228,7 +263,7 @@ MonologBundle):
 
 | Level | When | Logged |
 |-------|------|--------|
-| warning | A co-located file is outside every Twig path, so it is left out (see above). | in debug only; at build time (`metadata_cache: true`) into the container compiler log, shown in the profiler's *Logs* panel under *Container* |
+| warning | A co-located template is outside every Twig path, or a co-located CSS/JS file outside every AssetMapper path, so it is left out (see above). | in debug only; at build time (`metadata_cache: true`) into the container compiler log, shown in the profiler's *Logs* panel under *Container* |
 | warning | An HTML page with a `<head>` renders components with assets but does not call `render_component_assets()`. Fragments without a `<head>` (Turbo Frames, partials) are not reported. | in debug only |
 | error | `metadata_cache` is on but `%kernel.cache_dir%/sdc_metadata.php` does not exist — the cache was not warmed where the application runs, or the runtime cache directory differs from the build one. Pages still render, without component CSS and JS. | always |
 

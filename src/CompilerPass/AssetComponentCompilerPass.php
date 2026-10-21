@@ -13,13 +13,24 @@ namespace Tito10047\UX\Sdc\CompilerPass;
 
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Exception\LogicException;
+use Symfony\Component\Filesystem\Filesystem;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 
 /**
- * Resolves the Twig paths co-located files are looked up in, for the runtime
- * resolver and for the build-time one, and — with `ux_sdc.metadata_cache` on —
- * dumps the metadata of every component into `sdc_metadata.php`.
+ * Collects what the resolver needs to know about the application — its Twig
+ * paths, its AssetMapper paths and the components registered with an explicit
+ * template — for the runtime resolver and for the build-time one, and, with
+ * `ux_sdc.metadata_cache` on, dumps the metadata of every component into
+ * `sdc_metadata.php`.
+ *
+ * The paths are read from the services they configure, after every extension
+ * has loaded: the Twig filesystem loader and the AssetMapper repository. That
+ * is the list each of them actually uses — `twig.default_path`, `twig.paths`,
+ * bundle templates, `framework.asset_mapper.paths` and bundle public
+ * directories, normalised and merged — rather than a second reading of the
+ * raw configuration.
  *
  * @phpstan-import-type SdcMetadataCache from SdcMetadataRegistry
  */
@@ -33,15 +44,23 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
      */
     public const METADATA_CACHE_PARAMETER = '.ux_sdc.metadata_cache';
 
+    private const TWIG_LOADER = 'twig.loader.native_filesystem';
+    private const ASSET_MAPPER_REPOSITORY = 'asset_mapper.repository';
+
     public function process(ContainerBuilder $container): void
     {
         $twigRoots = $this->collectTwigRoots($container);
+        $assetRoots = $this->collectAssetMapperRoots($container);
+        $classesWithExplicitTemplate = $this->collectClassesWithExplicitTemplate($container);
 
-        // Both pipelines look files up in the same Twig paths. Only a compiler
-        // pass sees the `twig.paths` of the application, which is why the
-        // runtime resolver gets them from here and not from SdcExtension.
+        // Both pipelines resolve against the same roots and registrations. Only
+        // a compiler pass sees them complete, which is why the runtime resolver
+        // gets them from here and not from SdcExtension.
         if ($container->hasDefinition(ComponentMetadataResolver::class)) {
-            $container->getDefinition(ComponentMetadataResolver::class)->setArgument('$twigRoots', $twigRoots);
+            $container->getDefinition(ComponentMetadataResolver::class)
+                ->setArgument('$twigRoots', $twigRoots)
+                ->setArgument('$assetRoots', $assetRoots)
+                ->setArgument('$classesWithExplicitTemplate', $classesWithExplicitTemplate);
         }
 
         if (!$container->hasDefinition(SdcMetadataRegistry::class)) {
@@ -70,61 +89,142 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
         // exist yet. The kernel keeps that log for debug containers only (and
         // the profiler shows it), so the resolver is told it runs in debug: in
         // a production build the report goes nowhere without any further check.
-        $resolver = new ComponentMetadataResolver($twigRoots, $autoDiscovery, new CompilerLogLogger($container, $this), true);
+        $resolver = new ComponentMetadataResolver(
+            $twigRoots,
+            $assetRoots,
+            $autoDiscovery,
+            new CompilerLogLogger($container, $this),
+            true,
+            $classesWithExplicitTemplate,
+        );
 
         $this->dumpCache($cachePath, $this->resolveTaggedComponents($container, $resolver));
     }
 
     /**
-     * @return list<string> existing directories, as real paths
+     * The directories of the Twig filesystem loader, in the order Twig looks
+     * templates up, as registered by TwigBundle: `addPath($path)` for the main
+     * namespace, `addPath($path, $namespace)` for any other.
+     *
+     * @return array<string, string|null> existing directories, as real paths, => namespace (null for the main one)
      */
     private function collectTwigRoots(ContainerBuilder $container): array
     {
-        $twigRoots = [];
-        if ($container->hasParameter('kernel.project_dir')) {
-            $defaultDir = $container->getParameterBag()->resolveValue('%kernel.project_dir%/src_component');
-            if (is_dir($defaultDir)) {
-                $twigRoots[] = $defaultDir;
-            }
+        if (!$container->hasDefinition(self::TWIG_LOADER)) {
+            return [];
         }
 
-        if ($container->hasParameter('twig.default_path')) {
-            $twigRoots[] = $container->getParameterBag()->resolveValue($container->getParameter('twig.default_path'));
-        }
-
-        if ($container->hasParameter('ux_sdc.ux_components_dir')) {
-            $uxDir = $container->getParameterBag()->resolveValue($container->getParameter('ux_sdc.ux_components_dir'));
-            if (is_dir($uxDir)) {
-                $twigRoots[] = $uxDir;
-            }
-        }
-
-        if ($container->hasExtension('twig')) {
-            $twigConfigs = $container->getExtensionConfig('twig');
-            foreach ($twigConfigs as $config) {
-                if (isset($config['paths'])) {
-                    foreach ($config['paths'] as $path => $namespace) {
-                        // "paths" is either a path => namespace map or a plain list of paths.
-                        $actualPath = is_numeric($path) ? $namespace : $path;
-                        $twigRoots[] = $container->getParameterBag()->resolveValue($actualPath);
-                    }
-                }
-            }
-        }
-
-        $realRoots = [];
-        foreach ($twigRoots as $root) {
-            if (!\is_string($root) || '' === $root) {
+        $roots = [];
+        foreach ($container->getDefinition(self::TWIG_LOADER)->getMethodCalls() as [$method, $arguments]) {
+            if ('addPath' !== $method || !isset($arguments[0]) || !\is_string($arguments[0])) {
                 continue;
             }
 
-            $realRoot = realpath($root);
-            if (false !== $realRoot) {
-                $realRoots[] = $realRoot;
+            $namespace = isset($arguments[1]) && \is_string($arguments[1]) && '' !== $arguments[1] ? $arguments[1] : null;
+            $realPath = $this->resolveDirectory($container, $arguments[0]);
+
+            // `ux_sdc.ux_components_dir` is registered twice, in the main
+            // namespace and as @component: the main namespace is kept, so its
+            // templates keep the names they have always had.
+            if (null !== $realPath && (!\array_key_exists($realPath, $roots) || null === $namespace)) {
+                $roots[$realPath] = $namespace;
             }
         }
 
-        return array_values(array_unique($realRoots));
+        return $roots;
+    }
+
+    /**
+     * The directories of the AssetMapper repository, in the order AssetMapper
+     * looks assets up. Its first constructor argument has been the map of
+     * directory => namespace FrameworkBundle builds from
+     * `framework.asset_mapper.paths` since AssetMapper exists.
+     *
+     * @return array<string, string> existing directories, as real paths, => namespace ('' for none)
+     */
+    private function collectAssetMapperRoots(ContainerBuilder $container): array
+    {
+        // Absent when AssetMapper is disabled.
+        if (!$container->hasDefinition(self::ASSET_MAPPER_REPOSITORY)) {
+            return [];
+        }
+
+        $arguments = $container->getDefinition(self::ASSET_MAPPER_REPOSITORY)->getArguments();
+        $paths = $arguments[0] ?? $arguments['$paths'] ?? null;
+        if (!\is_array($paths)) {
+            throw new LogicException(\sprintf('UX SDC cannot read the AssetMapper paths: the first argument of the "%s" service is not the array of paths it expects (%s). This version of AssetMapper is not supported.', self::ASSET_MAPPER_REPOSITORY, get_debug_type($paths)));
+        }
+
+        $roots = [];
+        foreach ($paths as $path => $namespace) {
+            if (!\is_string($path) || !\is_string($namespace)) {
+                continue;
+            }
+
+            $realPath = $this->resolveDirectory($container, $path);
+            if (null !== $realPath && !\array_key_exists($realPath, $roots)) {
+                $roots[$realPath] = $namespace;
+            }
+        }
+
+        return $roots;
+    }
+
+    /**
+     * Components whose registration names their template: the `template`
+     * argument of #[AsTwigComponent] and its subclasses, or of a `twig.component`
+     * tag registered by hand. TwigComponent only fills in a default template
+     * for a tag that names none, and does so in its own copy of the tag, so the
+     * tags still say what the application chose.
+     *
+     * @return list<string>
+     */
+    private function collectClassesWithExplicitTemplate(ContainerBuilder $container): array
+    {
+        $classes = [];
+
+        foreach ($container->findTaggedServiceIds('twig.component') as $id => $tags) {
+            foreach ($tags as $tag) {
+                if (!isset($tag['template']) && !isset($tag['template_from_method'])) {
+                    continue;
+                }
+
+                $class = $container->getParameterBag()->resolveValue($container->getDefinition($id)->getClass());
+                if (\is_string($class)) {
+                    $classes[] = $class;
+                }
+
+                break;
+            }
+        }
+
+        return array_values(array_unique($classes));
+    }
+
+    /**
+     * Resolves a configured directory the way Twig and AssetMapper do: relative
+     * to the project directory unless absolute.
+     *
+     * @return string|null the real path; null when the directory does not exist
+     */
+    private function resolveDirectory(ContainerBuilder $container, string $path): ?string
+    {
+        $parameterBag = $container->getParameterBag();
+        $resolved = $container->resolveEnvPlaceholders($parameterBag->unescapeValue($parameterBag->resolveValue($path)), true);
+        if (!\is_string($resolved) || '' === $resolved) {
+            return null;
+        }
+
+        if (!(new Filesystem())->isAbsolutePath($resolved) && $container->hasParameter('kernel.project_dir')) {
+            $projectDir = $container->getParameter('kernel.project_dir');
+            if (\is_string($projectDir)) {
+                $resolved = $projectDir . '/' . $resolved;
+            }
+        }
+
+        $realPath = realpath($resolved);
+
+        return false !== $realPath && is_dir($realPath) ? $realPath : null;
     }
 
     /**

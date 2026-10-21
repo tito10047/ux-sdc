@@ -22,8 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Diagnostics for component assets that silently went missing, logged through the
   application's `logger` service (channel `ux_sdc` with MonologBundle; the bundle
   now requires `psr/log`). Each message says what to change:
-  - warning, in debug only: a CSS, JS or Twig file next to a component class is
-    outside every Twig path and is therefore not loaded. At build time
+  - warning, in debug only: a Twig file next to a component class is outside
+    every Twig path, or a CSS or JS file outside every AssetMapper path, and is
+    therefore not loaded. At build time
     (`metadata_cache: true`) the warning goes to the container compiler log, which
     the profiler shows under *Logs › Container*;
   - warning, in debug only: an HTML page with a `<head>` renders components with
@@ -58,14 +59,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the container, so no action is needed for the file itself.
 - **BC break:** `ComponentMetadataResolver::resolveMetadata($class, $componentName, &$allMetadata)`
   is replaced by `resolve(string $class): ComponentMetadata`, an immutable value
-  object with `assets` and `template`. The constructor takes an optional logger
-  and a `debug` flag.
+  object with `assets` and `template`. The constructor now reads
+  `(array $twigRoots, array $assetRoots, bool $autoDiscoveryEnabled, ?LoggerInterface $logger = null, bool $debug = false, array $classesWithExplicitTemplate = [])`:
+  Twig paths and AssetMapper paths are separate, each a list of directories or
+  a map of directory => namespace, as in `twig.paths` and
+  `framework.asset_mapper.paths`.
 - **Behaviour change:** single-directory components are supported inside
-  `ux_components_dir` (see *Where components can live* in the README). A CSS or
-  JS file next to a component class outside every Twig path used to be
-  registered under its bare file name (`Alert.css`), which never resolved and
-  produced a broken `<link>`/`<script>`; it is now left out, and reported in
-  debug.
+  `ux_components_dir`, or any directory that is both a Twig path and an
+  AssetMapper path (see *Where components can live* in the README). A CSS or JS
+  file next to a component class is now named by its AssetMapper logical path,
+  relative to the AssetMapper path it sits in — it used to be named relative to
+  a Twig path, which AssetMapper could not serve unless the two happened to
+  coincide, or, outside every Twig path, by its bare file name (`Alert.css`).
+  Either way the result was a broken `<link>`/`<script>`; such a file is now
+  left out, and reported in debug. For `ux_components_dir` nothing changes.
+- The bundle now requires `symfony/filesystem` directly; it was already
+  installed with FrameworkBundle.
 - Every `ux_sdc` configuration option is now described, in English, in
   `config:dump-reference ux_sdc`; the descriptions used to be in Slovak, and
   `stimulus` had none.
@@ -75,6 +84,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`zadanie.md`, `.junie/`) are no longer shipped.
 
 ### Fixed
+
+- A template named explicitly — the `template` argument of `#[AsTwigComponent]`,
+  `#[AsSdcComponent]` or `#[AsLiveComponent]`, or of a `twig.component` service
+  tag — is rendered again. A `.html.twig` file next to the component class used
+  to replace it silently. The co-located CSS and JS are still loaded.
+- The co-located template of a component under a Twig path registered with a
+  namespace (`twig.paths: {'%kernel.project_dir%/lib/ui': ui}`) is now named
+  `@ui/…`. It was named without the namespace, so Twig could not load it and
+  the page failed with "Unable to find template". A directory registered both
+  in the main namespace and with a namespace (as `ux_components_dir` is, also as
+  `@component`) keeps the name without one. Twig paths and AssetMapper paths are
+  now read from the services that use them, so relative paths, bundle
+  directories and `twig.default_path` are all taken into account.
 
 - `#[AsSdcComponent]` works on Symfony 6.4 and 7.0. There a class carrying only
   `#[AsSdcComponent]` was never registered as a Twig component ("Unknown

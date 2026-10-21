@@ -49,6 +49,8 @@ class TestKernel extends Kernel
      * @param array      $frameworkConfig loaded as a separate framework config, the way an application's own config/packages/framework.yaml would be
      * @param array|null $stimulusConfig  the application's own config/packages/stimulus.yaml; null when it has none
      * @param list<CompilerPassInterface> $compilerPasses added to the container on top of those of the bundles, e.g. to rearrange listeners
+     * @param array      $twigConfig      loaded as a separate twig config, the way an application's own config/packages/twig.yaml would be
+     * @param list<class-string> $services registered autowired and autoconfigured, the way an application's services.yaml registers its classes
      */
     public function __construct(
         string|array $configs = [],
@@ -57,6 +59,8 @@ class TestKernel extends Kernel
         private readonly array $frameworkConfig = [],
         private readonly ?array $stimulusConfig = null,
         private readonly array $compilerPasses = [],
+        private readonly array $twigConfig = [],
+        private readonly array $services = [],
     ) {
         if (is_string($configs)) {
             $environment = $configs;
@@ -127,6 +131,14 @@ class TestKernel extends Kernel
         $container->loadFromExtension('twig', [
             'default_path' => '%kernel.project_dir%/tests/Integration/Fixtures/templates',
         ]);
+
+        if ([] !== $this->twigConfig) {
+            $container->loadFromExtension('twig', $this->twigConfig);
+        }
+
+        foreach ($this->services as $class) {
+            $container->register($class, $class)->setAutowired(true)->setAutoconfigured(true);
+        }
 
         $container->loadFromExtension('twig_component', [
             'anonymous_template_directory' => 'components/',

@@ -39,7 +39,10 @@ trait CreatesTestKernel
             $options['configs'] ?? [],
             $env,
             (bool) $debug,
+            frameworkConfig: $options['framework'] ?? [],
             compilerPasses: $options['compiler_passes'] ?? [],
+            twigConfig: $options['twig'] ?? [],
+            services: $options['services'] ?? [],
         );
     }
 }

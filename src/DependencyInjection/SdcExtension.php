@@ -268,11 +268,14 @@ class SdcExtension extends Extension implements PrependExtensionInterface
     {
         $container->register(ComponentMetadataResolver::class)
             ->setArguments([
-                // Set by AssetComponentCompilerPass, which sees the Twig paths of the application.
+                // The roots and the components with an explicit template are set
+                // by AssetComponentCompilerPass, which sees those of the application.
                 '$twigRoots' => [],
+                '$assetRoots' => [],
                 '$autoDiscoveryEnabled' => $config['auto_discovery'],
                 '$logger' => new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
                 '$debug' => '%kernel.debug%',
+                '$classesWithExplicitTemplate' => [],
             ])
             ->addTag('monolog.logger', ['channel' => 'ux_sdc']);
     }

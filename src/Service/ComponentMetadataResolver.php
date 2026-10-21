@@ -19,21 +19,43 @@ use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
 /**
  * Resolves the assets and template co-located with a component class.
  *
- * A co-located file is addressed by its path relative to the Twig path it sits
- * in: that is its Twig name and, for `ux_sdc.ux_components_dir` (registered as
- * both a Twig path and an AssetMapper path), its AssetMapper logical path too.
- * A file outside every Twig path has no such name, so it is left out — and,
- * in debug, reported to the logger. Single-directory components are supported
- * under `ux_components_dir`; see the README.
+ * A co-located file is addressed by the name it has where it is served from:
+ *
+ *  - the template by its Twig name, relative to the Twig path it sits in and
+ *    prefixed with that path's namespace (`@ui/Alert/Alert.html.twig`); a path
+ *    of the main namespace wins over a namespaced one, so a file under
+ *    `ux_sdc.ux_components_dir` (registered both ways) gets the plain name;
+ *  - a stylesheet or script by its AssetMapper logical path, relative to the
+ *    AssetMapper path it sits in and prefixed with that path's namespace.
+ *
+ * The two are independent: a Twig path is not an AssetMapper path, nor the
+ * other way round, and a Twig namespace plays no part in a logical path.
+ * `ux_components_dir` is registered as both, with no namespace, so its files
+ * get the same relative name in each. A file without such a name is left out
+ * — and, in debug, reported to the logger.
+ *
+ * A component whose registration names its template (the `template` argument
+ * of #[AsTwigComponent], #[AsSdcComponent] or #[AsLiveComponent], or of the
+ * `twig.component` tag) keeps it: the file next to the class is not looked up.
  *
  * @phpstan-import-type SdcAsset from AssetRegistry
  */
 class ComponentMetadataResolver
 {
     /**
-     * @var list<string> real paths, with a trailing directory separator
+     * @var list<array{string, string}> real path with a trailing directory separator, and namespace ('' for the main one)
      */
-    private array $resolvedRoots = [];
+    private array $twigRoots;
+
+    /**
+     * @var list<array{string, string}> real path with a trailing directory separator, and namespace ('' for none)
+     */
+    private array $assetRoots;
+
+    /**
+     * @var array<string, true>
+     */
+    private array $classesWithExplicitTemplate;
 
     /**
      * Per-class resolution cache, deliberately kept for the lifetime of the
@@ -57,24 +79,29 @@ class ComponentMetadataResolver
     private array $classCache = [];
 
     /**
-     * @param array<string> $twigRoots
-     * @param bool          $debug     a file left out is reported only in debug: it is a
-     *                                 mistake in the application's code, the same in every
-     *                                 environment, and a production log would get it from
-     *                                 every process for as long as the code stays as it is
+     * Both root sets take the shape of the configuration they come from: a list
+     * of directories, or a map of directory => namespace. A directory that does
+     * not exist is ignored.
+     *
+     * @param array<int|string, string|null> $twigRoots                   Twig paths (`twig.paths`); a null or empty namespace is the main one
+     * @param array<int|string, string|null> $assetRoots                  AssetMapper paths (`framework.asset_mapper.paths`); a null or empty namespace is none
+     * @param bool                           $debug                       a file left out is reported only in debug: it is a
+     *                                                                    mistake in the application's code, the same in every
+     *                                                                    environment, and a production log would get it from
+     *                                                                    every process for as long as the code stays as it is
+     * @param list<string>                   $classesWithExplicitTemplate component classes registered with an explicit template
      */
     public function __construct(
-        private array $twigRoots,
+        array $twigRoots,
+        array $assetRoots,
         private bool $autoDiscoveryEnabled,
         private ?LoggerInterface $logger = null,
         private bool $debug = false,
+        array $classesWithExplicitTemplate = [],
     ) {
-        foreach ($this->twigRoots as $root) {
-            $realRoot = realpath($root);
-            if ($realRoot) {
-                $this->resolvedRoots[] = $realRoot . DIRECTORY_SEPARATOR;
-            }
-        }
+        $this->twigRoots = self::normalizeRoots($twigRoots);
+        $this->assetRoots = self::normalizeRoots($assetRoots);
+        $this->classesWithExplicitTemplate = array_fill_keys($classesWithExplicitTemplate, true);
     }
 
     public function resolve(string $class): ComponentMetadata
@@ -97,7 +124,7 @@ class ComponentMetadataResolver
             $basePath = dirname($fileName) . DIRECTORY_SEPARATOR . $reflectionClass->getShortName();
 
             foreach (['css', 'js'] as $ext) {
-                $path = $this->findCoLocatedFile($class, $basePath . '.' . $ext);
+                $path = $this->findCoLocatedAsset($class, $basePath . '.' . $ext);
                 if (null !== $path) {
                     $assets[] = [
                         'path' => $path,
@@ -108,7 +135,9 @@ class ComponentMetadataResolver
                 }
             }
 
-            $template = $this->findCoLocatedFile($class, $basePath . '.html.twig');
+            if (!isset($this->classesWithExplicitTemplate[$class])) {
+                $template = $this->findCoLocatedTemplate($class, $basePath . '.html.twig');
+            }
         }
 
         return $this->classCache[$class] = new ComponentMetadata($assets, $template);
@@ -161,52 +190,130 @@ class ComponentMetadataResolver
     }
 
     /**
-     * @return string|null the path of the file relative to its Twig path; null
-     *                     when there is no such file or it is outside every Twig path
+     * @return string|null the AssetMapper logical path of the file; null when
+     *                     there is no such file or it is outside every AssetMapper path
      */
-    private function findCoLocatedFile(string $class, string $file): ?string
+    private function findCoLocatedAsset(string $class, string $file): ?string
     {
         if (!file_exists($file)) {
             return null;
         }
 
         $realFile = realpath($file) ?: $file;
-        $relativePath = $this->findShortestRelativePath($realFile);
 
-        if (null === $relativePath && $this->debug) {
-            $this->reportOutsideTwigPaths($class, $realFile);
+        // The first matching path, in configuration order, as AssetMapper itself
+        // names a file (AssetMapperRepository::findLogicalPath()).
+        foreach ($this->assetRoots as [$root, $namespace]) {
+            if (str_starts_with($realFile, $root)) {
+                return self::prefix($namespace, substr($realFile, strlen($root)));
+            }
         }
 
-        return $relativePath;
+        if ($this->debug) {
+            $this->report(
+                'Component "{component}": "{file}" next to the class is outside every AssetMapper path ({roots}), so it is not loaded with the component. Move the component into the directory configured as "ux_sdc.ux_components_dir", add its directory to "framework.asset_mapper.paths", or reference the file by its AssetMapper logical path with #[Asset].',
+                $class,
+                $realFile,
+                $this->assetRoots,
+            );
+        }
+
+        return null;
     }
 
-    private function reportOutsideTwigPaths(string $class, string $file): void
+    /**
+     * @return string|null the Twig name of the file; null when there is no such
+     *                     file or it is outside every Twig path
+     */
+    private function findCoLocatedTemplate(string $class, string $file): ?string
     {
-        $message = str_ends_with($file, '.twig')
-            ? 'Component "{component}": the template "{file}" next to the class is outside every Twig path ({roots}), so it is not used. Move the component into the directory configured as "ux_sdc.ux_components_dir", or name its template explicitly with the "template" argument of #[AsTwigComponent] or #[AsSdcComponent].'
-            : 'Component "{component}": "{file}" next to the class is outside every Twig path ({roots}), so it is not loaded with the component. Move the component into the directory configured as "ux_sdc.ux_components_dir", or reference the file by its AssetMapper logical path with #[Asset].';
+        if (!file_exists($file)) {
+            return null;
+        }
 
-        $roots = array_map(static fn (string $root): string => rtrim($root, DIRECTORY_SEPARATOR), $this->resolvedRoots);
+        $realFile = realpath($file) ?: $file;
+
+        // A path of the main namespace wins, so that a file under
+        // `ux_components_dir` keeps the name it has without a namespace; within
+        // the same kind of path, the shortest name.
+        foreach ([true, false] as $mainNamespace) {
+            $name = null;
+
+            foreach ($this->twigRoots as [$root, $namespace]) {
+                if (('' === $namespace) !== $mainNamespace || !str_starts_with($realFile, $root)) {
+                    continue;
+                }
+
+                $candidate = self::prefix($mainNamespace ? '' : '@' . $namespace, substr($realFile, strlen($root)));
+                if (null === $name || strlen($candidate) < strlen($name)) {
+                    $name = $candidate;
+                }
+            }
+
+            if (null !== $name) {
+                return $name;
+            }
+        }
+
+        if ($this->debug) {
+            $this->report(
+                'Component "{component}": the template "{file}" next to the class is outside every Twig path ({roots}), so it is not used. Move the component into the directory configured as "ux_sdc.ux_components_dir", or name its template explicitly with the "template" argument of #[AsTwigComponent] or #[AsSdcComponent].',
+                $class,
+                $realFile,
+                $this->twigRoots,
+            );
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<array{string, string}> $roots
+     */
+    private function report(string $message, string $class, string $file, array $roots): void
+    {
+        $paths = array_map(static fn (array $root): string => rtrim($root[0], DIRECTORY_SEPARATOR), $roots);
 
         $this->logger?->warning($message, [
             'component' => $class,
             'file' => $file,
-            'roots' => [] === $roots ? 'none configured' : implode(', ', $roots),
+            'roots' => [] === $paths ? 'none configured' : implode(', ', array_unique($paths)),
         ]);
     }
 
-    private function findShortestRelativePath(string $filePath): ?string
+    /**
+     * @param array<int|string, string|null> $roots
+     *
+     * @return list<array{string, string}>
+     */
+    private static function normalizeRoots(array $roots): array
     {
-        $shortestPath = null;
-        foreach ($this->resolvedRoots as $root) {
-            if (str_starts_with($filePath, $root)) {
-                $relativePath = substr($filePath, strlen($root));
-                if ($shortestPath === null || strlen($relativePath) < strlen($shortestPath)) {
-                    $shortestPath = $relativePath;
-                }
+        $normalized = [];
+
+        foreach ($roots as $path => $namespace) {
+            // A list of directories, or a map of directory => namespace.
+            if (\is_int($path)) {
+                $path = (string) $namespace;
+                $namespace = '';
+            }
+
+            $realPath = '' === $path ? false : realpath($path);
+            if (false !== $realPath) {
+                $normalized[] = [rtrim($realPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR, (string) $namespace];
             }
         }
 
-        return $shortestPath;
+        return $normalized;
+    }
+
+    /**
+     * Joins a namespace and a relative path the way Twig and AssetMapper do,
+     * with forward slashes.
+     */
+    private static function prefix(string $namespace, string $relativePath): string
+    {
+        $relativePath = str_replace('\\', '/', $relativePath);
+
+        return '' === $namespace ? $relativePath : rtrim($namespace, '/') . '/' . $relativePath;
     }
 }
