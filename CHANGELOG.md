@@ -34,6 +34,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `%kernel.cache_dir%/sdc_metadata.php` does not exist (cache not warmed where
     the application runs, or a different runtime cache directory). The page is
     still delivered, without component CSS and JS.
+- The `controller` template variable is set for every component in
+  `component_namespace`, LiveComponents included, without the `Stimulus` trait
+  or `ComponentNamespaceInterface`. A `controller` the component exposes itself
+  (a public property, `#[ExposeInTemplate]`, the trait) is kept; one inherited
+  from the template around an embedded component (`<twig:X>…</twig:X>`) is not.
+  Without `component_namespace`, and for classes outside it, nothing is set.
+  The trait and the interface keep working, for the name in PHP
+  (`getController()`). `make:sdc-component` no longer generates them.
 
 ### Changed
 
@@ -73,6 +81,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   coincide, or, outside every Twig path, by its bare file name (`Alert.css`).
   Either way the result was a broken `<link>`/`<script>`; such a file is now
   left out, and reported in debug. For `ux_components_dir` nothing changes.
+- **Behaviour change:** the Stimulus controller name (`{{ controller }}`,
+  `Stimulus::getController()`) now follows StimulusBundle's naming exactly:
+  `_` in the class name below `component_namespace` becomes `-`, as in the name StimulusBundle
+  registers for the `_controller.js` file. `stimulus_controller(controller)`
+  renders the same as before; a hand-written `data-controller="{{ controller }}"`
+  on a class with an underscore now names the registered controller instead of
+  one that does not exist. `getController()` on a class outside the component
+  namespace now throws a `LogicException`; it used to return the whole class
+  name with `\` as `--`, which no controller of the component directory has.
 - The bundle now requires `symfony/filesystem` directly; it was already
   installed with FrameworkBundle.
 - Every `ux_sdc` configuration option is now described, in English, in
@@ -85,6 +102,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A controller implementing `ComponentNamespaceInterface` (a page controller
+  using the `Stimulus` trait) receives the component namespace on
+  `kernel.controller` whether or not LiveComponent is installed. Without
+  LiveComponent the listener was not registered, and `getController()` threw.
 - A template named explicitly — the `template` argument of `#[AsTwigComponent]`,
   `#[AsSdcComponent]` or `#[AsLiveComponent]`, or of a `twig.component` service
   tag — is rendered again. A `.html.twig` file next to the component class used

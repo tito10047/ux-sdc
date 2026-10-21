@@ -5,6 +5,7 @@ use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigura
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
+use Tito10047\UX\Sdc\Service\StimulusControllerNameResolver;
 use Tito10047\UX\Sdc\EventListener\AssetResponseListener;
 use Tito10047\UX\Sdc\EventListener\ComponentRenderListener;
 use Tito10047\UX\Sdc\EventListener\DevComponentRenderListener;
@@ -56,10 +57,18 @@ return static function (ContainerConfigurator $container): void {
         ])
         ->tag('monolog.logger', ['channel' => 'ux_sdc']);
 
+    $services->set(StimulusControllerNameResolver::class)
+        ->args(['%ux_sdc.component_namespace%']);
+
+    // Besides rendering, both listeners hand the component namespace on
+    // `kernel.controller` to a controller implementing ComponentNamespaceInterface:
+    // a page controller using the Stimulus trait, or a LiveComponent, which is the
+    // controller of its own re-render request and is never mounted in it.
     $services->set(ComponentRenderListener::class)
         ->args([
             service(SdcMetadataRegistry::class),
             service(AssetRegistry::class),
+            service(StimulusControllerNameResolver::class),
             '%ux_sdc.component_namespace%',
         ])
         ->tag('kernel.event_listener', [
@@ -69,12 +78,17 @@ return static function (ContainerConfigurator $container): void {
         ->tag('kernel.event_listener', [
             'event' => 'Symfony\UX\TwigComponent\Event\PreRenderEvent',
             'method' => 'onPreRender',
+        ])
+        ->tag('kernel.event_listener', [
+            'event' => 'kernel.controller',
+            'method' => 'onKernelController',
         ]);
 
     $services->set(DevComponentRenderListener::class)
         ->args([
             service(ComponentMetadataResolver::class),
             service(AssetRegistry::class),
+            service(StimulusControllerNameResolver::class),
             '%ux_sdc.component_namespace%',
         ])
         ->tag('kernel.event_listener', [
@@ -84,6 +98,10 @@ return static function (ContainerConfigurator $container): void {
         ->tag('kernel.event_listener', [
             'event' => 'Symfony\UX\TwigComponent\Event\PreRenderEvent',
             'method' => 'onPreRender',
+        ])
+        ->tag('kernel.event_listener', [
+            'event' => 'kernel.controller',
+            'method' => 'onKernelController',
         ]);
 
     $services->set(AssetExtension::class)

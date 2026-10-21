@@ -20,8 +20,6 @@ use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Config\FileLocator;
-use Symfony\Component\HttpKernel\KernelEvents;
-use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
 use Tito10047\UX\Sdc\CompilerPass\AssetComponentCompilerPass;
 use Tito10047\UX\Sdc\CompilerPass\StimulusControllerPathsCompilerPass;
 use Tito10047\UX\Sdc\EventListener\ComponentRenderListener;
@@ -95,23 +93,6 @@ class SdcExtension extends Extension implements PrependExtensionInterface
         // on 'class "string" does not exist', which took away the one command
         // that tells an application whether its container is sound.
         $container->setParameter('app.ui_components.dir', $config['ux_components_dir']);
-
-        if (class_exists(AsLiveComponent::class)) {
-            $listeners = [
-                'Tito10047\UX\Sdc\EventListener\ComponentRenderListener',
-                'Tito10047\UX\Sdc\EventListener\DevComponentRenderListener',
-            ];
-
-            foreach ($listeners as $listener) {
-                if ($container->hasDefinition($listener)) {
-                    $container->getDefinition($listener)
-                        ->addTag('kernel.event_listener', [
-                            'event' => KernelEvents::CONTROLLER,
-                            'method' => 'onKernelController',
-                        ]);
-                }
-            }
-        }
 
         $container->register(SdcMetadataRegistry::class)
             ->setArguments([

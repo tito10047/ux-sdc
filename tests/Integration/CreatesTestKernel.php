@@ -19,6 +19,8 @@ use Symfony\Component\HttpKernel\KernelInterface;
  * Options on top of `environment` and `debug`:
  *  - `configs`: the `ux_sdc` configuration
  *  - `compiler_passes`: extra compiler passes, see TestKernel
+ *  - `framework`, `twig`, `twig_component`: application configuration of those bundles
+ *  - `services`: application classes registered as services, see TestKernel
  */
 trait CreatesTestKernel
 {
@@ -43,6 +45,7 @@ trait CreatesTestKernel
             compilerPasses: $options['compiler_passes'] ?? [],
             twigConfig: $options['twig'] ?? [],
             services: $options['services'] ?? [],
+            twigComponentConfig: $options['twig_component'] ?? [],
         );
     }
 }

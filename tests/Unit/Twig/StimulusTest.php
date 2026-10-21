@@ -17,21 +17,15 @@ use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
 
 class StimulusTest extends TestCase
 {
-    public function testGetControllerReturnsFormattedName(): void
+    public function testGetControllerThrowsOutsideTheNamespace(): void
     {
-        $component = new class () implements ComponentNamespaceInterface {
-            use Stimulus;
-        };
+        $component = new TestComponent();
+        $component->setComponentNamespace('App\\Component\\');
 
-        $component->setComponentNamespace('Tito10047\\UX\\Sdc\\Tests\\Unit\\Twig\\');
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Cannot name the Stimulus controller of "Tito10047\\UX\\Sdc\\Tests\\Unit\\Twig\\TestComponent": the class is not in the component namespace "App\\Component\\"');
 
-        // The class name of the anonymous class will be something like
-        // Tito10047\UX\Sdc\Tests\Unit\Twig\StimulusTest@anonymous...
-        // We want to verify it replaces the namespace and backslashes
-
-        $controller = $component->getController();
-        $this->assertStringNotContainsString('Tito10047--UX--Sdc--Tests--Twig--', $controller);
-        $this->assertStringContainsString('StimulusTest', $controller);
+        $component->getController();
     }
 
     public function testGetControllerThrowsExceptionIfNamespaceNotSet(): void
@@ -61,6 +55,26 @@ class StimulusTest extends TestCase
 
         $this->assertEquals('Sub--SubComponent', $component->getController());
     }
+
+    public function testGetControllerWithNamespaceWithoutTrailingBackslash(): void
+    {
+        $component = new Sub\SubComponent();
+        $component->setComponentNamespace('Tito10047\\UX\\Sdc\\Tests\\Unit');
+
+        $this->assertSame('Twig--Sub--SubComponent', $component->getController());
+    }
+
+    /**
+     * The name is that of the class using the trait, as it always was: a
+     * subclass shares the controller of its parent.
+     */
+    public function testGetControllerOfSubclassNamesTheClassUsingTheTrait(): void
+    {
+        $component = new Sub\ExtendedComponent();
+        $component->setComponentNamespace('Tito10047\\UX\\Sdc\\Tests\\Unit\\Twig\\');
+
+        $this->assertSame('Sub--SubComponent', $component->getController());
+    }
 }
 
 class TestComponent implements ComponentNamespaceInterface
@@ -76,4 +90,8 @@ use Tito10047\UX\Sdc\Twig\Stimulus;
 class SubComponent implements ComponentNamespaceInterface
 {
     use Stimulus;
+}
+
+class ExtendedComponent extends SubComponent
+{
 }

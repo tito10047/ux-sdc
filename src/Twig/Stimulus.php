@@ -12,7 +12,17 @@
 namespace Tito10047\UX\Sdc\Twig;
 
 use Symfony\UX\TwigComponent\Attribute\ExposeInTemplate;
+use Tito10047\UX\Sdc\Service\StimulusControllerNameResolver;
 
+/**
+ * Gives a class the name of its Stimulus controller, in PHP (getController())
+ * and in its template ({{ controller }}). The class must also implement
+ * ComponentNamespaceInterface, which is how the bundle hands it the namespace.
+ *
+ * Components do not need it for the template variable: the bundle sets
+ * `controller` for every component in `component_namespace`. Use it when the
+ * name is needed in PHP, or on a controller class.
+ */
 trait Stimulus
 {
     private ?string $componentNamespace = null;
@@ -29,8 +39,7 @@ trait Stimulus
             throw new \LogicException('Component namespace is not set. Did you forget to implement ComponentNamespaceInterface?');
         }
 
-        $controller = self::class;
-        $controller = str_replace($this->componentNamespace, "", $controller);
-        return str_replace("\\", "--", ltrim($controller, "\\"));
+        return (new StimulusControllerNameResolver($this->componentNamespace))->resolve(self::class)
+            ?? throw new \LogicException(\sprintf('Cannot name the Stimulus controller of "%s": the class is not in the component namespace "%s", so no controller in the component directory is named after it.', self::class, $this->componentNamespace));
     }
 }

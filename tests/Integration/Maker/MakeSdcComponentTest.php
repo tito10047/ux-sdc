@@ -13,6 +13,8 @@ namespace Tito10047\UX\Sdc\Tests\Integration\Maker;
 
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\UX\StimulusBundle\AssetMapper\ControllersMapGenerator;
+use Symfony\UX\TwigComponent\ComponentRendererInterface;
 use Tito10047\UX\Sdc\Tests\Integration\IntegrationTestCase;
 
 class MakeSdcComponentTest extends IntegrationTestCase
@@ -80,6 +82,9 @@ class MakeSdcComponentTest extends IntegrationTestCase
         $this->assertStringContainsString('class Alert', $phpContent);
         $this->assertStringContainsString('use Tito10047\UX\Sdc\Attribute\AsSdcComponent;', $phpContent);
         $this->assertStringContainsString('#[AsSdcComponent]', $phpContent);
+        // {{ controller }} needs neither: the bundle sets it for every component in the namespace.
+        $this->assertStringNotContainsString('ComponentNamespaceInterface', $phpContent);
+        $this->assertStringNotContainsString('Stimulus', $phpContent);
 
         $twigContent = file_get_contents($baseDir . '/UI/Alert/Alert.html.twig');
         $this->assertStringContainsString('<div {{ attributes.defaults({class:"alert"}).defaults(stimulus_controller(controller)) }}>', $twigContent);
@@ -89,6 +94,36 @@ class MakeSdcComponentTest extends IntegrationTestCase
         $this->assertStringContainsString('.alert{', $cssContent);
 
         $this->assertStringContainsString('tests/Integration/Fixtures/Component/UI/Alert/Alert.php', $display);
+    }
+
+    /**
+     * The generated template passes {{ controller }} to stimulus_controller();
+     * it has to name the generated Alert_controller.js the way StimulusBundle does.
+     */
+    public function testGeneratedComponentRendersItsStimulusController(): void
+    {
+        if (!class_exists(ControllersMapGenerator::class)) {
+            self::markTestSkipped('symfony/stimulus-bundle is not installed.');
+        }
+
+        self::bootKernel();
+        $tester = new CommandTester((new Application(self::$kernel))->find('make:sdc-component'));
+        $tester->execute(['name' => 'UI:Alert', '--stimulus' => true], ['interactive' => false]);
+        $tester->assertCommandIsSuccessful();
+
+        // A new container, which registers the generated class.
+        self::ensureKernelShutdown();
+        self::bootKernel();
+
+        /** @var ComponentRendererInterface $renderer */
+        $renderer = self::getContainer()->get('ux.twig_component.component_renderer');
+        $html = $renderer->createAndRender('UI:Alert:Alert');
+
+        $generator = self::getContainer()->get('stimulus.asset_mapper.controllers_map_generator');
+        $this->assertInstanceOf(ControllersMapGenerator::class, $generator);
+        $this->assertArrayHasKey('UI--Alert--Alert', $generator->getControllersMap());
+
+        $this->assertStringContainsString('data-controller="UI--Alert--Alert"', $html);
     }
 
     public function testMakeSdcComponentWithAction(): void

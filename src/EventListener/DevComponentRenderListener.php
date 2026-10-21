@@ -16,6 +16,7 @@ use Symfony\UX\TwigComponent\Event\PostMountEvent;
 use Symfony\UX\TwigComponent\Event\PreRenderEvent;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
+use Tito10047\UX\Sdc\Service\StimulusControllerNameResolver;
 
 /**
  * Resolves the metadata of a component when it renders, from the files next to
@@ -30,6 +31,7 @@ final class DevComponentRenderListener
     public function __construct(
         private ComponentMetadataResolver $metadataResolver,
         private AssetRegistry $assetRegistry,
+        private StimulusControllerNameResolver $controllerNameResolver,
         private ?string $componentNamespace = null
     ) {
     }
@@ -67,5 +69,7 @@ final class DevComponentRenderListener
         if (null !== $componentMetadata->template) {
             $event->setTemplate($componentMetadata->template);
         }
+
+        $this->setStimulusController($event);
     }
 }

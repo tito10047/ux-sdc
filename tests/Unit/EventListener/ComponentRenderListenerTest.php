@@ -16,6 +16,7 @@ use Symfony\UX\TwigComponent\Event\PostMountEvent;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\EventListener\ComponentRenderListener;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
+use Tito10047\UX\Sdc\Service\StimulusControllerNameResolver;
 
 final class ComponentRenderListenerTest extends TestCase
 {
@@ -36,7 +37,7 @@ final class ComponentRenderListenerTest extends TestCase
 
         $metadataRegistry = new SdcMetadataRegistry($cachePath);
         $registry = new AssetRegistry();
-        $listener = new ComponentRenderListener($metadataRegistry, $registry);
+        $listener = new ComponentRenderListener($metadataRegistry, $registry, new StimulusControllerNameResolver(null));
 
         $event = new PostMountEvent($component, []);
         $listener->onPostMount($event);

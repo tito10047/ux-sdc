@@ -51,6 +51,7 @@ class TestKernel extends Kernel
      * @param list<CompilerPassInterface> $compilerPasses added to the container on top of those of the bundles, e.g. to rearrange listeners
      * @param array      $twigConfig      loaded as a separate twig config, the way an application's own config/packages/twig.yaml would be
      * @param list<class-string> $services registered autowired and autoconfigured, the way an application's services.yaml registers its classes
+     * @param array      $twigComponentConfig loaded as a separate twig_component config, the way an application's own config/packages/twig_component.yaml would be
      */
     public function __construct(
         string|array $configs = [],
@@ -61,6 +62,7 @@ class TestKernel extends Kernel
         private readonly array $compilerPasses = [],
         private readonly array $twigConfig = [],
         private readonly array $services = [],
+        private readonly array $twigComponentConfig = [],
     ) {
         if (is_string($configs)) {
             $environment = $configs;
@@ -143,6 +145,10 @@ class TestKernel extends Kernel
         $container->loadFromExtension('twig_component', [
             'anonymous_template_directory' => 'components/',
         ]);
+
+        if ([] !== $this->twigComponentConfig) {
+            $container->loadFromExtension('twig_component', $this->twigComponentConfig);
+        }
 
         if (class_exists(LiveComponentBundle::class)) {
             $container->loadFromExtension('live_component', [

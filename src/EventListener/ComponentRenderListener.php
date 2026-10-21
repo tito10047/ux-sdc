@@ -16,14 +16,14 @@ use Symfony\UX\TwigComponent\Event\PostMountEvent;
 use Symfony\UX\TwigComponent\Event\PreRenderEvent;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
+use Tito10047\UX\Sdc\Service\StimulusControllerNameResolver;
 
 /**
  * Reads the metadata of a component from the cache dumped when the container
  * is built (`ux_sdc.metadata_cache` true).
  *
  * Its events are tagged in config/services.php; SdcExtension keeps either this
- * listener or DevComponentRenderListener, and subscribes the one it keeps to
- * `kernel.controller` when LiveComponent is installed.
+ * listener or DevComponentRenderListener.
  */
 final class ComponentRenderListener
 {
@@ -32,6 +32,7 @@ final class ComponentRenderListener
     public function __construct(
         private SdcMetadataRegistry $metadataRegistry,
         private AssetRegistry $assetRegistry,
+        private StimulusControllerNameResolver $controllerNameResolver,
         private ?string $componentNamespace = null
     ) {
     }
@@ -69,5 +70,7 @@ final class ComponentRenderListener
         }
 
         $this->addAssets($this->metadataRegistry->getAssets($component::class));
+
+        $this->setStimulusController($event);
     }
 }

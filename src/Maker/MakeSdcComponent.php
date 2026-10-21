@@ -21,7 +21,6 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
-use Tito10047\UX\Sdc\Twig\Stimulus;
 
 final class MakeSdcComponent extends AbstractMaker
 {
@@ -109,9 +108,6 @@ EOF
         $generator->generateClass(
             $fullNamespace . '\\' . $componentName . '\\' . $componentName,
             __DIR__.'/../../templates/sdc/Component.tpl.php',
-            [
-                'with_stimulus' => $withStimulus,
-            ]
         );
 
         $generator->generateFile(

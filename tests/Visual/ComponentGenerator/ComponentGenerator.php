@@ -39,13 +39,10 @@ class ComponentGenerator
 namespace $namespace;
 
 use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
-use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
-use Tito10047\UX\Sdc\Twig\Stimulus;
 
 #[AsSdcComponent('$name')]
-class $name implements ComponentNamespaceInterface
+class $name
 {
-    use Stimulus;
 }
 PHP;
         } else {

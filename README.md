@@ -76,32 +76,35 @@ src_component/
         ├── Alert.php           # Auto-registered logic
         ├── Alert.html.twig     # Auto-mapped template
         ├── Alert.css           # Auto-injected styles
-        └── alert_controller.js # Auto-mapped Stimulus controller
+        └── Alert_controller.js # Auto-mapped Stimulus controller
 ```
 
 ```php
 namespace App\Component\Alert;
 
 use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
-use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
-use Tito10047\UX\Sdc\Twig\Stimulus;
 
 #[AsSdcComponent] // No need to define names, templates, or assets. It's all inferred!
 class Alert
 {
-    use Stimulus;
-
     public string $type = 'info';
     public string $message;
 }
 ```
 
-In the `Alert.html.twig` template, you can then use the automatically generated stimulus controller name:
+In the `Alert.html.twig` template, `controller` holds the name of the Stimulus controller next to the class:
 ```twig
 <div class="alert alert-{{ type }}" {{ stimulus_controller(controller) }}>
     {{ message }}
 </div>
 ```
+
+`controller` is set for every component in `component_namespace`, with no trait or
+interface on the class. It is the name StimulusBundle gives `Alert_controller.js`: the
+path relative to `ux_components_dir`, `/` as `--` and `_` as `-` (`UI/Date_Picker/Date_Picker.php`
+→ `UI--Date-Picker--Date-Picker`). A `controller` the component exposes itself (a public
+property, `#[ExposeInTemplate]`) is left alone. The `Stimulus` trait is only needed for the
+name in PHP (`getController()`), and then together with `ComponentNamespaceInterface`.
 
 > [!TIP]
 > **Zero Configuration Magic:** The bundle automatically registers the component, maps the template based on its location, and injects the required CSS/JS into your HTML header only when the component is rendered.
@@ -113,10 +116,10 @@ In the `Alert.html.twig` template, you can then use the automatically generated 
 * **Automatic Registration:** Every class marked with `#[AsSdcComponent]` is automatically discovered and registered.
 * **Smart Template Mapping:** Forget `template: 'components/Alert.html.twig'`. If the template is in the same folder as your class, it's found automatically.
 * **Asset Orchestration:** CSS and JS files in your component folder are collected during rendering and injected into the `<head>`.
-* **Automatic Stimulus Controllers:** By using the `Stimulus` trait and `ComponentNamespaceInterface`, your component automatically gets a `controller` variable representing its Stimulus controller name based on its namespace.
+* **Automatic Stimulus Controllers:** Every component in `component_namespace` gets a `controller` variable: the name of the Stimulus controller next to its class.
 * **Support for Live Components:** Works seamlessly with `#[AsLiveComponent]` and `#[Asset]` attributes for modern, reactive interfaces.
 * **No "Phantom" Controllers:** Load component-specific CSS via **AssetMapper** without the need for empty Stimulus controllers just for imports.
-* **Performance First:** * **Compiler Pass:** All file discovery happens at build time. Zero reflection in production.
+* **Performance First:** * **Compiler Pass:** All file discovery happens at build time; production never scans the filesystem.
 * **Response Post-processing:** Assets are injected at the end of the request.
 * **HTTP Preload:** Automatic generation of `Link` headers to trigger early browser downloads.
 * **Maker Command:** Quickly generate new SDC components with all necessary files using `php bin/console make:sdc-component`.
@@ -291,24 +294,19 @@ To enable dynamic loading of assets during Live Component updates, you must add 
 ```
 
 #### Usage with Live Components:
-To get full support (including the `controller` variable in Twig), your Live Component should implement 
-`ComponentNamespaceInterface` and use the `Stimulus` trait:
+A Live Component gets the `controller` variable like any other component, on its first
+render and on every re-render:
 
 ```php
 namespace App\Component\Search;
 
 use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
 use Symfony\UX\LiveComponent\DefaultActionTrait;
-use Tito10047\UX\Sdc\Attribute\Asset;
-use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
-use Tito10047\UX\Sdc\Twig\Stimulus;
 
-#[AsLiveComponent]
-#[Asset] // Automatically discovers Search.css and Search_controller.js
-class Search implements ComponentNamespaceInterface
+#[AsLiveComponent] // Search.css and Search.js are discovered; Search_controller.js is its Stimulus controller
+class Search
 {
     use DefaultActionTrait;
-    use Stimulus;
 
     // ... logic
 }
