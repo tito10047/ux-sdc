@@ -38,6 +38,10 @@ use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
  * of #[AsTwigComponent], #[AsSdcComponent] or #[AsLiveComponent], or of the
  * `twig.component` tag) keeps it: the file next to the class is not looked up.
  *
+ * An anonymous component — a template without a class — is resolved from its
+ * template instead: the stylesheet and script named after the template, next
+ * to it (`Alert/Alert.html.twig` → `Alert/Alert.css`, `Alert/Alert.js`).
+ *
  * A file left out is a problem of the returned metadata, which `debug:sdc`
  * shows; in debug, it is also logged when the class is resolved.
  *
@@ -81,6 +85,14 @@ class ComponentMetadataResolver
      * @var array<string, ComponentMetadata>
      */
     private array $classCache = [];
+
+    /**
+     * Per anonymous component template, kept like the per-class cache: an
+     * entry is derived from the template and the files next to it alone.
+     *
+     * @var array<string, ComponentMetadata>
+     */
+    private array $templateCache = [];
 
     /**
      * Both root sets take the shape of the configuration they come from: a list
@@ -128,31 +140,124 @@ class ComponentMetadataResolver
         if ($this->autoDiscoveryEnabled && false !== $fileName) {
             $basePath = dirname($fileName) . DIRECTORY_SEPARATOR . $reflectionClass->getShortName();
 
-            foreach (['css', 'js'] as $ext) {
-                $path = $this->findCoLocatedAsset($basePath . '.' . $ext, $problems);
-                if (null !== $path) {
-                    $assets[] = [
-                        'path' => $path,
-                        'type' => $ext,
-                        'priority' => 0,
-                        'attributes' => [],
-                        'source' => ComponentMetadata::SOURCE_DISCOVERED,
-                    ];
-                }
-            }
+            $assets = [...$assets, ...$this->findCoLocatedAssets($basePath, 'class', $problems)];
 
             if (!isset($this->classesWithExplicitTemplate[$class])) {
                 $template = $this->findCoLocatedTemplate($basePath . '.html.twig', $problems);
             }
         }
 
-        if ($this->debug) {
-            foreach ($problems as $problem) {
-                $this->logger?->warning('Component "{component}": ' . $problem['message'], ['component' => $class] + $problem['context']);
+        $this->logProblems('Component', $class, $problems);
+
+        return $this->classCache[$class] = new ComponentMetadata($assets, $template, $problems);
+    }
+
+    /**
+     * Resolves an anonymous component from its template, as Twig Components
+     * names it (`ComponentMetadata::getTemplate()`): the stylesheet and script
+     * named after the template file, next to it. The template itself is the
+     * one Twig Components renders, so the returned metadata names none.
+     *
+     * A template no Twig path holds (one from another Twig loader) has no
+     * file, hence nothing next to it.
+     */
+    public function resolveAnonymous(string $template): ComponentMetadata
+    {
+        if (isset($this->templateCache[$template])) {
+            return $this->templateCache[$template];
+        }
+
+        $file = $this->autoDiscoveryEnabled ? $this->locateTemplate($template) : null;
+
+        if (null === $file || !str_ends_with($file, '.html.twig')) {
+            return $this->templateCache[$template] = new ComponentMetadata();
+        }
+
+        $problems = [];
+        $assets = $this->findCoLocatedAssets(substr($file, 0, -\strlen('.html.twig')), 'template', $problems);
+
+        $this->logProblems('Anonymous component', $template, $problems);
+
+        return $this->templateCache[$template] = new ComponentMetadata($assets, null, $problems);
+    }
+
+    /**
+     * The file a Twig name stands for, looked up in the Twig paths the way the
+     * Twig filesystem loader does: `@namespace/…` in the paths of that
+     * namespace, anything else in those of the main namespace, the first path
+     * holding the file winning.
+     *
+     * @return string|null the real path; null when no Twig path holds the file
+     */
+    public function locateTemplate(string $template): ?string
+    {
+        $name = (string) preg_replace('#/{2,}#', '/', str_replace('\\', '/', $template));
+        $namespace = '';
+
+        if (str_starts_with($name, '@')) {
+            $position = strpos($name, '/');
+            if (false === $position) {
+                return null;
+            }
+
+            $namespace = substr($name, 1, $position - 1);
+            $name = substr($name, $position + 1);
+        }
+
+        $name = ltrim($name, '/');
+
+        foreach ($this->twigRoots as [$root, $rootNamespace]) {
+            if ($rootNamespace === $namespace && is_file($root . $name)) {
+                $realPath = realpath($root . $name);
+
+                return false === $realPath ? null : $realPath;
             }
         }
 
-        return $this->classCache[$class] = new ComponentMetadata($assets, $template, $problems);
+        return null;
+    }
+
+    /**
+     * The stylesheet and script next to a component, named after it.
+     *
+     * @param string           $basePath the path of the component files without their extension
+     * @param 'class'|'template' $owner  what the files are next to, for the problem reported
+     * @param list<SdcProblem> $problems receives the reason a file that exists is left out
+     *
+     * @return list<SdcComponentAsset>
+     */
+    private function findCoLocatedAssets(string $basePath, string $owner, array &$problems): array
+    {
+        $assets = [];
+
+        foreach (['css', 'js'] as $ext) {
+            $path = $this->findCoLocatedAsset($basePath . '.' . $ext, $owner, $problems);
+            if (null !== $path) {
+                $assets[] = [
+                    'path' => $path,
+                    'type' => $ext,
+                    'priority' => 0,
+                    'attributes' => [],
+                    'source' => ComponentMetadata::SOURCE_DISCOVERED,
+                ];
+            }
+        }
+
+        return $assets;
+    }
+
+    /**
+     * @param list<SdcProblem> $problems
+     */
+    private function logProblems(string $kind, string $component, array $problems): void
+    {
+        if (!$this->debug) {
+            return;
+        }
+
+        foreach ($problems as $problem) {
+            $this->logger?->warning($kind . ' "{component}": ' . $problem['message'], ['component' => $component] + $problem['context']);
+        }
     }
 
     /**
@@ -205,12 +310,13 @@ class ComponentMetadataResolver
     }
 
     /**
-     * @param list<SdcProblem> $problems receives the reason a file that exists is left out
+     * @param 'class'|'template' $owner
+     * @param list<SdcProblem>   $problems receives the reason a file that exists is left out
      *
      * @return string|null the AssetMapper logical path of the file; null when
      *                     there is no such file or it is outside every AssetMapper path
      */
-    private function findCoLocatedAsset(string $file, array &$problems): ?string
+    private function findCoLocatedAsset(string $file, string $owner, array &$problems): ?string
     {
         if (!file_exists($file)) {
             return null;
@@ -227,7 +333,9 @@ class ComponentMetadataResolver
         }
 
         $problems[] = self::problem(
-            '"{file}" next to the class is outside every AssetMapper path ({roots}), so it is not loaded with the component. Move the component into the directory configured as "ux_sdc.ux_components_dir", add its directory to "framework.asset_mapper.paths", or reference the file by its AssetMapper logical path with #[Asset].',
+            'class' === $owner
+                ? '"{file}" next to the class is outside every AssetMapper path ({roots}), so it is not loaded with the component. Move the component into the directory configured as "ux_sdc.ux_components_dir", add its directory to "framework.asset_mapper.paths", or reference the file by its AssetMapper logical path with #[Asset].'
+                : '"{file}" next to the template is outside every AssetMapper path ({roots}), so it is not loaded with the component. Move the component into the directory configured as "ux_sdc.ux_components_dir", or add its directory to "framework.asset_mapper.paths".',
             $realFile,
             $this->assetRoots,
         );

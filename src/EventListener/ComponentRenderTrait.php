@@ -51,6 +51,11 @@ trait ComponentRenderTrait
      * variables does not: an embedded component (`<twig:X>…</twig:X>`) receives
      * the context of the template around it, so the `controller` found there
      * may be that of the parent component or of the page.
+     *
+     * An anonymous component gets none. Its controller would be named after
+     * the path of its template in the component directory, but its template
+     * name does not tell which Twig path holds the file, and finding out
+     * would take a filesystem lookup on every render.
      */
     private function setStimulusController(PreRenderEvent $event): void
     {

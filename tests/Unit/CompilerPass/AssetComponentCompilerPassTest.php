@@ -12,6 +12,7 @@
 namespace Tito10047\UX\Sdc\Tests\Unit\CompilerPass;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\DependencyInjection\Argument\AbstractArgument;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Exception\LogicException;
@@ -59,10 +60,11 @@ final class AssetComponentCompilerPassTest extends TestCase
         $this->assertFileExists($this->cachePath);
         $map = require $this->cachePath;
 
-        $this->assertArrayHasKey(MockComponent::class, $map);
-        $this->assertSame('test.css', $map[MockComponent::class]['assets'][0]['path']);
-        $this->assertSame(5, $map[MockComponent::class]['assets'][0]['priority']);
-        $this->assertNull($map[MockComponent::class]['template']);
+        $this->assertArrayHasKey(MockComponent::class, $map['components']);
+        $this->assertSame([], $map['anonymous']);
+        $this->assertSame('test.css', $map['components'][MockComponent::class]['assets'][0]['path']);
+        $this->assertSame(5, $map['components'][MockComponent::class]['assets'][0]['priority']);
+        $this->assertNull($map['components'][MockComponent::class]['template']);
     }
 
     public function testNothingIsDumpedWithoutMetadataCache(): void
@@ -97,8 +99,8 @@ final class AssetComponentCompilerPassTest extends TestCase
         (new AssetComponentCompilerPass())->process($container);
 
         $map = require $this->cachePath;
-        $this->assertSame('Alert/Alert.html.twig', $map[Alert::class]['template']);
-        $this->assertSame(['vendor/explicit.css', 'Alert/Alert.css', 'Alert/Alert.js'], array_column($map[Alert::class]['assets'], 'path'));
+        $this->assertSame('Alert/Alert.html.twig', $map['components'][Alert::class]['template']);
+        $this->assertSame(['vendor/explicit.css', 'Alert/Alert.css', 'Alert/Alert.js'], array_column($map['components'][Alert::class]['assets'], 'path'));
         $this->assertSame([], $container->getCompiler()->getLog());
     }
 
@@ -115,8 +117,8 @@ final class AssetComponentCompilerPassTest extends TestCase
         (new AssetComponentCompilerPass())->process($container);
 
         $map = require $this->cachePath;
-        $this->assertSame('@ui/Alert/Alert.html.twig', $map[Alert::class]['template']);
-        $this->assertSame(['vendor/explicit.css', 'lib/ui/Alert/Alert.css', 'lib/ui/Alert/Alert.js'], array_column($map[Alert::class]['assets'], 'path'));
+        $this->assertSame('@ui/Alert/Alert.html.twig', $map['components'][Alert::class]['template']);
+        $this->assertSame(['vendor/explicit.css', 'lib/ui/Alert/Alert.css', 'lib/ui/Alert/Alert.js'], array_column($map['components'][Alert::class]['assets'], 'path'));
     }
 
     /**
@@ -131,13 +133,13 @@ final class AssetComponentCompilerPassTest extends TestCase
         (new AssetComponentCompilerPass())->process($container);
 
         $map = require $this->cachePath;
-        $this->assertSame(['vendor/explicit.css'], array_column($map[Alert::class]['assets'], 'path'));
-        $this->assertNull($map[Alert::class]['template']);
+        $this->assertSame(['vendor/explicit.css'], array_column($map['components'][Alert::class]['assets'], 'path'));
+        $this->assertNull($map['components'][Alert::class]['template']);
 
         // Kept for debug:sdc, which reads them from the registry.
         $this->assertSame(
             [realpath(self::FIXTURES . '/Alert/Alert.css'), realpath(self::FIXTURES . '/Alert/Alert.js'), realpath(self::FIXTURES . '/Alert/Alert.html.twig')],
-            array_map(static fn (array $problem): string => $problem['context']['file'], $map[Alert::class]['problems']),
+            array_map(static fn (array $problem): string => $problem['context']['file'], $map['components'][Alert::class]['problems']),
         );
 
         $log = $container->getCompiler()->getLog();
@@ -155,8 +157,8 @@ final class AssetComponentCompilerPassTest extends TestCase
         (new AssetComponentCompilerPass())->process($container);
 
         $map = require $this->cachePath;
-        $this->assertNull($map[Alert::class]['template']);
-        $this->assertSame(['vendor/explicit.css', 'Alert/Alert.css', 'Alert/Alert.js'], array_column($map[Alert::class]['assets'], 'path'));
+        $this->assertNull($map['components'][Alert::class]['template']);
+        $this->assertSame(['vendor/explicit.css', 'Alert/Alert.css', 'Alert/Alert.js'], array_column($map['components'][Alert::class]['assets'], 'path'));
     }
 
     /**
@@ -222,6 +224,99 @@ final class AssetComponentCompilerPassTest extends TestCase
         $this->assertSame([Alert::class], $definition->getArgument('$classesWithExplicitTemplate'));
     }
 
+    /**
+     * The templates of anonymous components, under the name Twig Components
+     * gives each and the component names it may know them by: in the
+     * anonymous template directory of each main Twig path, in `components/`
+     * of each namespaced one, and in ux_components_dir. The templates of the
+     * component classes are left out — the one next to a class, and the one
+     * Twig Components gives a class.
+     */
+    public function testGivesTheInspectorTheAnonymousTemplates(): void
+    {
+        $container = $this->createContainer(metadataCache: false, component: Alert::class);
+        $container->register(ComponentInspector::class);
+        $this->addTwigPaths($container, [self::FIXTURES, self::FIXTURES . '/Acme' => 'Acme']);
+        $this->addComponentFactory($container, ['default' => ['key' => 'default', 'class' => MockComponent::class, 'template' => 'components/Default.html.twig']]);
+        $container->register('ux.twig_component.component_template_finder', \stdClass::class)->setArguments([new Reference('twig.loader'), 'components/']);
+
+        (new AssetComponentCompilerPass())->process($container);
+
+        $this->assertSame([
+            'components/Notice.html.twig' => ['Notice'],
+            'components/Panel/index.html.twig' => ['Panel', 'Panel:index'],
+            '@Acme/components/Button.html.twig' => ['Acme:Button'],
+        ], $container->getDefinition(ComponentInspector::class)->getArgument('$anonymousTemplates'));
+    }
+
+    /**
+     * ux_components_dir, a Twig path of the main namespace, holds anonymous
+     * components under their path, where ComponentDirectoryTemplateFinder
+     * finds them. Without `twig_component.anonymous_template_directory`
+     * (deprecated in Twig Components 2.x), `components/` is looked in.
+     */
+    public function testAnonymousTemplatesOfTheComponentDirectory(): void
+    {
+        $container = $this->createContainer(metadataCache: true, autoDiscovery: true, component: Alert::class);
+        $container->register(ComponentInspector::class);
+        $container->setParameter('ux_sdc.ux_components_dir', self::FIXTURES);
+        $this->addTwigPaths($container, [self::FIXTURES]);
+        $this->addAssetMapperPaths($container, [self::FIXTURES => '']);
+        $container->register('ux.twig_component.component_template_finder', \stdClass::class)->setArguments([new Reference('twig.loader'), null]);
+
+        (new AssetComponentCompilerPass())->process($container);
+
+        $this->assertSame([
+            'components/Default.html.twig' => ['Default'],
+            'components/Notice.html.twig' => ['Notice'],
+            'components/Panel/index.html.twig' => ['Panel', 'Panel:index'],
+            'Acme/components/Button.html.twig' => ['Acme:components:Button'],
+        ], $container->getDefinition(ComponentInspector::class)->getArgument('$anonymousTemplates'), 'The template next to Alert belongs to the class.');
+
+        $map = require $this->cachePath;
+        $this->assertSame(['components/Notice.html.twig', 'Acme/components/Button.html.twig'], array_keys($map['anonymous']));
+        $this->assertSame(['components/Notice.css', 'components/Notice.js'], array_column($map['anonymous']['components/Notice.html.twig']['assets'], 'path'));
+        $this->assertSame([], $map['anonymous']['components/Notice.html.twig']['problems']);
+        $this->assertSame('Alert/Alert.html.twig', $map['components'][Alert::class]['template']);
+    }
+
+    /**
+     * Twig Components joins its anonymous template directory and the name
+     * with a slash, so an empty directory gives names with a leading one.
+     */
+    public function testAnEmptyAnonymousTemplateDirectoryIsEveryMainTwigPath(): void
+    {
+        $container = $this->createContainer(metadataCache: false, component: Alert::class);
+        $container->register(ComponentInspector::class);
+        $this->addTwigPaths($container, [self::FIXTURES . '/components']);
+        $container->register('ux.twig_component.component_template_finder', \stdClass::class)->setArguments([new Reference('twig.loader'), '']);
+
+        (new AssetComponentCompilerPass())->process($container);
+
+        $this->assertSame([
+            '/Default.html.twig' => ['Default'],
+            '/Notice.html.twig' => ['Notice'],
+            '/Panel/index.html.twig' => ['Panel', 'Panel:index'],
+        ], $container->getDefinition(ComponentInspector::class)->getArgument('$anonymousTemplates'));
+    }
+
+    /**
+     * The templates of the component classes come from the configuration
+     * TwigComponentPass gives the component factory: without it, the pass ran
+     * too early, or Twig Components changed.
+     */
+    public function testFailsOnAComponentFactoryWithoutComponentConfiguration(): void
+    {
+        $container = $this->createContainer(metadataCache: false);
+        $container->register('ux.twig_component.component_factory', \stdClass::class)
+            ->setArguments([null, null, null, null, new AbstractArgument('Added in TwigComponentPass.')]);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('"ux.twig_component.component_factory"');
+
+        (new AssetComponentCompilerPass())->process($container);
+    }
+
     public function testFailsOnAnAssetMapperRepositoryItDoesNotKnow(): void
     {
         $container = $this->createContainer(metadataCache: false);
@@ -249,6 +344,16 @@ final class AssetComponentCompilerPassTest extends TestCase
 
             $loader->addMethodCall('addPath', null === $namespace ? [$path] : [$path, $namespace]);
         }
+    }
+
+    /**
+     * As TwigComponentPass sets it: the configuration of each component, fifth argument.
+     *
+     * @param array<string, array<string, string>> $config
+     */
+    private function addComponentFactory(ContainerBuilder $container, array $config): void
+    {
+        $container->register('ux.twig_component.component_factory', \stdClass::class)->setArguments([null, null, null, null, $config]);
     }
 
     /**

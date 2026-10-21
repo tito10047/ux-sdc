@@ -43,7 +43,10 @@ final class ComponentRenderListener
 
         $this->setComponentNamespace($component);
 
-        $this->addAssets($this->metadataRegistry->getAssets($component::class));
+        // An anonymous component is known by its template, which onPreRender() gets.
+        if (true !== $event->getMetadata()?->isAnonymous()) {
+            $this->addAssets($this->metadataRegistry->getAssets($component::class));
+        }
     }
 
     public function onKernelController(ControllerEvent $event): void
@@ -62,6 +65,13 @@ final class ComponentRenderListener
 
     public function onPreRender(PreRenderEvent $event): void
     {
+        $metadata = $event->getMetadata();
+        if ($metadata->isAnonymous()) {
+            $this->addAssets($this->metadataRegistry->getAnonymousComponentMetadata($metadata->getTemplate())->assets);
+
+            return;
+        }
+
         $component = $event->getComponent();
         $template = $this->metadataRegistry->getTemplate($component::class);
 

@@ -16,6 +16,7 @@ use Symfony\Component\Routing\RouterInterface;
 use Symfony\UX\StimulusBundle\AssetMapper\ControllersMapGenerator;
 use Symfony\UX\TwigComponent\ComponentFactory;
 use Symfony\UX\TwigComponent\ComponentMetadata as TwigComponentMetadata;
+use Symfony\UX\TwigComponent\ComponentTemplateFinderInterface;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\AssetPath;
 use Tito10047\UX\Sdc\Service\ComponentMetadata;
@@ -34,10 +35,9 @@ use Twig\Token;
  * is then checked against the services that serve it — Twig, AssetMapper,
  * StimulusBundle — for what would keep a part of the component from loading.
  *
- * The list of components is the `twig.component` services, collected by
- * AssetComponentCompilerPass; their names and templates come from Twig
- * Components itself. Anonymous components are not listed: they have no class,
- * hence nothing next to one.
+ * The list of components is the `twig.component` services and the templates
+ * of anonymous components, collected by AssetComponentCompilerPass; their
+ * names and templates come from Twig Components itself.
  *
  * @phpstan-import-type SdcComponentAsset from ComponentMetadata
  * @phpstan-import-type ReportedAsset from ComponentReport
@@ -57,12 +57,20 @@ final class ComponentInspector
     /** @var array<string, true> */
     private readonly array $classesWithExplicitTemplate;
 
+    /** @var array<string, string|null>|null component name => class, null for an anonymous component */
+    private ?array $components = null;
+
+    /** @var array<string, string> name of an anonymous component => its template */
+    private array $anonymousComponents = [];
+
     /**
      * @param ComponentFactory             $componentFactory            names a component class and its template the way Twig Components does
      * @param bool                         $metadataCache               whether `ux_sdc.metadata_cache` resolved to true
      * @param ControllersMapGenerator|null $controllersMapGenerator     absent without StimulusBundle or without AssetMapper
-     * @param list<string>                 $componentClasses            the classes of the `twig.component` services
-     * @param list<string>                 $classesWithExplicitTemplate component classes registered with an explicit template
+     * @param list<string>                     $componentClasses            the classes of the `twig.component` services
+     * @param list<string>                     $classesWithExplicitTemplate component classes registered with an explicit template
+     * @param ComponentTemplateFinderInterface $templateFinder              finds the template of an anonymous component the way Twig Components does
+     * @param array<string, list<string>>      $anonymousTemplates          template of an anonymous component => the names it may be rendered as
      */
     public function __construct(
         private readonly ComponentFactory $componentFactory,
@@ -76,6 +84,8 @@ final class ComponentInspector
         private readonly ?RouterInterface $router,
         private readonly array $componentClasses,
         array $classesWithExplicitTemplate,
+        private readonly ComponentTemplateFinderInterface $templateFinder,
+        private readonly array $anonymousTemplates,
     ) {
         $this->classesWithExplicitTemplate = array_fill_keys($classesWithExplicitTemplate, true);
     }
@@ -86,22 +96,50 @@ final class ComponentInspector
     }
 
     /**
-     * @return array<string, string> component name => class, sorted by name
+     * @return array<string, string|null> component name => class, null for an anonymous component, sorted by name
      */
     public function listComponents(): array
     {
+        if (null !== $this->components) {
+            return $this->components;
+        }
+
+        // The classes first: Twig Components gives a class precedence over a
+        // template of the same name.
         $components = [];
         foreach ($this->componentClasses as $class) {
             $components[$this->componentFactory->metadataFor($class)->getName()] = $class;
         }
 
+        // Each anonymous template under the first of its names Twig Components
+        // resolves to it.
+        foreach ($this->anonymousTemplates as $template => $names) {
+            foreach ($names as $name) {
+                if (!\array_key_exists($name, $components) && $template === $this->templateFinder->findAnonymousComponentTemplate($name)) {
+                    $components[$name] = null;
+                    $this->anonymousComponents[$name] = $template;
+
+                    break;
+                }
+            }
+        }
+
         ksort($components);
 
-        return $components;
+        return $this->components = $components;
     }
 
-    public function inspect(string $class): ComponentReport
+    /**
+     * @param string $name a component name, as listComponents() returns it
+     */
+    public function inspect(string $name): ComponentReport
     {
+        $class = $this->listComponents()[$name] ?? null;
+
+        if (null === $class) {
+            return $this->inspectAnonymous($name, $this->anonymousComponents[$name] ?? throw new \InvalidArgumentException(\sprintf('Unknown component "%s".', $name)));
+        }
+
         $component = $this->componentFactory->metadataFor($class);
         $metadata = $this->metadataCache
             ? $this->metadataRegistry->getComponentMetadata($class)
@@ -127,6 +165,41 @@ final class ComponentInspector
             $assets,
             $stimulusController,
             $this->findRoutes($class),
+            $problems,
+        );
+    }
+
+    /**
+     * An anonymous component has its template, and the assets next to it. It
+     * has no routes, and gets no `controller` from the bundle.
+     */
+    private function inspectAnonymous(string $name, string $template): ComponentReport
+    {
+        $metadata = $this->metadataCache
+            ? $this->metadataRegistry->getAnonymousComponentMetadata($template)
+            : $this->metadataResolver->resolveAnonymous($template);
+
+        $problems = $metadata->getProblemMessages();
+
+        $assets = [];
+        foreach ($metadata->assets as $asset) {
+            $assets[] = $this->describeAsset($asset, $problems);
+        }
+
+        // A `controller` the template reads is one it is passed as a prop:
+        // there is no name of the bundle's to check it against.
+        $used = $this->templateUsesController($template, $problems);
+
+        return new ComponentReport(
+            $name,
+            null,
+            $template,
+            ComponentReport::TEMPLATE_ANONYMOUS,
+            // Twig Components found it when the list was made.
+            true,
+            $assets,
+            ['name' => null, 'set_by_component' => false, 'used' => $used, 'registered' => null],
+            [],
             $problems,
         );
     }
@@ -186,7 +259,7 @@ final class ComponentInspector
             $mapped = null !== $publicPath;
 
             if (!$mapped) {
-                $problems[] = \sprintf('The asset "%s" (%s) is not in the asset map, so the page links to it as it is and it will most likely not load. Use its AssetMapper logical path (see "bin/console debug:asset-map"), or a URL.%s', $path, $asset['source'], ComponentMetadata::SOURCE_DISCOVERED === $asset['source'] && $this->metadataCache ? ' It was next to the class when the container was built: run "bin/console cache:clear".' : '');
+                $problems[] = \sprintf('The asset "%s" (%s) is not in the asset map, so the page links to it as it is and it will most likely not load. Use its AssetMapper logical path (see "bin/console debug:asset-map"), or a URL.%s', $path, $asset['source'], ComponentMetadata::SOURCE_DISCOVERED === $asset['source'] && $this->metadataCache ? ' It was next to the component when the container was built: run "bin/console cache:clear".' : '');
             }
         }
 

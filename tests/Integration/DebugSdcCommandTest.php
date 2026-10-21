@@ -26,6 +26,10 @@ use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Library\Badge\Badge;
  * `debug:sdc` over a component directory of its own (Fixtures/DebugSdc): one
  * component without a problem, one per problem the command finds, and a
  * component outside ux_components_dir whose files AssetMapper does not serve.
+ * Anonymous components: `Notice:Notice` in the component directory, `Card` in
+ * the anonymous template directory of Twig Components under a Twig default
+ * path of its own (Fixtures/DebugSdcTemplates), whose CSS AssetMapper does not
+ * serve, and a template there that a component class shadows (`Alert:Alert`).
  *
  * Every case runs with both metadata pipelines: they must describe the
  * components the same way.
@@ -146,6 +150,60 @@ final class DebugSdcCommandTest extends IntegrationTestCase
         $this->assertStringStartsWith('"' . realpath(__DIR__ . '/Fixtures/Library/Badge/Badge.js') . '" next to the class is outside every AssetMapper path (', $badge['problems'][1]);
     }
 
+    /**
+     * An anonymous component has its template and the assets next to it; no
+     * class, no routes, no Stimulus controller from the bundle.
+     */
+    #[DataProvider('metadataCache')]
+    public function testDescribesAnonymousComponents(bool $metadataCache): void
+    {
+        $components = $this->json($metadataCache);
+
+        $assetMapper = self::getContainer()->get(AssetMapperInterface::class);
+        $this->assertInstanceOf(AssetMapperInterface::class, $assetMapper);
+
+        $notice = $components['Notice:Notice'];
+        $this->assertNull($notice['class']);
+        $this->assertSame(['name' => 'Notice/Notice.html.twig', 'origin' => 'anonymous', 'found' => true], $notice['template']);
+        $this->assertSame([
+            [
+                'path' => 'Notice/Notice.css',
+                'public_path' => $assetMapper->getPublicPath('Notice/Notice.css'),
+                'type' => 'css',
+                'source' => 'discovered',
+                'priority' => 0,
+                'attributes' => [],
+                'mapped' => true,
+            ],
+        ], $notice['assets']);
+        $this->assertSame(['name' => null, 'set_by_component' => false, 'used' => false, 'registered' => null], $notice['stimulus_controller']);
+        $this->assertSame([], $notice['routes']);
+        $this->assertSame([], $notice['problems']);
+
+        $card = $components['Card'];
+        $this->assertNull($card['class']);
+        $this->assertSame(['name' => 'components/Card.html.twig', 'origin' => 'anonymous', 'found' => true], $card['template']);
+        $this->assertSame([], $card['assets']);
+        $this->assertCount(1, $card['problems']);
+        $this->assertStringStartsWith('"' . realpath(__DIR__ . '/Fixtures/DebugSdcTemplates/components/Card.css') . '" next to the template is outside every AssetMapper path (', $card['problems'][0]);
+
+        // components/Alert/Alert.html.twig would be <twig:Alert:Alert>, which is the class.
+        $this->assertSame(Alert::class, $components['Alert:Alert']['class']);
+    }
+
+    #[DataProvider('metadataCache')]
+    public function testShowsAnAnonymousComponentInDetail(bool $metadataCache): void
+    {
+        $tester = $this->execute($metadataCache, ['name' => 'Notice:Notice']);
+        $tester->assertCommandIsSuccessful();
+        $display = $tester->getDisplay();
+
+        $this->assertMatchesRegularExpression('/^\s+Class\s+none \(anonymous component\)\s*$/m', $display);
+        $this->assertMatchesRegularExpression('~^\s+Template\s+Notice/Notice\.html\.twig \(anonymous\)\s*$~m', $display);
+        $this->assertMatchesRegularExpression('~^\s+Routes\s+-\s*$~m', $display);
+        $this->assertStringContainsString('[OK] No problems found.', $display);
+    }
+
     #[DataProvider('metadataCache')]
     public function testListsComponentsAndFlagsProblems(bool $metadataCache): void
     {
@@ -161,10 +219,13 @@ final class DebugSdcCommandTest extends IntegrationTestCase
         $this->assertMatchesRegularExpression('~^\s+⚠ Controlled:Controlled\s+Controlled/Controlled\.html\.twig \(co-located\)\s+-\s+-\s+⚠ Controlled--Controlled\s*$~m', $display);
         $this->assertMatchesRegularExpression('~^\s+⚠ Explicit:Explicit\s+⚠ debug_sdc/missing\.html\.twig \(explicit\)~m', $display);
         $this->assertMatchesRegularExpression('~^\s+Quiet:Quiet\s+Quiet/Quiet\.html\.twig \(co-located\)\s+-\s+-\s+-\s*$~m', $display);
+        $this->assertMatchesRegularExpression('~^\s+Notice:Notice\s+Notice/Notice\.html\.twig \(anonymous\)\s+Notice/Notice\.css\s+-\s+-\s*$~m', $display);
+        $this->assertMatchesRegularExpression('~^\s+⚠ Card\s+components/Card\.html\.twig \(anonymous\)\s+-\s+-\s+-\s*$~m', $display);
 
         $this->assertStringContainsString('Broken:Broken (' . Broken::class . ')', $display);
+        $this->assertStringContainsString('Card (components/Card.html.twig)', $display);
         $this->assertStringNotContainsString('Alert:Alert (' . Alert::class . ')', $display, 'A component without problems has no section.');
-        $this->assertStringContainsString('[WARNING] 7 problems found.', $display);
+        $this->assertStringContainsString('[WARNING] 8 problems found.', $display);
         $this->assertStringContainsString($metadataCache ? 'Metadata from the build-time cache' : 'Metadata resolved from the files next to each class', $display);
     }
 
@@ -223,6 +284,7 @@ final class DebugSdcCommandTest extends IntegrationTestCase
         yield 'class with a leading backslash' => ['\\' . Broken::class, ['Broken:Broken']];
         yield 'part of a class' => ['Fixtures\\Library', ['LibraryBadge']];
         yield 'part of several' => ['ro', ['Broken:Broken', 'Controlled:Controlled']];
+        yield 'anonymous' => ['notice', ['Notice:Notice']];
     }
 
     public function testFailsWhenNothingMatches(): void
@@ -247,7 +309,7 @@ final class DebugSdcCommandTest extends IntegrationTestCase
         $this->assertNotNull(self::$kernel);
         $tester = new CommandCompletionTester((new Application(self::$kernel))->find('debug:sdc'));
 
-        $this->assertSame(['Alert:Alert', 'Broken:Broken', 'Controlled:Controlled', 'Explicit:Explicit', 'LibraryBadge', 'Quiet:Quiet'], $tester->complete(['']));
+        $this->assertSame(['Alert:Alert', 'Broken:Broken', 'Card', 'Controlled:Controlled', 'Explicit:Explicit', 'LibraryBadge', 'Notice:Notice', 'Quiet:Quiet'], $tester->complete(['']));
         $this->assertSame(['txt', 'json'], $tester->complete(['--format', '']));
     }
 
@@ -261,7 +323,7 @@ final class DebugSdcCommandTest extends IntegrationTestCase
 
         $output = $this->decode($tester);
         $this->assertSame($metadataCache, $output['metadata_cache']);
-        $this->assertSame(['Alert:Alert', 'Broken:Broken', 'Controlled:Controlled', 'Explicit:Explicit', 'LibraryBadge', 'Quiet:Quiet'], array_column($output['components'], 'name'), 'Sorted by name.');
+        $this->assertSame(['Alert:Alert', 'Broken:Broken', 'Card', 'Controlled:Controlled', 'Explicit:Explicit', 'LibraryBadge', 'Notice:Notice', 'Quiet:Quiet'], array_column($output['components'], 'name'), 'Sorted by name.');
 
         return array_column($output['components'], null, 'name');
     }
@@ -303,8 +365,12 @@ final class DebugSdcCommandTest extends IntegrationTestCase
                 'component_namespace' => self::NAMESPACE,
                 'ux_components_dir' => '%kernel.project_dir%/tests/Integration/Fixtures/DebugSdc',
             ],
-            // A component library of the application: a Twig path, not an AssetMapper path.
-            'twig' => ['paths' => ['%kernel.project_dir%/tests/Integration/Fixtures/Library' => 'ui']],
+            'twig' => [
+                // Its `components/` directory holds anonymous components.
+                'default_path' => '%kernel.project_dir%/tests/Integration/Fixtures/DebugSdcTemplates',
+                // A component library of the application: a Twig path, not an AssetMapper path.
+                'paths' => ['%kernel.project_dir%/tests/Integration/Fixtures/Library' => 'ui'],
+            ],
             'services' => [Badge::class],
             'route_imports' => [['.', 'ux_sdc']],
         ];

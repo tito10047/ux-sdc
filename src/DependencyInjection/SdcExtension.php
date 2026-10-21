@@ -34,6 +34,13 @@ use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 
 class SdcExtension extends Extension implements PrependExtensionInterface
 {
+    /**
+     * The Twig namespace `ux_components_dir` is registered under, besides the
+     * main one: `@component/Alert/Alert.html.twig` names a file of that
+     * directory and of no other.
+     */
+    public const TWIG_NAMESPACE = 'component';
+
     public function getAlias(): string
     {
         return 'ux_sdc';
@@ -145,7 +152,7 @@ class SdcExtension extends Extension implements PrependExtensionInterface
             $container->prependExtensionConfig('twig', [
                 'paths' => [
                     rtrim($uxComponentsDir, DIRECTORY_SEPARATOR) => null,
-                    $uxComponentsDir.DIRECTORY_SEPARATOR => 'component',
+                    $uxComponentsDir.DIRECTORY_SEPARATOR => self::TWIG_NAMESPACE,
                 ],
             ]);
         }

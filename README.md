@@ -22,8 +22,9 @@ src_component/
 The bundle connects [Twig Components](https://symfony.com/bundles/ux-twig-component/current/index.html)
 with [AssetMapper](https://symfony.com/doc/current/frontend/asset_mapper.html): it
 registers the component directory with Twig, AssetMapper and StimulusBundle, finds
-the files next to each component class, and injects the `<link>` and `<script>`
-tags of the components a response actually rendered.
+the files next to each component class (or template, for an anonymous component),
+and injects the `<link>` and `<script>` tags of the components a response actually
+rendered.
 
 The idea comes from Hugo Alliaume's article
 [*A Better Architecture for Your Symfony UX Twig Components*](https://hugo.alliau.me/blog/posts/a-better-architecture-for-your-symfony-ux-twig-components).
@@ -337,6 +338,41 @@ framework:
 example — gets its templates found, but its stylesheets and scripts cannot be
 served and are left out.
 
+### Anonymous components
+
+A component without a class — only a template — gets the stylesheet and script
+named after its template, next to it:
+
+```
+src_component/
+└── Notice/
+    ├── Notice.html.twig
+    ├── Notice.css
+    └── Notice.js
+```
+
+```twig
+<twig:Notice:Notice message="Saved" />
+```
+
+The bundle lets Twig Components find anonymous components in `ux_components_dir`,
+named after their path the way a class there is: `Notice/Notice.html.twig` is
+`Notice:Notice`, and `Notice/index.html.twig` is `Notice`. Twig Components' own
+`anonymous_template_directory` (`templates/components/` in a Flex application) is
+looked up first, and a component class of the same name wins over both. An
+anonymous component found there gets its assets by the same rules as any other
+file (see [Where components can live](#where-components-can-live)):
+`templates/components/Button.css` is not served by AssetMapper, so it is left out
+and reported.
+
+An anonymous component gets no `controller` variable: its template name does not
+tell where the file is without looking it up on every render. Name its Stimulus
+controller instead — `{{ stimulus_controller('Notice--Notice') }}` for a
+`Notice_controller.js` next to the template.
+
+`auto_discovery: false` leaves anonymous components without assets: there is
+nothing to declare them with.
+
 ## Live Components
 
 Live Components get their assets like any other component on the first render.
@@ -573,14 +609,17 @@ component until the worker restarts.
    adds a `twig_component.defaults` entry for `component_namespace`. Every class under `component_namespace` is registered
    as an autoconfigured service, so `#[AsSdcComponent]`, `#[AsTwigComponent]`,
    `#[AsLiveComponent]` and `#[Route]` on it take effect. A compiler pass collects
-   the application's Twig and AssetMapper paths; with `metadata_cache` on, it
-   resolves the template and assets of every `twig.component` service and writes
-   them to `%kernel.cache_dir%/sdc_metadata.php`.
+   the application's Twig and AssetMapper paths and the templates of anonymous
+   components; with `metadata_cache` on, it resolves the template and assets of
+   every `twig.component` service and the assets of every anonymous component,
+   and writes them to `%kernel.cache_dir%/sdc_metadata.php`.
 2. **Rendering.** On TwigComponent's `PostMountEvent` and `PreRenderEvent`, a
    listener adds the component's assets to a per-request registry, points the
    component at its co-located template unless one was named explicitly, and sets
-   the `controller` variable. With `metadata_cache` on it reads the cached file;
-   off, it resolves the files next to the class (once per class and process).
+   the `controller` variable; for an anonymous component, it adds the assets next
+   to its template. With `metadata_cache` on it reads the cached file; off, it
+   resolves the files next to the class or template (once per class or template
+   and process).
 3. **Response.** A `kernel.response` listener (priority 64, ahead of WebLink's
    `Link` header listener) replaces the first placeholder in an HTML main response
    with the tags, sorted by priority, and adds a `Link: rel="preload"` header for
@@ -629,8 +668,8 @@ also shows a cache that predates a file you just added.
 - `--strict` — exits with 1 when there is a problem, for a CI step. Without it,
   like every `debug:*` command, it exits with 0.
 
-`debug:twig-component` complements it with the props and hooks of a component,
-and anonymous components.
+Anonymous components are listed too, marked `(anonymous)`. `debug:twig-component`
+complements the command with the props and hooks of a component.
 
 The bundle also logs what goes wrong while rendering, through the application's
 `logger` (on the `ux_sdc` channel with MonologBundle):
@@ -646,8 +685,6 @@ Every message says what to change.
 
 ## Known limitations
 
-- **Anonymous components** (a template without a PHP class) get no co-located
-  assets; only class-based components do.
 - **Turbo Frames and Streams.** Turbo takes only the frame or stream from the
   response and ignores its `<head>`, and only Live Component requests get the
   `X-SDC-Assets-*` headers. The CSS and JS of a component that first appears in a
@@ -660,8 +697,10 @@ Every message says what to change.
 - **ESI.** Each ESI fragment is its own main request; assets of its components do
   not reach the page that includes it.
 - **New asset files without a rebuild.** With `metadata_cache: true`, adding or
-  removing a CSS/JS/Twig file next to a component needs a `cache:clear`. With
-  `false`, a long-running worker picks it up after a restart.
+  removing a CSS/JS/Twig file next to a component, or an anonymous component,
+  needs a `cache:clear`. With `false`, a long-running worker picks it up after a
+  restart; `debug:sdc` lists an anonymous component added since the container was
+  built only once it is rebuilt.
 
 ## Non-goals
 

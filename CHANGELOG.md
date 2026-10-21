@@ -72,6 +72,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path import, is registered once. Before the directory exists the import loads
   nothing (and the routes appear once it is created); without
   `component_namespace` it loads nothing either.
+- Anonymous components (a template without a class) in `ux_components_dir`:
+  `src_component/Notice/Notice.html.twig` renders as `<twig:Notice:Notice>`, named
+  after its path like a class there (`Notice/index.html.twig` is `Notice`). Twig
+  Components' `anonymous_template_directory` keeps precedence, and a class of
+  the same name wins. `debug:sdc` lists anonymous components, marked
+  `(anonymous)`, with their assets.
+- `SdcMetadataRegistry::getAnonymousComponentMetadata(string $template)` and
+  `ComponentMetadataResolver::resolveAnonymous(string $template)`: the metadata
+  of an anonymous component, by its template as Twig Components names it;
+  `ComponentMetadataResolver::locateTemplate(string $template)`: the file a Twig
+  name stands for.
 - `ux_sdc.routing.enabled` (default `true`; `routing: false` is a shorthand):
   `false` makes the `ux_sdc` import load nothing and keeps the component classes
   out of `resource: routing.controllers` (Symfony 7.4+). An import of the
@@ -104,7 +115,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a list, empty when there are none) and `getTemplate(string $class): ?string`.
   Its constructor takes `bool $cacheEnabled` and an optional logger after
   `$cachePath`. The `sdc_metadata.php` format changed to
-  `[class => ['assets' => [...], 'template' => ?string, 'problems' => [...]]]`,
+  `['components' => [class => ['assets' => [...], 'template' => ?string, 'problems' => [...]]], 'anonymous' => [template => ['assets' => [...], 'problems' => [...]]]]`,
   each asset with a `source` (`discovered`, `#[Asset]` or `#[AsSdcComponent]`);
   it is regenerated with
   the container, so no action is needed for the file itself.
@@ -168,6 +179,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Anonymous components get their CSS and JS: the stylesheet and script named
+  after the template, next to it (`Notice/Notice.css` and `Notice/Notice.js` for
+  `Notice/Notice.html.twig`), in both metadata pipelines
+  ([#3](https://github.com/tito10047/ux-sdc/issues/3)). They used to get none.
+  The usual rules apply: a file outside every AssetMapper path — next to a
+  template in `templates/components/` — is left out and reported. Anonymous
+  components get no `controller` variable.
 - Installing the bundle before `ux_components_dir` exists no longer breaks every
   page of the application. The directory was registered as a Twig path and an
   AssetMapper path regardless, and Twig refuses a path that does not exist, so

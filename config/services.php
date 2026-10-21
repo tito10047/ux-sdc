@@ -11,6 +11,7 @@ use Tito10047\UX\Sdc\EventListener\AssetResponseListener;
 use Tito10047\UX\Sdc\EventListener\ComponentRenderListener;
 use Tito10047\UX\Sdc\EventListener\DevComponentRenderListener;
 use Tito10047\UX\Sdc\Twig\AssetExtension;
+use Tito10047\UX\Sdc\Twig\ComponentDirectoryTemplateFinder;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Tito10047\UX\Sdc\Maker\MakeSdcComponent;
 use Tito10047\UX\Sdc\Routing\ComponentRouteLoader;
@@ -110,6 +111,15 @@ return static function (ContainerConfigurator $container): void {
             'method' => 'onKernelController',
         ]);
 
+    // Anonymous components in ux_components_dir, looked up after those of
+    // `twig_component.anonymous_template_directory`.
+    $services->set(ComponentDirectoryTemplateFinder::class)
+        ->decorate('ux.twig_component.component_template_finder')
+        ->args([
+            service('.inner'),
+            service('twig.loader'),
+        ]);
+
     $services->set(AssetExtension::class)
         ->args(['$placeholder' => '<!-- __UX_TWIG_COMPONENT_ASSETS__ -->'])
         ->tag('twig.extension');
@@ -141,6 +151,8 @@ return static function (ContainerConfigurator $container): void {
                 service('router')->nullOnInvalid(),
                 abstract_arg('the classes of the twig.component services, set by AssetComponentCompilerPass'),
                 abstract_arg('the component classes registered with an explicit template, set by AssetComponentCompilerPass'),
+                service('ux.twig_component.component_template_finder'),
+                abstract_arg('the templates of anonymous components, set by AssetComponentCompilerPass'),
             ]);
 
         $services->set(DebugSdcCommand::class)

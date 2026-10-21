@@ -26,8 +26,9 @@ use Tito10047\UX\Sdc\Service\ComponentMetadata;
  * @phpstan-type ReportedRoute array{name: string, path: string}
  *
  * `ReportedStimulusController` is the `controller` variable of the template:
- * `name` as the bundle derives it (null outside `component_namespace`, or when
- * the component sets the variable itself, `set_by_component`), whether the
+ * `name` as the bundle derives it (null outside `component_namespace`, for an
+ * anonymous component, or when the component sets the variable itself,
+ * `set_by_component`), whether the
  * template `used` it, and whether StimulusBundle has a controller of that name
  * (`registered`, null when that is not known).
  *
@@ -45,8 +46,11 @@ final class ComponentReport
     public const TEMPLATE_FROM_METHOD = 'method';
     /** The template Twig Components looks up when nothing else names one. */
     public const TEMPLATE_DEFAULT = 'default';
+    /** The template of an anonymous component, which has no class. */
+    public const TEMPLATE_ANONYMOUS = 'anonymous';
 
     /**
+     * @param string|null                $class              null for an anonymous component
      * @param string                     $template           the Twig name; for TEMPLATE_FROM_METHOD, the method
      * @param self::TEMPLATE_*           $templateOrigin
      * @param bool|null                  $templateFound      null when the template is only known on render
@@ -57,7 +61,7 @@ final class ComponentReport
      */
     public function __construct(
         public readonly string $name,
-        public readonly string $class,
+        public readonly ?string $class,
         public readonly string $template,
         public readonly string $templateOrigin,
         public readonly ?bool $templateFound,

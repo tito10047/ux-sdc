@@ -17,13 +17,14 @@ use Symfony\Component\DependencyInjection\Exception\LogicException;
 use Symfony\Component\Filesystem\Filesystem;
 use Tito10047\UX\Sdc\Debug\ComponentInspector;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
+use Tito10047\UX\Sdc\Service\ComponentMetadata;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 
 /**
  * Collects what the resolver needs to know about the application — its Twig
  * paths, its AssetMapper paths and the components registered with an explicit
  * template — for the runtime resolver and for the build-time one, hands the
- * components to `debug:sdc`, and, with
+ * components, anonymous ones included, to `debug:sdc`, and, with
  * `ux_sdc.metadata_cache` on, dumps the metadata of every component into
  * `sdc_metadata.php`.
  *
@@ -35,6 +36,8 @@ use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
  * raw configuration.
  *
  * @phpstan-import-type SdcMetadataCache from SdcMetadataRegistry
+ * @phpstan-import-type SdcComponentAsset from ComponentMetadata
+ * @phpstan-import-type SdcProblem from ComponentMetadata
  */
 final class AssetComponentCompilerPass implements CompilerPassInterface
 {
@@ -46,8 +49,22 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
      */
     public const METADATA_CACHE_PARAMETER = '.ux_sdc.metadata_cache';
 
+    /**
+     * Below the default priority, after Twig Components' TwigComponentPass has
+     * named the component classes and their templates.
+     */
+    public const PRIORITY = -8;
+
     private const TWIG_LOADER = 'twig.loader.native_filesystem';
     private const ASSET_MAPPER_REPOSITORY = 'asset_mapper.repository';
+    private const COMPONENT_FACTORY = 'ux.twig_component.component_factory';
+    private const COMPONENT_TEMPLATE_FINDER = 'ux.twig_component.component_template_finder';
+
+    /**
+     * The directory of a bundle's Twig path Twig Components looks anonymous
+     * components up in: `@Acme/components/Button.html.twig` is `<twig:Acme:Button>`.
+     */
+    private const BUNDLE_ANONYMOUS_DIRECTORY = 'components';
 
     public function process(ContainerBuilder $container): void
     {
@@ -66,10 +83,34 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
                 ->setArgument('$classesWithExplicitTemplate', $classesWithExplicitTemplate);
         }
 
+        $metadataCache = true === $container->getParameter(self::METADATA_CACHE_PARAMETER);
+
+        // Validated as a boolean node by the bundle configuration.
+        $autoDiscovery = (bool) $container->getParameter('ux_sdc.auto_discovery');
+
+        // With the metadata cache on, files the resolver has to leave out are
+        // reported to the compiler log, the build-time counterpart of the
+        // `logger` service, which does not exist yet. The kernel keeps that log
+        // for debug containers only (and the profiler shows it), so the resolver
+        // is told it runs in debug: in a production build the report goes
+        // nowhere without any further check. Without the cache, the runtime
+        // resolver reports them on render; this one only names templates.
+        $resolver = new ComponentMetadataResolver(
+            $twigRoots,
+            $assetRoots,
+            $autoDiscovery,
+            $metadataCache ? new CompilerLogLogger($container, $this) : null,
+            $metadataCache,
+            $classesWithExplicitTemplate,
+        );
+
+        $anonymousTemplates = $this->collectAnonymousTemplates($container, $twigRoots, $resolver, $componentClasses);
+
         if ($container->hasDefinition(ComponentInspector::class)) {
             $container->getDefinition(ComponentInspector::class)
                 ->setArgument('$componentClasses', $componentClasses)
-                ->setArgument('$classesWithExplicitTemplate', $classesWithExplicitTemplate);
+                ->setArgument('$classesWithExplicitTemplate', $classesWithExplicitTemplate)
+                ->setArgument('$anonymousTemplates', $anonymousTemplates);
         }
 
         if (!$container->hasDefinition(SdcMetadataRegistry::class)) {
@@ -79,7 +120,7 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
         $registryDefinition = $container->getDefinition(SdcMetadataRegistry::class);
         $cachePath = $container->getParameterBag()->resolveValue($registryDefinition->getArgument('$cachePath'));
 
-        if (true !== $container->getParameter(self::METADATA_CACHE_PARAMETER)) {
+        if (!$metadataCache) {
             // The metadata is resolved on render. A file left behind by an earlier
             // build with the cache on would describe components as they were then;
             // the registry does not read it, but nothing should be left to mislead.
@@ -90,24 +131,10 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
             return;
         }
 
-        // Validated as a boolean node by the bundle configuration.
-        $autoDiscovery = (bool) $container->getParameter('ux_sdc.auto_discovery');
-
-        // Files the resolver has to leave out are reported to the compiler log,
-        // the build-time counterpart of the `logger` service, which does not
-        // exist yet. The kernel keeps that log for debug containers only (and
-        // the profiler shows it), so the resolver is told it runs in debug: in
-        // a production build the report goes nowhere without any further check.
-        $resolver = new ComponentMetadataResolver(
-            $twigRoots,
-            $assetRoots,
-            $autoDiscovery,
-            new CompilerLogLogger($container, $this),
-            true,
-            $classesWithExplicitTemplate,
-        );
-
-        $this->dumpCache($cachePath, $this->resolveComponents($componentClasses, $resolver));
+        $this->dumpCache($cachePath, [
+            'components' => $this->resolveComponents($componentClasses, $resolver),
+            'anonymous' => $this->resolveAnonymousComponents(array_keys($anonymousTemplates), $resolver),
+        ]);
     }
 
     /**
@@ -239,7 +266,7 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
     /**
      * The classes of the `twig.component` services that exist.
      *
-     * @return list<string>
+     * @return list<class-string>
      */
     private function collectComponentClasses(ContainerBuilder $container): array
     {
@@ -257,9 +284,176 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
     }
 
     /**
+     * The templates of anonymous components: every `.html.twig` file of the
+     * directories Twig Components looks anonymous components up in, under the
+     * name it gives the template, with the names it may know the component by.
+     *
+     *  - `twig_component.anonymous_template_directory` in each Twig path of
+     *    the main namespace: `components/Alert.html.twig` is `<twig:Alert>`;
+     *  - `components/` in each namespaced Twig path:
+     *    `@Acme/components/Button.html.twig` is `<twig:Acme:Button>`;
+     *  - `ux_sdc.ux_components_dir`, where ComponentDirectoryTemplateFinder
+     *    looks them up: `Alert/Alert.html.twig` is `<twig:Alert:Alert>`.
+     *
+     * Of the names, the one that resolves to the template is only known once
+     * Twig Components runs (`index.html.twig` is the template of its directory
+     * from Twig Components 2.32 on, a template may be shadowed by another, a
+     * class may take the name), so `debug:sdc` checks them then. Here, only the
+     * templates of component classes are left out: the template named in the
+     * registration of a class or given to it by Twig Components by default,
+     * and the `.html.twig` file named after a class, next to it — used by the
+     * class or not, it belongs to the class.
+     *
+     * @param array<string, string|null> $twigRoots        existing directories, as real paths, => namespace (null for the main one)
+     * @param list<class-string>         $componentClasses
+     *
+     * @return array<string, list<string>> template name => component names, the most likely first
+     */
+    private function collectAnonymousTemplates(ContainerBuilder $container, array $twigRoots, ComponentMetadataResolver $resolver, array $componentClasses): array
+    {
+        $directories = [];
+
+        $anonymousDirectory = $this->readAnonymousTemplateDirectory($container);
+        foreach ($twigRoots as $root => $namespace) {
+            if (null === $namespace) {
+                // Joined as Twig Components joins it: the directory, then "/".
+                $directories[] = [$root, $anonymousDirectory, rtrim($anonymousDirectory, '/') . '/', ''];
+            } else {
+                $directories[] = [$root, self::BUNDLE_ANONYMOUS_DIRECTORY, '@' . $namespace . '/' . self::BUNDLE_ANONYMOUS_DIRECTORY . '/', $namespace . ':'];
+            }
+        }
+
+        $componentsDir = $container->hasParameter('ux_sdc.ux_components_dir') ? $container->getParameter('ux_sdc.ux_components_dir') : null;
+        $componentsDir = \is_string($componentsDir) ? $this->resolveDirectory($container, $componentsDir) : null;
+        // Looked up only when the directory is a Twig path, under the namespace SdcExtension gives it.
+        if (null !== $componentsDir && \array_key_exists($componentsDir, $twigRoots)) {
+            $directories[] = [$componentsDir, '', '', ''];
+        }
+
+        $classTemplates = $this->collectClassTemplateFiles($container, $resolver, $componentClasses);
+
+        $templates = [];
+        foreach ($directories as [$root, $directory, $templatePrefix, $namePrefix]) {
+            foreach (self::findTemplates($root . ('' === trim($directory, '/') ? '' : '/' . trim($directory, '/'))) as $relativePath) {
+                $template = $templatePrefix . $relativePath;
+
+                $file = $resolver->locateTemplate($template);
+                if (null === $file || isset($classTemplates[$file]) || isset($templates[$template])) {
+                    continue;
+                }
+
+                $name = $namePrefix . str_replace('/', ':', substr($relativePath, 0, -\strlen('.html.twig')));
+
+                // From Twig Components 2.32 on, `Alert/index.html.twig` is `<twig:Alert>`.
+                $templates[$template] = str_ends_with($name, ':index') && ':index' !== $name
+                    ? [substr($name, 0, -\strlen(':index')), $name]
+                    : [$name];
+            }
+        }
+
+        return $templates;
+    }
+
+    /**
+     * `twig_component.anonymous_template_directory`, as Twig Components hands
+     * it to its template finder. Not set at all, which Twig Components 2.x
+     * still accepts (deprecated), its finder looks in `components/` first.
+     */
+    private function readAnonymousTemplateDirectory(ContainerBuilder $container): string
+    {
+        if (!$container->hasDefinition(self::COMPONENT_TEMPLATE_FINDER)) {
+            return 'components';
+        }
+
+        $directory = $container->getDefinition(self::COMPONENT_TEMPLATE_FINDER)->getArguments()[1] ?? null;
+        if (null === $directory) {
+            return 'components';
+        }
+
+        $directory = $container->getParameterBag()->resolveValue($directory);
+        if (!\is_string($directory)) {
+            throw new LogicException(\sprintf('UX SDC cannot read the directory of anonymous components: the second argument of the "%s" service is not the string it expects (%s). This version of Twig Components is not supported.', self::COMPONENT_TEMPLATE_FINDER, get_debug_type($directory)));
+        }
+
+        return $directory;
+    }
+
+    /**
+     * The template files of the component classes, which no anonymous
+     * component renders: the template Twig Components gives each class (from
+     * the component configuration TwigComponentPass hands its factory), and
+     * the `.html.twig` file named after the class, next to it.
+     *
+     * @param list<class-string> $componentClasses
+     *
+     * @return array<string, true> real paths
+     */
+    private function collectClassTemplateFiles(ContainerBuilder $container, ComponentMetadataResolver $resolver, array $componentClasses): array
+    {
+        $files = [];
+
+        foreach ($componentClasses as $class) {
+            $reflectionClass = new \ReflectionClass($class);
+            $classFile = $reflectionClass->getFileName();
+            if (false === $classFile) {
+                continue;
+            }
+
+            $template = realpath(\dirname($classFile) . '/' . $reflectionClass->getShortName() . '.html.twig');
+            if (false !== $template) {
+                $files[$template] = true;
+            }
+        }
+
+        if (!$container->hasDefinition(self::COMPONENT_FACTORY)) {
+            return $files;
+        }
+
+        $config = $container->getDefinition(self::COMPONENT_FACTORY)->getArguments()[4] ?? null;
+        if (!\is_array($config)) {
+            throw new LogicException(\sprintf('UX SDC cannot read the templates of the component classes: the fifth argument of the "%s" service is not the component configuration it expects (%s). This version of Twig Components is not supported.', self::COMPONENT_FACTORY, get_debug_type($config)));
+        }
+
+        foreach ($config as $component) {
+            $template = \is_array($component) && isset($component['template']) && \is_string($component['template'])
+                ? $resolver->locateTemplate($component['template'])
+                : null;
+
+            if (null !== $template) {
+                $files[$template] = true;
+            }
+        }
+
+        return $files;
+    }
+
+    /**
+     * @return list<string> the `.html.twig` files under the directory, relative to it, with forward slashes, sorted
+     */
+    private static function findTemplates(string $directory): array
+    {
+        if (!is_dir($directory)) {
+            return [];
+        }
+
+        $templates = [];
+        $files = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($directory, \FilesystemIterator::SKIP_DOTS | \FilesystemIterator::FOLLOW_SYMLINKS));
+
+        foreach ($files as $file) {
+            if ($file instanceof \SplFileInfo && $file->isFile() && str_ends_with($file->getFilename(), '.html.twig')) {
+                $templates[] = str_replace('\\', '/', substr($file->getPathname(), \strlen($directory) + 1));
+            }
+        }
+
+        sort($templates);
+
+        return $templates;
+    }
+
+    /**
      * @param list<string> $componentClasses
      *
-     * @return SdcMetadataCache
+     * @return array<string, array{assets: list<SdcComponentAsset>, template: string|null, problems: list<SdcProblem>}>
      */
     private function resolveComponents(array $componentClasses, ComponentMetadataResolver $resolver): array
     {
@@ -272,6 +466,29 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
                 $metadata[$class] = [
                     'assets' => $componentMetadata->assets,
                     'template' => $componentMetadata->template,
+                    'problems' => $componentMetadata->problems,
+                ];
+            }
+        }
+
+        return $metadata;
+    }
+
+    /**
+     * @param list<string> $templates
+     *
+     * @return array<string, array{assets: list<SdcComponentAsset>, problems: list<SdcProblem>}>
+     */
+    private function resolveAnonymousComponents(array $templates, ComponentMetadataResolver $resolver): array
+    {
+        $metadata = [];
+
+        foreach ($templates as $template) {
+            $componentMetadata = $resolver->resolveAnonymous($template);
+
+            if (!$componentMetadata->isEmpty()) {
+                $metadata[$template] = [
+                    'assets' => $componentMetadata->assets,
                     'problems' => $componentMetadata->problems,
                 ];
             }

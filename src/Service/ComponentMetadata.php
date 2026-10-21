@@ -12,12 +12,13 @@
 namespace Tito10047\UX\Sdc\Service;
 
 /**
- * What ComponentMetadataResolver found for one component class: the assets to
- * load with it, the template sitting next to it, if any, and the files next to
- * it that could not be used.
+ * What ComponentMetadataResolver found for one component class, or for the
+ * template of one anonymous component: the assets to load with it, the
+ * template sitting next to the class, if any, and the files next to it that
+ * could not be used.
  *
  * `SdcComponentAsset` is an asset as AssetRegistry takes it, plus where it was
- * found: next to the class, in #[Asset] or in #[AsSdcComponent].
+ * found: next to the class or template, in #[Asset] or in #[AsSdcComponent].
  *
  * `SdcProblem` is a file left out, as a PSR-3 message and its context: the
  * resolver logs it as is, and `debug:sdc` shows it.

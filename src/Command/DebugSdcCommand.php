@@ -28,10 +28,11 @@ use Tito10047\UX\Sdc\Service\ComponentMetadata;
 
 /**
  * Shows what the bundle adds to each component — template, CSS, JS, Stimulus
- * controller, routes — and what keeps any of it from loading.
+ * controller, routes — and what keeps any of it from loading. Anonymous
+ * components are listed too, with the assets next to their template.
  *
  * It complements `debug:twig-component`, which shows the props and hooks of a
- * component and lists anonymous ones.
+ * component.
  *
  * Like the other `debug:*` commands, it exits with 0 whatever it finds;
  * `--strict` makes problems fail it, for a CI step.
@@ -65,6 +66,7 @@ final class DebugSdcCommand extends Command
                 The <info>%command.name%</info> command displays the components of the application
                 as UX SDC renders them: the template, the CSS and JS with their public paths,
                 the Stimulus controller and the routes of the controllers next to the class.
+                Anonymous components (a template without a class) are marked <comment>(anonymous)</comment>.
                 It flags (<fg=yellow>⚠</>) what keeps a part of a component from loading.
 
                   <info>php %command.full_name%</info>
@@ -79,8 +81,8 @@ final class DebugSdcCommand extends Command
                   <info>php %command.full_name% --strict</info>
 
                 The metadata comes from where the pages get it: the build-time cache with
-                <comment>ux_sdc.metadata_cache</comment> on, the files next to each class otherwise.
-                Anonymous components, and the props of a component, are shown by <info>debug:twig-component</info>.
+                <comment>ux_sdc.metadata_cache</comment> on, the files next to each component otherwise.
+                The props of a component are shown by <info>debug:twig-component</info>.
                 EOF);
     }
 
@@ -117,8 +119,8 @@ final class DebugSdcCommand extends Command
         }
 
         $reports = [];
-        foreach ($components as $class) {
-            $reports[] = $this->inspector->inspect($class);
+        foreach (array_keys($components) as $componentName) {
+            $reports[] = $this->inspector->inspect($componentName);
         }
 
         if ('json' === $format) {
@@ -144,9 +146,9 @@ final class DebugSdcCommand extends Command
      * An exact name or class selects that component alone; anything else
      * every component whose name or class contains it.
      *
-     * @param array<string, string> $components name => class
+     * @param array<string, string|null> $components name => class, null for an anonymous component
      *
-     * @return array<string, string>
+     * @return array<string, string|null>
      */
     private static function filter(array $components, string $search): array
     {
@@ -160,7 +162,7 @@ final class DebugSdcCommand extends Command
 
         return array_filter(
             $components,
-            static fn (string $componentClass, string $componentName): bool => false !== stripos($componentName, $search) || false !== stripos($componentClass, $class),
+            static fn (?string $componentClass, string $componentName): bool => false !== stripos($componentName, $search) || (null !== $componentClass && false !== stripos($componentClass, $class)),
             \ARRAY_FILTER_USE_BOTH,
         );
     }
@@ -195,7 +197,7 @@ final class DebugSdcCommand extends Command
 
         $io->table(['Property', 'Value'], [
             ['Name', OutputFormatter::escape($report->name)],
-            ['Class', OutputFormatter::escape($report->class)],
+            ['Class', null === $report->class ? '<comment>none (anonymous component)</comment>' : OutputFormatter::escape($report->class)],
             ['Template', $this->formatTemplate($report)],
             ['CSS', $this->formatAssets($report, 'css', true)],
             ['JS', $this->formatAssets($report, 'js', true)],
@@ -214,8 +216,8 @@ final class DebugSdcCommand extends Command
     private function renderSummary(SymfonyStyle $io, array $reports): void
     {
         $io->comment($this->inspector->usesMetadataCache()
-            ? 'Metadata from the build-time cache ("ux_sdc.metadata_cache" on): a file added next to a class needs "bin/console cache:clear".'
-            : 'Metadata resolved from the files next to each class ("ux_sdc.metadata_cache" off).');
+            ? 'Metadata from the build-time cache ("ux_sdc.metadata_cache" on): a file added next to a class or an anonymous component template needs "bin/console cache:clear".'
+            : 'Metadata resolved from the files next to each class or anonymous component template ("ux_sdc.metadata_cache" off).');
 
         $count = 0;
         foreach ($reports as $report) {
@@ -223,7 +225,7 @@ final class DebugSdcCommand extends Command
                 continue;
             }
 
-            $io->section(\sprintf('%s (%s)', OutputFormatter::escape($report->name), OutputFormatter::escape($report->class)));
+            $io->section(\sprintf('%s (%s)', OutputFormatter::escape($report->name), OutputFormatter::escape($report->class ?? $report->template)));
             $io->listing(array_map(OutputFormatter::escape(...), $report->problems));
             $count += \count($report->problems);
         }

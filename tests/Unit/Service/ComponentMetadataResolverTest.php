@@ -11,6 +11,7 @@
 
 namespace Tito10047\UX\Sdc\Tests\Unit\Service;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LogLevel;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
@@ -229,5 +230,114 @@ final class ComponentMetadataResolverTest extends TestCase
         $metadata = (new ComponentMetadataResolver([self::FIXTURES], [self::FIXTURES], true))->resolve('App\\DoesNotExist');
 
         $this->assertTrue($metadata->isEmpty());
+    }
+    /**
+     * An anonymous component is resolved from its template: the stylesheet and
+     * script named after it, next to it.
+     */
+    public function testResolvesAnAnonymousComponentFromItsTemplate(): void
+    {
+        $logger = new TestLogger();
+        $metadata = (new ComponentMetadataResolver([self::FIXTURES], [self::FIXTURES], true, $logger, true))->resolveAnonymous('components/Notice.html.twig');
+
+        $this->assertSame([
+            ['path' => 'components/Notice.css', 'type' => 'css', 'priority' => 0, 'attributes' => [], 'source' => 'discovered'],
+            ['path' => 'components/Notice.js', 'type' => 'js', 'priority' => 0, 'attributes' => [], 'source' => 'discovered'],
+        ], $metadata->assets);
+        $this->assertNull($metadata->template, 'Twig Components renders the template it found.');
+        $this->assertSame([], $metadata->problems);
+        $this->assertSame([], $logger->records);
+    }
+
+    /**
+     * The template is looked up in the Twig paths of its namespace; the assets
+     * are named after their AssetMapper path, whatever the Twig namespace.
+     */
+    public function testResolvesAnAnonymousComponentOfANamespacedTwigPath(): void
+    {
+        $metadata = (new ComponentMetadataResolver([self::FIXTURES . '/Acme' => 'Acme'], [self::FIXTURES => 'lib'], true))->resolveAnonymous('@Acme/components/Button.html.twig');
+
+        $this->assertSame(['lib/Acme/components/Button.css'], array_column($metadata->assets, 'path'));
+    }
+
+    public function testLeavesOutFilesNextToAnAnonymousTemplateOutsideEveryAssetMapperPath(): void
+    {
+        $logger = new TestLogger();
+        $resolver = new ComponentMetadataResolver([self::FIXTURES], [self::UNRELATED_ROOT], true, $logger, true);
+        $metadata = $resolver->resolveAnonymous('components/Notice.html.twig');
+
+        $this->assertSame([], $metadata->assets);
+        $this->assertCount(2, $metadata->problems);
+
+        $warnings = $logger->recordsOf(LogLevel::WARNING);
+        $this->assertCount(2, $warnings);
+        $this->assertSame('Anonymous component "{component}": "{file}" next to the template is outside every AssetMapper path ({roots}), so it is not loaded with the component. Move the component into the directory configured as "ux_sdc.ux_components_dir", or add its directory to "framework.asset_mapper.paths".', $warnings[0]['message']);
+        $this->assertSame('components/Notice.html.twig', $warnings[0]['context']['component']);
+        $this->assertSame(realpath(self::FIXTURES . '/components/Notice.css'), $warnings[0]['context']['file']);
+        $this->assertSame(realpath(self::FIXTURES . '/components/Notice.js'), $warnings[1]['context']['file']);
+
+        // Once per template.
+        $this->assertSame($metadata, $resolver->resolveAnonymous('components/Notice.html.twig'));
+        $this->assertCount(2, $logger->records);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function anonymousTemplatesWithoutAssets(): iterable
+    {
+        yield 'no file next to the template' => ['components/Panel/index.html.twig'];
+        yield 'not in any Twig path' => ['components/Missing.html.twig'];
+        yield 'unknown namespace' => ['@Missing/components/Notice.html.twig'];
+        yield 'not a .html.twig template' => ['components/Notice.css'];
+    }
+
+    #[DataProvider('anonymousTemplatesWithoutAssets')]
+    public function testAnonymousComponentWithoutFilesNextToItHasNoMetadata(string $template): void
+    {
+        $logger = new TestLogger();
+        $metadata = (new ComponentMetadataResolver([self::FIXTURES], [self::FIXTURES], true, $logger, true))->resolveAnonymous($template);
+
+        $this->assertTrue($metadata->isEmpty());
+        $this->assertSame([], $logger->records);
+    }
+
+    public function testWithoutAutoDiscoveryAnAnonymousComponentHasNoMetadata(): void
+    {
+        $metadata = (new ComponentMetadataResolver([self::FIXTURES], [self::FIXTURES], false))->resolveAnonymous('components/Notice.html.twig');
+
+        $this->assertTrue($metadata->isEmpty());
+    }
+
+    /**
+     * As the Twig filesystem loader finds a template: in the paths of its
+     * namespace, in order, the name normalised.
+     *
+     * @param array<int|string, string|null> $twigRoots
+     */
+    #[DataProvider('templateLocations')]
+    public function testLocatesATemplateTheWayTwigDoes(array $twigRoots, string $template, ?string $expected): void
+    {
+        $resolver = new ComponentMetadataResolver($twigRoots, [], true);
+
+        $this->assertSame(null === $expected ? null : realpath($expected), $resolver->locateTemplate($template));
+    }
+
+    /**
+     * @return iterable<string, array{array<int|string, string|null>, string, string|null}>
+     */
+    public static function templateLocations(): iterable
+    {
+        $notice = self::FIXTURES . '/components/Notice.html.twig';
+
+        yield 'main namespace' => [[self::FIXTURES], 'components/Notice.html.twig', $notice];
+        yield 'first path holding it' => [[self::UNRELATED_ROOT, self::FIXTURES], 'components/Notice.html.twig', $notice];
+        yield 'leading and doubled slashes' => [[self::FIXTURES], '/components//Notice.html.twig', $notice];
+        yield 'backslashes' => [[self::FIXTURES], 'components\\Notice.html.twig', $notice];
+        yield 'namespace' => [[self::FIXTURES => 'ui'], '@ui/components/Notice.html.twig', $notice];
+        yield 'main namespace is not a named one' => [[self::FIXTURES => 'ui'], 'components/Notice.html.twig', null];
+        yield 'named namespace is not the main one' => [[self::FIXTURES], '@ui/components/Notice.html.twig', null];
+        yield 'namespace without a path' => [[self::FIXTURES => 'ui'], '@ui', null];
+        yield 'missing' => [[self::FIXTURES], 'components/Missing.html.twig', null];
     }
 }

@@ -39,8 +39,8 @@ class SdcMetadataRegistryTest extends TestCase
     {
         $asset = ['path' => 'Alert/Alert.css', 'type' => 'css', 'priority' => 0, 'attributes' => []];
         $this->writeCache([
-            'App\Alert' => ['assets' => [$asset], 'template' => 'Alert/Alert.html.twig'],
-            'App\Icon' => ['assets' => [], 'template' => 'Icon/Icon.html.twig'],
+            'App\Alert' => ['assets' => [$asset], 'template' => 'Alert/Alert.html.twig', 'problems' => []],
+            'App\Icon' => ['assets' => [], 'template' => 'Icon/Icon.html.twig', 'problems' => []],
         ]);
 
         $registry = new SdcMetadataRegistry($this->cachePath);
@@ -70,6 +70,26 @@ class SdcMetadataRegistryTest extends TestCase
         $this->assertTrue($registry->getComponentMetadata('App\Unknown')->isEmpty());
     }
 
+    public function testGivesTheMetadataOfAnAnonymousComponentByTemplate(): void
+    {
+        $asset = ['path' => 'Notice/Notice.css', 'type' => 'css', 'priority' => 0, 'attributes' => [], 'source' => 'discovered'];
+        $problem = ['message' => '"{file}" is outside', 'context' => ['file' => '/app/Notice.js']];
+        $this->writeCache([], [
+            'Notice/Notice.html.twig' => ['assets' => [$asset], 'problems' => [$problem]],
+        ]);
+
+        $registry = new SdcMetadataRegistry($this->cachePath);
+
+        $metadata = $registry->getAnonymousComponentMetadata('Notice/Notice.html.twig');
+        $this->assertSame([$asset], $metadata->assets);
+        $this->assertNull($metadata->template);
+        $this->assertSame([$problem], $metadata->problems);
+
+        $this->assertTrue($registry->getAnonymousComponentMetadata('components/Unknown.html.twig')->isEmpty());
+        $this->assertTrue($registry->getComponentMetadata('Notice/Notice.html.twig')->isEmpty(), 'Classes and templates are looked up apart.');
+        $this->assertTrue($registry->getAnonymousComponentMetadata('App\Unknown')->isEmpty());
+    }
+
     public function testUnknownClassHasNoAssetsAndNoTemplate(): void
     {
         $this->writeCache([]);
@@ -90,6 +110,7 @@ class SdcMetadataRegistryTest extends TestCase
 
         $this->assertSame([], $registry->getAssets('App\Alert'));
         $this->assertNull($registry->getTemplate('App\Alert'));
+        $this->assertTrue($registry->getAnonymousComponentMetadata('Notice/Notice.html.twig')->isEmpty());
 
         $this->assertCount(1, $logger->records);
         $this->assertSame(LogLevel::ERROR, $logger->records[0]['level']);
@@ -118,15 +139,16 @@ class SdcMetadataRegistryTest extends TestCase
         $this->assertSame([], $registry->getAssets('App\Alert'));
         $this->assertSame([], $logger->records);
 
-        $this->writeCache(['App\Alert' => ['assets' => [], 'template' => 'Alert/Alert.html.twig']]);
+        $this->writeCache(['App\Alert' => ['assets' => [], 'template' => 'Alert/Alert.html.twig', 'problems' => []]]);
         $this->assertNull((new SdcMetadataRegistry($this->cachePath, false, $logger))->getTemplate('App\Alert'));
     }
 
     /**
-     * @param array<string, mixed> $data
+     * @param array<string, mixed> $components
+     * @param array<string, mixed> $anonymous
      */
-    private function writeCache(array $data): void
+    private function writeCache(array $components, array $anonymous = []): void
     {
-        file_put_contents($this->cachePath, '<?php return ' . var_export($data, true) . ';');
+        file_put_contents($this->cachePath, '<?php return ' . var_export(['components' => $components, 'anonymous' => $anonymous], true) . ';');
     }
 }

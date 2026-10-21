@@ -20,7 +20,8 @@ use Tito10047\UX\Sdc\Service\StimulusControllerNameResolver;
 
 /**
  * Resolves the metadata of a component when it renders, from the files next to
- * its class (`ux_sdc.metadata_cache` false). The resolver caches it per class.
+ * its class, or to its template for an anonymous component
+ * (`ux_sdc.metadata_cache` false). The resolver caches it per class and template.
  *
  * Wired like ComponentRenderListener, which it replaces in that mode.
  */
@@ -59,6 +60,8 @@ final class DevComponentRenderListener
     {
         $metadata = $event->getMetadata();
         if ($metadata->isAnonymous()) {
+            $this->addAssets($this->metadataResolver->resolveAnonymous($metadata->getTemplate())->assets);
+
             return;
         }
 

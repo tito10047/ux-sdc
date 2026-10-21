@@ -50,7 +50,7 @@ class SdcBundle extends Bundle
         parent::build($container);
 
         $container->addCompilerPass(new SdcComponentAttributePass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, SdcComponentAttributePass::PRIORITY);
-        $container->addCompilerPass(new AssetComponentCompilerPass());
+        $container->addCompilerPass(new AssetComponentCompilerPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, AssetComponentCompilerPass::PRIORITY);
         $container->addCompilerPass(new StimulusControllerPathsCompilerPass());
         $container->addCompilerPass(new ComponentRoutesCompilerPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, ComponentRoutesCompilerPass::PRIORITY);
     }

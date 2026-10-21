@@ -18,16 +18,26 @@ use Tito10047\UX\Sdc\Service\ComponentMetadata;
  * Reads the component metadata AssetComponentCompilerPass resolved when the
  * container was built.
  *
- * `SdcMetadataCache` is the shape of `sdc_metadata.php`: component class to its
- * assets, its co-located template and the files next to it that could not be
- * used. Classes with none of these are left out.
+ * `SdcMetadataCache` is the shape of `sdc_metadata.php`:
+ *
+ *  - `components`: component class to its assets, its co-located template and
+ *    the files next to it that could not be used;
+ *  - `anonymous`: the template of an anonymous component, as Twig Components
+ *    names it, to the assets next to it and the files that could not be used.
+ *
+ * Components with none of these are left out.
  *
  * @phpstan-import-type SdcComponentAsset from ComponentMetadata
  * @phpstan-import-type SdcProblem from ComponentMetadata
- * @phpstan-type SdcMetadataCache array<string, array{assets: list<SdcComponentAsset>, template: string|null, problems: list<SdcProblem>}>
+ * @phpstan-type SdcMetadataCache array{
+ *     components: array<string, array{assets: list<SdcComponentAsset>, template: string|null, problems: list<SdcProblem>}>,
+ *     anonymous: array<string, array{assets: list<SdcComponentAsset>, problems: list<SdcProblem>}>,
+ * }
  */
 class SdcMetadataRegistry
 {
+    private const EMPTY = ['components' => [], 'anonymous' => []];
+
     /**
      * @var SdcMetadataCache|null
      */
@@ -50,7 +60,7 @@ class SdcMetadataRegistry
      */
     public function getAssets(string $class): array
     {
-        return $this->load()[$class]['assets'] ?? [];
+        return $this->load()['components'][$class]['assets'] ?? [];
     }
 
     /**
@@ -58,7 +68,7 @@ class SdcMetadataRegistry
      */
     public function getTemplate(string $class): ?string
     {
-        return $this->load()[$class]['template'] ?? null;
+        return $this->load()['components'][$class]['template'] ?? null;
     }
 
     /**
@@ -67,13 +77,29 @@ class SdcMetadataRegistry
      */
     public function getComponentMetadata(string $class): ComponentMetadata
     {
-        $metadata = $this->load()[$class] ?? null;
+        $metadata = $this->load()['components'][$class] ?? null;
 
         if (null === $metadata) {
             return new ComponentMetadata();
         }
 
         return new ComponentMetadata($metadata['assets'], $metadata['template'], $metadata['problems']);
+    }
+
+    /**
+     * Everything the build resolved for an anonymous component.
+     *
+     * @param string $template the template of the component, as Twig Components names it
+     */
+    public function getAnonymousComponentMetadata(string $template): ComponentMetadata
+    {
+        $metadata = $this->load()['anonymous'][$template] ?? null;
+
+        if (null === $metadata) {
+            return new ComponentMetadata();
+        }
+
+        return new ComponentMetadata($metadata['assets'], null, $metadata['problems']);
     }
 
     /**
@@ -86,7 +112,7 @@ class SdcMetadataRegistry
         }
 
         if (!$this->cacheEnabled) {
-            return $this->metadata = [];
+            return $this->metadata = self::EMPTY;
         }
 
         if (!file_exists($this->cachePath)) {
@@ -101,7 +127,7 @@ class SdcMetadataRegistry
                 ['path' => $this->cachePath]
             );
 
-            return $this->metadata = [];
+            return $this->metadata = self::EMPTY;
         }
 
         return $this->metadata = require $this->cachePath;
