@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-# 1. Vytvorenie dummy projektu
+# 1. Create a dummy Symfony project
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 PROJECT_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
 
@@ -16,19 +16,18 @@ if [ ! -d "dummy-project" ]; then
 fi
 cd dummy-project
 
-# 2. Konfigurácia lokálneho repozitára a symfony/flex
+# 2. Install the bundle from this checkout, with Flex recipes enabled
 composer config repositories.local "{\"type\": \"path\", \"url\": \"$PROJECT_ROOT\", \"canonical\": false, \"options\": {\"symlink\": true}}"
 composer config extra.symfony.allow-contrib true
 composer config minimum-stability dev
 composer config prefer-stable true
 
-# 3. Úprava autoload v composer.json
-# Použijeme php na bezpečnú úpravu JSONu
+# 3. Map App\Component\ to src_component/ in composer.json, editing the JSON with PHP
 if [ -f "composer.json" ]; then
 php -r '
 $json = json_decode(file_get_contents("composer.json"), true);
 $json["autoload"]["psr-4"]["App\\Component\\"] = "src_component/";
-// Oprava require-dev ak je to pole (Composer schema vyžaduje objekt)
+// json_decode() turns an empty require-dev object into an array; the Composer schema wants an object
 if (isset($json["require-dev"]) && empty($json["require-dev"])) {
     $json["require-dev"] = new stdClass();
 }
@@ -36,27 +35,23 @@ file_put_contents("composer.json", json_encode($json, JSON_PRETTY_PRINT | JSON_U
 '
 fi
 
-# 3b. Pridanie src_component do services.yaml pre autodiscovery
-# Bundle už registruje triedy, ale pre istotu v skeleton projekte 
-# musíme zabezpečiť, aby App\ neprekrývalo náš namespace ak by bol v src/
-# V tomto flow je to v src_component/, takze bundle by to mal zvladnut.
-
-# 3c. Vytvorenie priecinka pre komponenty
+# 3b. Create the component directory. services.yaml is left alone: the bundle
+#     registers the classes of component_namespace itself.
 mkdir -p src_component
 
-# 4. Inštalácia závislostí
+# 4. Install the dependencies
 BRANCH_NAME=${1:-main}
 composer require symfony/twig-bundle symfony/ux-twig-component webapp --no-interaction
 composer require tito10047/ux-sdc:dev-$BRANCH_NAME --no-interaction
 
-# 5. Kopírovanie E2E testovacích súborov (z tests_e2e/basic)
+# 5. Copy the E2E fixtures (from tests_e2e/basic)
 cp -r "$PROJECT_ROOT/tests_e2e/basic/"* .
 
-# 6. Overenie
+# 6. Verify
 echo "Running debug:container..."
 JSON_OUTPUT=$(php bin/console debug:container --tag=twig.component --format=json)
 
-# Voliteľne: Overenie existencie služby pre náš komponent pomocou php na parsovanie JSONu
+# The test component must be registered as a Twig component service
 if echo "$JSON_OUTPUT" | php -r '
 $json = json_decode(file_get_contents("php://stdin"), true);
 if (isset($json["definitions"]["App\\Component\\Component\\MyComponent"])) {

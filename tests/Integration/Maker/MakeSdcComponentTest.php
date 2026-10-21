@@ -97,7 +97,7 @@ class MakeSdcComponentTest extends IntegrationTestCase
         $command = $application->find('make:sdc-component');
         $tester = new CommandTester($command);
 
-        // UI:Homepage s voľbou --action
+        // Page:Homepage with --action
         $tester->execute([
             'name' => 'Page:Homepage',
             '--action' => true,

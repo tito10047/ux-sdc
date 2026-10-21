@@ -11,13 +11,20 @@
 
 namespace Tito10047\UX\Sdc\EventListener;
 
-use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\UX\TwigComponent\Event\PostMountEvent;
 use Symfony\UX\TwigComponent\Event\PreRenderEvent;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
 
+/**
+ * Reads the metadata of a component from the cache dumped when the container
+ * is built (`ux_sdc.metadata_cache` true).
+ *
+ * Its events are tagged in config/services.php; SdcExtension keeps either this
+ * listener or DevComponentRenderListener, and subscribes the one it keeps to
+ * `kernel.controller` when LiveComponent is installed.
+ */
 final class ComponentRenderListener
 {
     use ComponentRenderTrait;
@@ -29,7 +36,6 @@ final class ComponentRenderListener
     ) {
     }
 
-    #[AsEventListener(event: PostMountEvent::class)]
     public function onPostMount(PostMountEvent $event): void
     {
         $component = $event->getComponent();
@@ -39,7 +45,6 @@ final class ComponentRenderListener
         $this->addAssets($this->metadataRegistry->getAssets($component::class));
     }
 
-    #[AsEventListener(event: ControllerEvent::class)]
     public function onKernelController(ControllerEvent $event): void
     {
         $controller = $event->getController();
@@ -54,7 +59,6 @@ final class ComponentRenderListener
         }
     }
 
-    #[AsEventListener(event: PreRenderEvent::class)]
     public function onPreRender(PreRenderEvent $event): void
     {
         $component = $event->getComponent();

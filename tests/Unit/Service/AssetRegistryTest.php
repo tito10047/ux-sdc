@@ -35,7 +35,7 @@ final class AssetRegistryTest extends TestCase
     {
         $registry = new AssetRegistry();
         $registry->addAsset('style.css', 'css', 10);
-        $registry->addAsset('style.css', 'css', 20); // Vyššia priorita
+        $registry->addAsset('style.css', 'css', 20); // Higher priority
 
         $assets = $registry->getSortedAssets();
 

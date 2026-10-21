@@ -98,16 +98,4 @@ return static function (ContainerConfigurator $container): void {
             ])
             ->tag('maker.command');
     }
-
-    $services = $container->services();
-
-    //	$services->defaults()
-    //		->autowire()
-    //		->autoconfigure();
-    //
-    //	// Symfony si samo vytiahne hodnoty z parametrov kontajnera
-    //	$services->load(
-    //		'%sdc.component_namespace%',
-    //		'%sdc.component_dir%'
-    //	);
 };

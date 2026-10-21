@@ -44,11 +44,9 @@ final class AssetRegistry implements ResetInterface
                 'priority' => $priority,
                 'attributes' => $attributes,
             ];
-        } else {
-            // Ak už existuje, môžeme aktualizovať prioritu na vyššiu
-            if ($priority > $this->assets[$key]['priority']) {
-                $this->assets[$key]['priority'] = $priority;
-            }
+        } elseif ($priority > $this->assets[$key]['priority']) {
+            // The same asset requested again: it is loaded once, with the highest priority asked for.
+            $this->assets[$key]['priority'] = $priority;
         }
     }
 

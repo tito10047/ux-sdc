@@ -66,6 +66,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   registered under its bare file name (`Alert.css`), which never resolved and
   produced a broken `<link>`/`<script>`; it is now left out, and reported in
   debug.
+- Every `ux_sdc` configuration option is now described, in English, in
+  `config:dump-reference ux_sdc`; the descriptions used to be in Slovak, and
+  `stimulus` had none.
+- The package archive installed by Composer contains only what an application
+  needs (`src/`, `config/`, `assets/`, `templates/` and the documentation). The
+  tests, the end-to-end setup, tool configuration and an internal specification
+  (`zadanie.md`, `.junie/`) are no longer shipped.
 
 ### Fixed
 

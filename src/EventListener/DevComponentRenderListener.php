@@ -11,7 +11,6 @@
 
 namespace Tito10047\UX\Sdc\EventListener;
 
-use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\UX\TwigComponent\Event\PostMountEvent;
 use Symfony\UX\TwigComponent\Event\PreRenderEvent;
@@ -21,6 +20,8 @@ use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 /**
  * Resolves the metadata of a component when it renders, from the files next to
  * its class (`ux_sdc.metadata_cache` false). The resolver caches it per class.
+ *
+ * Wired like ComponentRenderListener, which it replaces in that mode.
  */
 final class DevComponentRenderListener
 {
@@ -33,13 +34,11 @@ final class DevComponentRenderListener
     ) {
     }
 
-    #[AsEventListener(event: PostMountEvent::class)]
     public function onPostMount(PostMountEvent $event): void
     {
         $this->setComponentNamespace($event->getComponent());
     }
 
-    #[AsEventListener(event: ControllerEvent::class)]
     public function onKernelController(ControllerEvent $event): void
     {
         $controller = $event->getController();
@@ -54,7 +53,6 @@ final class DevComponentRenderListener
         }
     }
 
-    #[AsEventListener(event: PreRenderEvent::class)]
     public function onPreRender(PreRenderEvent $event): void
     {
         $metadata = $event->getMetadata();

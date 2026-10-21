@@ -49,7 +49,7 @@ class DevRuntimeAutodiscoveryTest extends IntegrationTestCase
         // assets on PreRenderEvent.
         $html = $twig->render('auto_discovery.html.twig');
 
-        // Overíme, že template bola nájdená (inak by twig vyhodil chybu ak by ju nenašiel cez alias)
+        // The co-located template was found: Twig would have thrown if it could not load it.
         $this->assertStringContainsString('data-testid="auto-discovery-component"', $html);
         $this->assertStringContainsString('Auto Discovery Component Content', $html);
 
@@ -69,7 +69,7 @@ class DevRuntimeAutodiscoveryTest extends IntegrationTestCase
 
         $finalHtml = $response->getContent();
 
-        // Overíme, že assets boli nájdené a vložené
+        // The co-located CSS and JS were found and injected.
         $this->assertStringContainsString('<link rel="stylesheet" href="/assets/AutoDiscovery/AutoDiscoveryComponent.css">', $finalHtml);
         $this->assertStringContainsString('<script src="/assets/AutoDiscovery/AutoDiscoveryComponent.js"></script>', $finalHtml);
     }
@@ -90,14 +90,14 @@ class DevRuntimeAutodiscoveryTest extends IntegrationTestCase
             $loader->addPath(realpath(__DIR__ . '/Fixtures/Component'));
         }
 
-        // Použijeme SdcComponent, ktorý má template definovanú v atribúte
+        // SdcComponent names its template in its attribute.
         $html = $twig->render('base.html.twig');
 
         /** @var AssetRegistry $assetRegistry */
         $assetRegistry = $container->get(AssetRegistry::class);
 
-        // SdcComponent má v atribúte definované css a js, takže by sa mali pridať
-        // aj keď je auto_discovery vypnuté.
+        // SdcComponent declares its CSS and JS in its attribute, so they are added
+        // even with auto_discovery off.
         $this->assertNotEmpty($assetRegistry->getSortedAssets());
     }
 }

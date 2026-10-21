@@ -95,11 +95,6 @@ class BenchmarkKernel extends Kernel
                     $container->register('twig.extension.profiler', \Twig\Extension\ProfilerExtension::class)
                         ->addArgument(new Definition(\Twig\Profiler\Profile::class))
                         ->setPublic(false);
-
-                    // Možno budeš potrebovať aj toto pre AssetMapper, ak ho používaš
-                    if (!$container->has('assets._asset_mapper_debug_command')) {
-                        $container->register('assets._asset_mapper_debug_command', \stdClass::class)->setPublic(false);
-                    }
                 }
 
                 if (!$container->hasDefinition('asset_mapper')) {
