@@ -90,6 +90,30 @@ final class FragmentAssetHeaderTest extends TestCase
         $this->assertFalse($response->headers->has('X-SDC-Assets'));
     }
 
+    /**
+     * The fragment inserts what uses a font or an image as soon as it
+     * arrives: a preload would come no earlier. Version 1 stays as it is.
+     */
+    public function testLeavesFontsAndImagesOut(): void
+    {
+        $response = new Response();
+
+        (new FragmentAssetHeader())->addTo(new Request(), $response, [
+            new ResolvedAsset('/inter.woff2', 'font'),
+            new ResolvedAsset('/a.css', 'css'),
+            new ResolvedAsset('/hero.avif', 'image'),
+        ]);
+
+        $this->assertSame(
+            '{"v":1,"assets":[{"type":"css","href":"/a.css","attributes":{"data-turbo-track":"dynamic"}}]}',
+            $response->headers->get('X-SDC-Assets'),
+        );
+
+        $response = new Response();
+        (new FragmentAssetHeader())->addTo(new Request(), $response, [new ResolvedAsset('/inter.woff2', 'font')]);
+        $this->assertFalse($response->headers->has('X-SDC-Assets'), 'Nothing to list, no header.');
+    }
+
     public function testWarnsInDebugAboutAHeaderTooLongForAProxy(): void
     {
         $assets = [];

@@ -111,14 +111,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Warning, in debug only: the `X-SDC-Assets` header of a response is longer than
   2 KB — nginx in front of PHP-FPM answers 502 once all the response headers
   exceed `fastcgi_buffer_size` (4k or 8k by default).
+- `#[Asset]` preloads fonts and images: the types `font` and `image` (constants
+  `Asset::FONT`, `Asset::IMAGE`, next to `Asset::CSS` and `Asset::JS`) render
+  `<link rel="preload" as="font|image">` with the MIME type of the extension —
+  and `crossorigin` for a font, which browsers fetch in CORS mode — and the same
+  `Link: rel="preload"` header. They are not listed in the `X-SDC-Assets` header
+  of fragments. `debug:sdc` shows them in a *Preload* column.
 
 ### Changed
 
 - README rewritten against the current code: every example verified in a Flex-style
   application; one consistent `App\Component\` ↔ `src_component/` mapping; the
-  component name (`<twig:Alert:Alert />`), `#[Asset]` (a path without `type` that
-  is not `.css` is loaded as a script) and the events actually used are documented
-  correctly; new sections for requirements, the `make:sdc-component` options and
+  component name (`<twig:Alert:Alert />`), `#[Asset]` and the events actually
+  used are documented correctly; new sections for requirements, the `make:sdc-component` options and
   what the generated `--action` code still needs per Symfony version, a complete
   configuration reference, known limitations and non-goals.
 - **Behaviour change:** the metadata pipeline is now selected by the debug flag
@@ -238,6 +243,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A Live Component request is recognised by an `Accept` header that lists
   `application/vnd.live-component+html` among other types too, not only by one
   that is exactly that.
+- **BC break:** the type of an `#[Asset]` without `type` is told by the extension
+  of its path from a fixed list — `.css`; `.js`, `.mjs`; `.woff2`, `.woff`,
+  `.ttf`, `.otf`; `.avif`, `.webp`, `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`
+  (the query string of a URL does not count). A path that tells none used to be
+  loaded as a script; now it fails the container build (with
+  `metadata_cache: false`, the render) with an `InvalidArgumentException` naming
+  the component. Declare the type of such a path:
+  `#[Asset('https://cdn.example.com/lib', type: 'js')]`,
+  `#[Asset('https://fonts.googleapis.com/css2?family=Inter', type: 'css')]`.
+- **BC break:** `#[Asset]` accepts only the types `css`, `js`, `font` and
+  `image`, and an empty path is an error; any other type used to be accepted
+  and the asset silently never loaded. Its properties are read-only, and
+  `$type` holds the type the asset loads as — declared or told by the path
+  (`null` only for an `#[Asset]` without a path, which is still ignored).
 
 ### Fixed
 
@@ -361,6 +380,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Asset URLs are now HTML-escaped in `href` and `src`.
 - `ux_sdc.placeholder` can no longer be configured empty, which would match
   every response.
+- `#[Asset('fonts/inter.woff2')]` — any path without `type` other than `.css` —
+  was loaded as `<script src="…woff2">` and preloaded `as="script"`. It is
+  preloaded as a font now (see *Added*), and a path whose type is unknown is
+  never loaded as a script.
 
 ## [0.4.0] - 2026-10-02
 

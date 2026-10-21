@@ -64,6 +64,58 @@ final class PageAssetInjectorTest extends TestCase
         );
     }
 
+    /**
+     * A font or an image gets a preload tag and the same `Link`: the header
+     * may be dropped on the way (a proxy, an HTML cache), the tag may not.
+     */
+    public function testPreloadsFontsAndImagesWithATagAndALink(): void
+    {
+        $request = new Request();
+        $response = new Response(self::PAGE);
+
+        $this->createInjector()->inject($request, $response, self::PAGE, [
+            new ResolvedAsset('/inter.woff2', 'font'),
+            new ResolvedAsset('/hero.avif', 'image', ['fetchpriority' => 'high', 'imagesizes' => false]),
+            new ResolvedAsset('/a.css', 'css'),
+        ]);
+
+        $this->assertSame(
+            '<html><head>'
+            . '<link rel="preload" href="/inter.woff2" as="font" type="font/woff2" crossorigin>' . "\n"
+            . '<link rel="preload" href="/hero.avif" as="image" type="image/avif" fetchpriority="high">' . "\n"
+            . '<link rel="stylesheet" href="/a.css" data-turbo-track="dynamic">' . "\n"
+            . '</head><body></body></html>',
+            $response->getContent(),
+        );
+
+        $links = $request->attributes->get('_links');
+        $this->assertInstanceOf(GenericLinkProvider::class, $links);
+        $this->assertSame(
+            [
+                ['/inter.woff2', ['as' => 'font', 'type' => 'font/woff2', 'crossorigin' => true]],
+                ['/hero.avif', ['as' => 'image', 'type' => 'image/avif', 'fetchpriority' => 'high']],
+                ['/a.css', ['as' => 'style']],
+            ],
+            array_map(static fn (Link $link): array => [$link->getHref(), $link->getAttributes()], $links->getLinks()),
+        );
+    }
+
+    /**
+     * Neither the policy nor the provider has a say in a preload: `font-src`
+     * and `img-src` govern it.
+     */
+    public function testAsksForNoNonceForAPreload(): void
+    {
+        $nonceProvider = $this->createMock(NonceProviderInterface::class);
+        $nonceProvider->expects($this->never())->method('getStyleNonce');
+        $nonceProvider->expects($this->never())->method('getScriptNonce');
+        $response = new Response(self::PAGE);
+
+        $this->createInjector($nonceProvider)->inject(new Request(), $response, self::PAGE, [new ResolvedAsset('/inter.woff2', 'font')]);
+
+        $this->assertStringNotContainsString('nonce', (string) $response->getContent());
+    }
+
     public function testSetsNoLinksWithoutAssets(): void
     {
         $request = new Request();

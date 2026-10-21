@@ -33,6 +33,22 @@ final class AssetTagRendererTest extends TestCase
         );
     }
 
+    public function testRendersAPreloadLinkForAFont(): void
+    {
+        $this->assertSame(
+            '<link rel="preload" href="/assets/inter.woff2" as="font" type="font/woff2" crossorigin>',
+            (new AssetTagRenderer())->render(new ResolvedAsset('/assets/inter.woff2', 'font'), 'n0nce'),
+        );
+    }
+
+    public function testRendersAPreloadLinkForAnImage(): void
+    {
+        $this->assertSame(
+            '<link rel="preload" href="/assets/hero.webp" as="image" type="image/webp" fetchpriority="high">',
+            (new AssetTagRenderer())->render(new ResolvedAsset('/assets/hero.webp', 'image', ['fetchpriority' => 'high']), null),
+        );
+    }
+
     public function testRendersBooleanAttributesLikeTwigComponents(): void
     {
         $asset = new ResolvedAsset('/a.js', 'js', ['type' => false, 'defer' => true, 'async' => false, 'nonce' => null]);

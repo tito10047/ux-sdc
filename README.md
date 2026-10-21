@@ -196,12 +196,24 @@ For a class `Alert`, the bundle looks next to `Alert.php` for:
 |------|---------|
 | `Alert.html.twig` | the component template |
 | `Alert.css` | a stylesheet, added to `<head>` when the component renders |
-| `Alert.js` | a classic `<script>`, added to `<head>` when the component renders |
+| `Alert.js` | a [module script](#scripts-are-es-modules), added to `<head>` when the component renders |
 | `Alert_controller.js` | a Stimulus controller, loaded by StimulusBundle (see below) |
 
 The file names follow the class name exactly, case included. Rename the class,
 rename the files. Discovery can be turned off with `auto_discovery: false`; then
 templates and assets have to be declared explicitly.
+
+Only these names are discovered: one stylesheet and one script per component.
+Declare any further file next to the class with [`#[Asset]`](#attributes), by its
+logical path — which also says how it loads, something a file name could only
+hint at:
+
+```php
+#[AsSdcComponent]
+#[Asset('Alert/Alert.print.css', attributes: ['media' => 'print'])]
+#[Asset('Alert/Inter.woff2')] // preloaded, see Fonts and images
+final class Alert {}
+```
 
 A template named explicitly always wins over the one next to the class:
 
@@ -229,8 +241,9 @@ Discovery works for `#[AsTwigComponent]` and `#[AsLiveComponent]` classes too;
 attribute per class: `#[AsLiveComponent]` combined with `#[AsSdcComponent]`
 fails the container build with *"another component already has this name"*.
 
-**`#[Asset]`** adds any other stylesheet or script, from any AssetMapper path or
-an absolute URL. It is repeatable and works on every component class:
+**`#[Asset]`** adds any other stylesheet, script, font or image, from any
+AssetMapper path or an absolute URL. It is repeatable and works on every
+component class:
 
 ```php
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
@@ -245,9 +258,9 @@ final class Chart {}
 | Argument | Meaning |
 |----------|---------|
 | `path` | AssetMapper logical path (`styles/reset.css`) or a URL. Required — `#[Asset]` without a path is ignored. |
-| `type` | `css` or `js`. When omitted, a path ending in `.css` is a stylesheet and **anything else is loaded as a script**, so do not declare fonts or images this way. |
+| `type` | `css`, `js`, `font` or `image` (`Asset::CSS`, `Asset::JS`, `Asset::FONT`, `Asset::IMAGE`). When omitted, the extension of the path tells it: `.css`; `.js`, `.mjs`; `.woff2`, `.woff`, `.ttf`, `.otf`; `.avif`, `.webp`, `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg` (the query string of a URL does not count). A path that tells none — `https://fonts.googleapis.com/css2?family=Inter`, a URL without an extension — has to declare it; an unknown type, or a type that cannot be told, fails the container build (or, with `metadata_cache: false`, the render) with the name of the component. |
 | `priority` | Higher comes first in `<head>`. Default `0`. |
-| `attributes` | Extra HTML attributes for the tag. `true` renders a bare attribute, `false` and `null` leave it out. They override the ones the bundle sets: `'type' => false` loads a classic script (see below), `'nonce' => false` leaves the [CSP nonce](#content-security-policy-nonces) out, `'data-turbo-track' => false` the [Turbo mark](#turbo) of a stylesheet. |
+| `attributes` | Extra HTML attributes for the tag. `true` renders a bare attribute, `false` and `null` leave it out. They override the ones the bundle sets: `'type' => false` loads a classic script (see below), `'nonce' => false` leaves the [CSP nonce](#content-security-policy-nonces) out, `'data-turbo-track' => false` the [Turbo mark](#turbo) of a stylesheet, `'crossorigin' => false` the `crossorigin` of a [font preload](#fonts-and-images). |
 
 `#[Asset]` is for files that are *not* next to the class. It does not switch
 discovery on or off; `auto_discovery` does.
@@ -288,6 +301,52 @@ Stylesheets and classic scripts are announced early with a
 `rel="preload"; as="script"` would make the browser download them twice, and
 `rel="modulepreload"` in a header starts loading modules before the import map
 is parsed. The browser fetches a module as soon as it parses its tag.
+
+### Fonts and images
+
+A font or an image is not loaded by a tag of its own — the component's stylesheet
+(`@font-face`, `background-image`) or template (`<img>`) uses it — so `#[Asset]`
+only *preloads* it, and the browser fetches it before it gets to that use:
+
+```php
+#[AsSdcComponent]
+#[Asset('Hero/Inter.woff2')]
+#[Asset('Hero/hero.avif', attributes: ['fetchpriority' => 'high'])]
+final class Hero {}
+```
+
+```html
+<link rel="preload" href="/assets/Hero/Inter-5c1d0e2.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/Hero/hero-a01b2c3.avif" as="image" type="image/avif" fetchpriority="high">
+```
+
+and the same in the `Link` response header:
+
+```
+Link: </assets/Hero/Inter-5c1d0e2.woff2>; rel="preload"; as="font"; type="font/woff2"; crossorigin,</assets/Hero/hero-a01b2c3.avif>; rel="preload"; as="image"; type="image/avif"; fetchpriority="high"
+```
+
+The header lets the browser start before it parses the page; the tag is there
+because a proxy, a CDN or an HTML cache may drop the header.
+
+- `type` is the MIME type of the extension, so that a browser skips a format it
+  does not support. A URL without an extension gets none; set it with
+  `attributes: ['type' => 'font/woff2']`.
+- A font gets `crossorigin`: browsers fetch fonts in CORS mode, same-origin ones
+  included, and a preload made without it is not reused — the font would be
+  downloaded twice. A font from another origin needs CORS headers there anyway.
+- Preload only what the page uses right away: a browser warns about a preload
+  left unused for a few seconds after the page loaded. For an image, a responsive
+  `<img>` needs `imagesrcset`/`imagesizes` in `attributes` to match the
+  candidate the browser will pick.
+- A preload takes no nonce: `font-src` and `img-src` govern it.
+- A [fragment](#the-x-sdc-assets-header) does not list fonts and images: it
+  inserts the stylesheet or markup that uses them as soon as it arrives, so a
+  preload would come no earlier.
+
+Within the CSS of the component, refer to the font relatively
+(`src: url('./Inter.woff2')`): AssetMapper rewrites the URL to the same public path
+the preload uses.
 
 ### Content Security Policy nonces
 
@@ -572,7 +631,9 @@ X-SDC-Assets: {"v":1,"assets":[{"type":"css","href":"/assets/Alert/Alert-9c2e1d0
 - `v` — the version of the format, `1`. It changes when an older client would
   misread the value; a client ignores a version it does not know.
 - `type` — `css` (stylesheet), `module` (module script) or `script` (classic
-  script).
+  script). A client skips an entry of a type it does not know, so a type may be
+  added without a new version. Fonts and images are not listed (see
+  [Fonts and images](#fonts-and-images)).
 - `href` — the public path or URL, as in the `href`/`src` of the tag.
 - `attributes` — left out when empty: the attributes the tag of a full page
   gets after `rel`/`href`/`src` and a module's `type="module"`, in that order — a
@@ -783,8 +844,9 @@ component until the worker restarts.
 3. **Response.** A `kernel.response` listener (priority 64, ahead of WebLink's
    `Link` header listener) replaces the first placeholder in an HTML main response
    with the tags, sorted by priority — scripts as ES modules, with the CSP nonce
-   when a provider is configured — and adds a `Link: rel="preload"` header for each
-   stylesheet and classic script. A Live Component re-render, a Turbo Frame or
+   when a provider is configured, fonts and images as `<link rel="preload">` — and
+   adds a `Link: rel="preload"` header for each stylesheet, classic script, font
+   and image. A Live Component re-render, a Turbo Frame or
    Stream, and any other HTML response without the placeholder get the
    [`X-SDC-Assets` header](#the-x-sdc-assets-header) instead. The registry is reset between requests, so long-running workers do not
    carry assets over.
@@ -802,12 +864,12 @@ php bin/console debug:sdc
 ```
 
 ```
- ---------------- --------------------------------------- -------------------------- ------------------- ---------------------
-  Component        Template                                CSS                        JS                  Stimulus controller
- ---------------- --------------------------------------- -------------------------- ------------------- ---------------------
-  UI:Alert:Alert   UI/Alert/Alert.html.twig (co-located)   UI/Alert/Alert.css         UI/Alert/Alert.js   UI--Alert--Alert
-  ⚠ Legacy:Old     ⚠ /Legacy/Old.html.twig (default)       ⚠ css/old.css (#[Asset])   -                   -
- ---------------- --------------------------------------- -------------------------- ------------------- ---------------------
+ ---------------- --------------------------------------- -------------------------- ------------------- ---------------------------------- ---------------------
+  Component        Template                                CSS                        JS                  Preload                            Stimulus controller
+ ---------------- --------------------------------------- -------------------------- ------------------- ---------------------------------- ---------------------
+  UI:Alert:Alert   UI/Alert/Alert.html.twig (co-located)   UI/Alert/Alert.css         UI/Alert/Alert.js   UI/Alert/Inter.woff2 (#[Asset])    UI--Alert--Alert
+  ⚠ Legacy:Old     ⚠ /Legacy/Old.html.twig (default)       ⚠ css/old.css (#[Asset])   -                   -                                  -
+ ---------------- --------------------------------------- -------------------------- ------------------- ---------------------------------- ---------------------
 
 Legacy:Old (App\Component\Legacy\Old)
 -------------------------------------
@@ -817,10 +879,10 @@ Legacy:Old (App\Component\Legacy\Old)
 ```
 
 It flags (⚠) a file next to a class that is outside every Twig or AssetMapper
-path, an asset path the asset map does not know, an asset of a type other than
-`css`/`js`, a missing template, and a template that uses `{{ controller }}`
-when StimulusBundle has no controller of that name (without StimulusBundle the
-controller is shown as not checked). It reads the metadata from
+path, an asset path the asset map does not know, a missing template, and a
+template that uses `{{ controller }}` when StimulusBundle has no controller of
+that name (without StimulusBundle the controller is shown as not checked).
+Preloaded fonts and images have a column of their own. It reads the metadata from
 where the pages do — the build-time cache with `metadata_cache: true` — so it
 also shows a cache that predates a file you just added.
 

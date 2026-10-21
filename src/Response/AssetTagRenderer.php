@@ -13,7 +13,8 @@ namespace Tito10047\UX\Sdc\Response;
 
 /**
  * Renders the HTML tag that loads an asset: `<link rel="stylesheet">` for a
- * stylesheet, `<script src>` for a script.
+ * stylesheet, `<script src>` for a script, `<link rel="preload">` for a font
+ * or an image.
  *
  * @internal
  */
@@ -27,9 +28,11 @@ final class AssetTagRenderer
         $path = htmlspecialchars($asset->path, ENT_QUOTES);
         $attributes = $this->renderAttributes($asset->tagAttributes($nonce));
 
-        return $asset->isStylesheet()
-            ? sprintf('<link rel="stylesheet" href="%s"%s>', $path, $attributes)
-            : sprintf('<script src="%s"%s></script>', $path, $attributes);
+        return match (true) {
+            $asset->isStylesheet() => sprintf('<link rel="stylesheet" href="%s"%s>', $path, $attributes),
+            $asset->isScript() => sprintf('<script src="%s"%s></script>', $path, $attributes),
+            default => sprintf('<link rel="preload" href="%s"%s>', $path, $attributes),
+        };
     }
 
     /**

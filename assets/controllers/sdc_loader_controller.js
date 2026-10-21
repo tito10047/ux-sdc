@@ -15,10 +15,12 @@
 //   ]}
 //
 // `css` is a stylesheet, `module` a module script, `script` a classic one, in
-// the order of the tags of a full page. `attributes` are the further attributes
-// of the tag (a string, or `true` for a bare attribute). The elements are built
-// like the tags of a full page, attribute by attribute, so that Turbo Drive,
-// which compares <head> elements by their markup, sees them as the same.
+// the order of the tags of a full page; an entry of any other type is skipped,
+// so a type can be added without raising the version. `attributes` are the
+// further attributes of the tag (a string, or `true` for a bare attribute).
+// The elements are built like the tags of a full page, attribute by attribute,
+// so that Turbo Drive, which compares <head> elements by their markup, sees
+// them as the same.
 //
 // Under a Content Security Policy with nonces, the new elements get the nonce of
 // the page they are added to, taken from an element that already carries one,

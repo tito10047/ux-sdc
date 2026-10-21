@@ -11,13 +11,16 @@
 
 namespace Tito10047\UX\Sdc\Tests\Integration\Fixtures\DebugSdc\Alert;
 
+use Tito10047\UX\Sdc\Attribute\Asset;
 use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
 
 /**
  * A component debug:sdc has nothing to complain about: template, CSS, JS and
- * Stimulus controller next to the class, and an action with a route.
+ * Stimulus controller next to the class, a font it preloads, and an action
+ * with a route.
  */
 #[AsSdcComponent]
+#[Asset('Alert/Alert.woff2')]
 final class Alert
 {
 }

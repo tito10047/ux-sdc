@@ -40,8 +40,9 @@ final class AssetResolver
     }
 
     /**
-     * The assets with their public paths and their type narrowed to `css` or
-     * `js`, in the order given. Assets of any other type are left out.
+     * The assets with their public paths, in the order given. An asset
+     * registered without a type gets the one its path tells; one of no known
+     * type is left out.
      *
      * @param list<SdcAsset> $assets as AssetRegistry::getSortedAssets() returns them
      *
@@ -54,13 +55,9 @@ final class AssetResolver
         foreach ($assets as $asset) {
             $path = $this->assetMapper->getAsset($asset['path'])->publicPath ?? $this->passThrough($asset['path']);
 
-            $type = match (true) {
-                AssetType::CSS === $asset['type'], '' === $asset['type'] && str_ends_with($path, '.css') => AssetType::CSS,
-                AssetType::JS === $asset['type'], '' === $asset['type'] && str_ends_with($path, '.js') => AssetType::JS,
-                default => null,
-            };
+            $type = '' === $asset['type'] ? AssetType::fromPath($path) : $asset['type'];
 
-            if (null !== $type) {
+            if (\in_array($type, AssetType::ALL, true)) {
                 $resolved[] = new ResolvedAsset($path, $type, $asset['attributes']);
             }
         }

@@ -64,6 +64,15 @@ final class DebugSdcCommandTest extends IntegrationTestCase
         $this->assertSame(['name' => 'Alert/Alert.html.twig', 'origin' => 'co-located', 'found' => true], $alert['template']);
         $this->assertSame([
             [
+                'path' => 'Alert/Alert.woff2',
+                'public_path' => $assetMapper->getPublicPath('Alert/Alert.woff2'),
+                'type' => 'font',
+                'source' => '#[Asset]',
+                'priority' => 0,
+                'attributes' => [],
+                'mapped' => true,
+            ],
+            [
                 'path' => 'Alert/Alert.css',
                 'public_path' => $assetMapper->getPublicPath('Alert/Alert.css'),
                 'type' => 'css',
@@ -88,8 +97,8 @@ final class DebugSdcCommandTest extends IntegrationTestCase
     }
 
     /**
-     * An asset path the asset map does not know is flagged, a URL is not; an
-     * asset of a type that is never loaded is flagged.
+     * An asset path the asset map does not know is flagged, a URL is not. A
+     * font is preloaded, which is no problem (before 1.0 it was never loaded).
      */
     #[DataProvider('metadataCache')]
     public function testFlagsAssetsThatDoNotLoad(bool $metadataCache): void
@@ -103,10 +112,9 @@ final class DebugSdcCommandTest extends IntegrationTestCase
             ['missing/broken.css', null, 'css', '#[AsSdcComponent]', false],
         ], array_map(static fn (array $asset): array => [$asset['path'], $asset['public_path'], $asset['type'], $asset['source'], $asset['mapped']], $broken['assets']));
 
-        $this->assertCount(3, $broken['problems']);
+        $this->assertCount(2, $broken['problems']);
         $this->assertStringContainsString('The component has no template', $broken['problems'][0]);
-        $this->assertStringContainsString('"https://cdn.example.com/broken.woff2" (#[Asset]) has the type "font"', $broken['problems'][1]);
-        $this->assertStringContainsString('"missing/broken.css" (#[AsSdcComponent]) is not in the asset map', $broken['problems'][2]);
+        $this->assertStringContainsString('"missing/broken.css" (#[AsSdcComponent]) is not in the asset map', $broken['problems'][1]);
         $this->assertSame(['origin' => 'default', 'found' => false], array_intersect_key($broken['template'], ['origin' => true, 'found' => true]));
     }
 
@@ -161,8 +169,8 @@ final class DebugSdcCommandTest extends IntegrationTestCase
         $this->assertSame([], $components['Quiet:Quiet']['problems']);
 
         $display = $this->execute($metadataCache, [])->getDisplay();
-        $this->assertMatchesRegularExpression('~^\s+Controlled:Controlled\s+Controlled/Controlled\.html\.twig \(co-located\)\s+-\s+-\s+Controlled--Controlled\s*$~m', $display);
-        $this->assertMatchesRegularExpression('~^\s+Quiet:Quiet\s+Quiet/Quiet\.html\.twig \(co-located\)\s+-\s+-\s+-\s*$~m', $display);
+        $this->assertMatchesRegularExpression('~^\s+Controlled:Controlled\s+Controlled/Controlled\.html\.twig \(co-located\)\s+-\s+-\s+-\s+Controlled--Controlled\s*$~m', $display);
+        $this->assertMatchesRegularExpression('~^\s+Quiet:Quiet\s+Quiet/Quiet\.html\.twig \(co-located\)\s+-\s+-\s+-\s+-\s*$~m', $display);
 
         $tester = $this->execute($metadataCache, ['name' => 'Controlled:Controlled']);
         $tester->assertCommandIsSuccessful();
@@ -250,23 +258,23 @@ final class DebugSdcCommandTest extends IntegrationTestCase
         $tester->assertCommandIsSuccessful('Like every debug:* command, problems do not fail it without --strict.');
         $display = $tester->getDisplay();
 
-        $this->assertMatchesRegularExpression('/^\s+Component\s+Template\s+CSS\s+JS\s+Stimulus controller\s*$/m', $display);
-        $this->assertMatchesRegularExpression('~^\s+Alert:Alert\s+Alert/Alert\.html\.twig \(co-located\)\s+Alert/Alert\.css\s+Alert/Alert\.js\s+Alert--Alert\s*$~m', $display);
-        $this->assertMatchesRegularExpression('~^\s+⚠ Broken:Broken\s+⚠ /Broken/Broken\.html\.twig \(default\)\s+https://cdn\.example\.com/broken\.css \(#\[Asset\]\)\s+⚠ https://cdn\.example\.com/broken\.woff2 \(#\[Asset\]\)\s+-\s*$~m', $display);
+        $this->assertMatchesRegularExpression('/^\s+Component\s+Template\s+CSS\s+JS\s+Preload\s+Stimulus controller\s*$/m', $display);
+        $this->assertMatchesRegularExpression('~^\s+Alert:Alert\s+Alert/Alert\.html\.twig \(co-located\)\s+Alert/Alert\.css\s+Alert/Alert\.js\s+Alert/Alert\.woff2 \(#\[Asset\]\)\s+Alert--Alert\s*$~m', $display);
+        $this->assertMatchesRegularExpression('~^\s+⚠ Broken:Broken\s+⚠ /Broken/Broken\.html\.twig \(default\)\s+https://cdn\.example\.com/broken\.css \(#\[Asset\]\)\s+-\s+https://cdn\.example\.com/broken\.woff2 \(#\[Asset\]\)\s+-\s*$~m', $display);
         $this->assertMatchesRegularExpression('~^\s+⚠ missing/broken\.css \(#\[AsSdcComponent\]\)\s*$~m', $display);
         $this->assertMatchesRegularExpression(self::hasStimulusBundle()
-            ? '~^\s+⚠ Controlled:Controlled\s+Controlled/Controlled\.html\.twig \(co-located\)\s+-\s+-\s+⚠ Controlled--Controlled\s*$~m'
-            : '~^\s+Controlled:Controlled\s+Controlled/Controlled\.html\.twig \(co-located\)\s+-\s+-\s+Controlled--Controlled\s*$~m', $display);
+            ? '~^\s+⚠ Controlled:Controlled\s+Controlled/Controlled\.html\.twig \(co-located\)\s+-\s+-\s+-\s+⚠ Controlled--Controlled\s*$~m'
+            : '~^\s+Controlled:Controlled\s+Controlled/Controlled\.html\.twig \(co-located\)\s+-\s+-\s+-\s+Controlled--Controlled\s*$~m', $display);
         $this->assertMatchesRegularExpression('~^\s+⚠ Explicit:Explicit\s+⚠ debug_sdc/missing\.html\.twig \(explicit\)~m', $display);
-        $this->assertMatchesRegularExpression('~^\s+Quiet:Quiet\s+Quiet/Quiet\.html\.twig \(co-located\)\s+-\s+-\s+-\s*$~m', $display);
-        $this->assertMatchesRegularExpression('~^\s+Notice:Notice\s+Notice/Notice\.html\.twig \(anonymous\)\s+Notice/Notice\.css\s+-\s+-\s*$~m', $display);
-        $this->assertMatchesRegularExpression('~^\s+⚠ Card\s+components/Card\.html\.twig \(anonymous\)\s+-\s+-\s+-\s*$~m', $display);
+        $this->assertMatchesRegularExpression('~^\s+Quiet:Quiet\s+Quiet/Quiet\.html\.twig \(co-located\)\s+-\s+-\s+-\s+-\s*$~m', $display);
+        $this->assertMatchesRegularExpression('~^\s+Notice:Notice\s+Notice/Notice\.html\.twig \(anonymous\)\s+Notice/Notice\.css\s+-\s+-\s+-\s*$~m', $display);
+        $this->assertMatchesRegularExpression('~^\s+⚠ Card\s+components/Card\.html\.twig \(anonymous\)\s+-\s+-\s+-\s+-\s*$~m', $display);
 
         $this->assertStringContainsString('Broken:Broken (' . Broken::class . ')', $display);
         $this->assertStringContainsString('Card (components/Card.html.twig)', $display);
         $this->assertStringNotContainsString('Alert:Alert (' . Alert::class . ')', $display, 'A component without problems has no section.');
         // The missing controller of Controlled:Controlled is one of them only with StimulusBundle.
-        $this->assertStringContainsString(\sprintf('[WARNING] %d problems found.', self::hasStimulusBundle() ? 8 : 7), $display);
+        $this->assertStringContainsString(\sprintf('[WARNING] %d problems found.', self::hasStimulusBundle() ? 7 : 6), $display);
         $this->assertStringContainsString($metadataCache ? 'Metadata from the build-time cache' : 'Metadata resolved from the files next to each class', $display);
     }
 
@@ -298,6 +306,7 @@ final class DebugSdcCommandTest extends IntegrationTestCase
         $this->assertMatchesRegularExpression('/^\s+Class\s+' . preg_quote(Alert::class, '/') . '\s*$/m', $display);
         $this->assertStringContainsString('Alert/Alert.css → ' . $assetMapper->getPublicPath('Alert/Alert.css') . ' (discovered)', $display);
         $this->assertStringContainsString('Alert/Alert.js → ' . $assetMapper->getPublicPath('Alert/Alert.js') . ' (discovered)', $display);
+        $this->assertMatchesRegularExpression('~^\s+Preload\s+Alert/Alert\.woff2 → ' . preg_quote((string) $assetMapper->getPublicPath('Alert/Alert.woff2'), '~') . ' \(#\[Asset\]\)\s*$~m', $display);
         $this->assertMatchesRegularExpression('~^\s+Routes\s+debug_sdc_alert \(/debug-sdc/alert\)\s*$~m', $display);
         $this->assertMatchesRegularExpression(self::hasStimulusBundle() ? '/^\s+Stimulus controller\s+Alert--Alert\s*$/m' : '/^\s+Stimulus controller\s+Alert--Alert \(not checked without StimulusBundle\)\s*$/m', $display);
         $this->assertStringContainsString('[OK] No problems found.', $display);

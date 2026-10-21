@@ -19,8 +19,8 @@ use Tito10047\UX\Sdc\Service\ComponentMetadata;
  *
  * `ReportedAsset` is an asset of the component: `path` as the metadata names
  * it, `public_path` as the page links to it (null when the asset map does not
- * know the logical path), `type` as it is loaded (`css` or `js`; anything else
- * is not loaded), and `mapped`, null for a URL linked as it is.
+ * know the logical path), `type` (`css`, `js`, or `font` and `image`, which are
+ * only preloaded), and `mapped`, null for a URL linked as it is.
  *
  * @phpstan-type ReportedAsset array{path: string, public_path: string|null, type: string, source: ComponentMetadata::SOURCE_*, priority: int, attributes: array<string, mixed>, mapped: bool|null}
  * @phpstan-type ReportedRoute array{name: string, path: string}

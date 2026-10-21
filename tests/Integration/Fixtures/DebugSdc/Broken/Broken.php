@@ -15,8 +15,8 @@ use Tito10047\UX\Sdc\Attribute\Asset;
 use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
 
 /**
- * No template anywhere, a stylesheet that is not in the asset map, a URL that
- * is linked as it is, and an asset of a type that is never loaded.
+ * No template anywhere, a stylesheet that is not in the asset map, and URLs
+ * that are linked as they are — a stylesheet, and a font that is preloaded.
  */
 #[AsSdcComponent(css: 'missing/broken.css')]
 #[Asset('https://cdn.example.com/broken.css', priority: 5)]

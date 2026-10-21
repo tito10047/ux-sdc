@@ -16,13 +16,17 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\WebLink\GenericLinkProvider;
 use Symfony\Component\WebLink\Link;
+use Tito10047\UX\Sdc\Attribute\Asset;
 use Tito10047\UX\Sdc\Csp\NonceProviderInterface;
-use Tito10047\UX\Sdc\Service\AssetType;
 
 /**
  * Puts the tags of the assets into a page, where its placeholder is, and the
- * preload links of the stylesheets and classic scripts into the `_links`
- * request attribute, which WebLink turns into the `Link` header.
+ * preload links of the stylesheets, classic scripts, fonts and images into the
+ * `_links` request attribute, which WebLink turns into the `Link` header.
+ *
+ * A font or an image gets both: the `Link` header lets the browser start
+ * early, but a proxy or a CDN may drop it, and an HTML cache stores the page
+ * without it; the `<link rel="preload">` tag goes wherever the page goes.
  *
  * @internal
  */
@@ -54,8 +58,8 @@ final class PageAssetInjector
 
         // Asked for only when a tag of that kind is injected: a provider such as
         // NelmioSecurityBundle adds a nonce to the policy as soon as it hands it out.
-        $styleNonce = \in_array(AssetType::CSS, $types, true) ? $this->nonceProvider?->getStyleNonce() : null;
-        $scriptNonce = \in_array(AssetType::JS, $types, true) ? $this->nonceProvider?->getScriptNonce() : null;
+        $styleNonce = \in_array(Asset::CSS, $types, true) ? $this->nonceProvider?->getStyleNonce() : null;
+        $scriptNonce = \in_array(Asset::JS, $types, true) ? $this->nonceProvider?->getScriptNonce() : null;
 
         $html = '';
         $links = [];
@@ -65,6 +69,13 @@ final class PageAssetInjector
             if ($asset->isStylesheet()) {
                 $html .= $this->tagRenderer->render($asset, $styleNonce) . "\n";
                 $links[] = (new Link('preload', $asset->path))->withAttribute('as', 'style');
+
+                continue;
+            }
+
+            if ($asset->isPreload()) {
+                $html .= $this->tagRenderer->render($asset, null) . "\n";
+                $links[] = $this->preloadLink($asset);
 
                 continue;
             }
@@ -105,6 +116,23 @@ final class PageAssetInjector
         }
 
         $this->addPreloadLinks($request, $links);
+    }
+
+    /**
+     * The `Link` of a font or an image: the attributes of its tag, with the
+     * convention of the tag — `true` a bare parameter, `false` and `null` none.
+     */
+    private function preloadLink(ResolvedAsset $asset): Link
+    {
+        $link = new Link('preload', $asset->path);
+
+        foreach ($asset->tagAttributes(null) as $name => $value) {
+            if (false !== $value && null !== $value) {
+                $link = $link->withAttribute($name, true === $value ? true : (string) $value);
+            }
+        }
+
+        return $link;
     }
 
     /**

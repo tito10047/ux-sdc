@@ -310,7 +310,10 @@ final class AssetResponseListenerTest extends TestCase
         $this->assertFalse($response->headers->has('X-SDC-Assets'));
     }
 
-    public function testSendsNoHeaderWithoutAssets(): void
+    /**
+     * A font is only preloaded, which a fragment has no use for.
+     */
+    public function testSendsNoHeaderWithoutAssetsToList(): void
     {
         $this->registry->addAsset('font.woff2', '');
 

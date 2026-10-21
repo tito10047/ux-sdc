@@ -19,7 +19,6 @@ use Symfony\UX\TwigComponent\ComponentMetadata as TwigComponentMetadata;
 use Symfony\UX\TwigComponent\ComponentTemplateFinderInterface;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\AssetPath;
-use Tito10047\UX\Sdc\Service\AssetType;
 use Tito10047\UX\Sdc\Service\ComponentMetadata;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 use Tito10047\UX\Sdc\Service\StimulusControllerNameResolver;
@@ -246,12 +245,6 @@ final class ComponentInspector
     private function describeAsset(array $asset, array &$problems): array
     {
         $path = $asset['path'];
-        // As the render listeners register it.
-        $type = AssetType::resolve($asset['type'], $path);
-
-        if (!AssetType::isLoaded($type)) {
-            $problems[] = \sprintf('The asset "%s" (%s) has the type "%s", so it is not loaded: only "css" and "js" are.', $path, $asset['source'], $type);
-        }
 
         $mapped = null;
         $publicPath = null;
@@ -267,7 +260,7 @@ final class ComponentInspector
         return [
             'path' => $path,
             'public_path' => $mapped ? $publicPath : (null === $mapped ? $path : null),
-            'type' => $type,
+            'type' => $asset['type'],
             'source' => $asset['source'],
             'priority' => $asset['priority'],
             'attributes' => $asset['attributes'],

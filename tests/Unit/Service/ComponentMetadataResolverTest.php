@@ -11,13 +11,16 @@
 
 namespace Tito10047\UX\Sdc\Tests\Unit\Service;
 
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LogLevel;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 use Tito10047\UX\Sdc\Tests\TestLogger;
 use Tito10047\UX\Sdc\Tests\Unit\Service\Fixtures\Alert\Alert;
+use Tito10047\UX\Sdc\Tests\Unit\Service\Fixtures\Preload\Preload;
 use Tito10047\UX\Sdc\Tests\Unit\Service\Fixtures\SdcAlert\SdcAlert;
+use Tito10047\UX\Sdc\Tests\Unit\Service\Fixtures\UntypedAsset\UntypedAsset;
 
 final class ComponentMetadataResolverTest extends TestCase
 {
@@ -28,7 +31,7 @@ final class ComponentMetadataResolverTest extends TestCase
      */
     private const UNRELATED_ROOT = __DIR__ . '/../../Integration/Fixtures/templates';
 
-    private const EXPLICIT_ASSET = ['path' => 'vendor/explicit.css', 'type' => '', 'priority' => 3, 'attributes' => [], 'source' => '#[Asset]'];
+    private const EXPLICIT_ASSET = ['path' => 'vendor/explicit.css', 'type' => 'css', 'priority' => 3, 'attributes' => [], 'source' => '#[Asset]'];
 
     public function testResolvesFilesNextToTheClassRelativeToTheirRoots(): void
     {
@@ -101,6 +104,36 @@ final class ComponentMetadataResolverTest extends TestCase
             ['js/sdc.js', '#[AsSdcComponent]'],
             ['SdcAlert/SdcAlert.css', 'discovered'],
         ], array_map(static fn (array $asset): array => [$asset['path'], $asset['source']], $metadata->assets));
+    }
+
+    /**
+     * The type of an #[Asset] is the one it declares or its path tells.
+     */
+    public function testResolvesTheTypeOfEachAsset(): void
+    {
+        $metadata = (new ComponentMetadataResolver([], [], false))->resolve(Preload::class);
+
+        $this->assertSame([
+            ['path' => 'fonts/inter.woff2', 'type' => 'font', 'priority' => 10, 'attributes' => [], 'source' => '#[Asset]'],
+            ['path' => 'https://cdn.example.com/hero?w=1200', 'type' => 'image', 'priority' => 0, 'attributes' => ['fetchpriority' => 'high'], 'source' => '#[Asset]'],
+        ], $metadata->assets, 'The #[Asset] without a path is left out.');
+    }
+
+    /**
+     * The attribute cannot tell which class it is on; the resolver can.
+     */
+    public function testNamesTheComponentOfAnInvalidAsset(): void
+    {
+        try {
+            (new ComponentMetadataResolver([], [], false))->resolve(UntypedAsset::class);
+            $this->fail('An #[Asset] whose type is not known must not be resolved.');
+        } catch (InvalidArgumentException $e) {
+            $this->assertSame(
+                \sprintf('An #[Asset] of the component "%s" is invalid: The type of the asset "https://cdn.example.com/lib" cannot be told from its path. Declare it: #[Asset(type: …)] with one of "css", "js", "font", "image".', UntypedAsset::class),
+                $e->getMessage(),
+            );
+            $this->assertInstanceOf(InvalidArgumentException::class, $e->getPrevious());
+        }
     }
 
     /**

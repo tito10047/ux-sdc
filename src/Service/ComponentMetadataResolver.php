@@ -11,6 +11,7 @@
 
 namespace Tito10047\UX\Sdc\Service;
 
+use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
 use ReflectionClass;
 use Tito10047\UX\Sdc\Attribute\Asset;
@@ -120,6 +121,9 @@ class ComponentMetadataResolver
         $this->classesWithExplicitTemplate = array_fill_keys($classesWithExplicitTemplate, true);
     }
 
+    /**
+     * @throws InvalidArgumentException when an #[Asset] of the class is invalid
+     */
     public function resolve(string $class): ComponentMetadata
     {
         if (isset($this->classCache[$class])) {
@@ -264,22 +268,33 @@ class ComponentMetadataResolver
      * @param ReflectionClass<object> $reflectionClass
      *
      * @return list<SdcComponentAsset>
+     *
+     * @throws InvalidArgumentException when an #[Asset] of the class is invalid
      */
     private function collectExplicitAssets(ReflectionClass $reflectionClass): array
     {
         $assets = [];
 
         foreach ($reflectionClass->getAttributes(Asset::class) as $attribute) {
-            $asset = $attribute->newInstance();
-            if ($asset->path) {
-                $assets[] = [
-                    'path' => $asset->path,
-                    'type' => $asset->type ?? '',
-                    'priority' => $asset->priority,
-                    'attributes' => $asset->attributes,
-                    'source' => ComponentMetadata::SOURCE_ASSET_ATTRIBUTE,
-                ];
+            try {
+                $asset = $attribute->newInstance();
+            } catch (InvalidArgumentException $e) {
+                // The attribute does not know the class it is on.
+                throw new InvalidArgumentException(\sprintf('An #[Asset] of the component "%s" is invalid: %s', $reflectionClass->getName(), $e->getMessage()), 0, $e);
             }
+
+            // An #[Asset] without a path, and so without a type, loads nothing.
+            if (null === $asset->path || null === $asset->type) {
+                continue;
+            }
+
+            $assets[] = [
+                'path' => $asset->path,
+                'type' => $asset->type,
+                'priority' => $asset->priority,
+                'attributes' => $asset->attributes,
+                'source' => ComponentMetadata::SOURCE_ASSET_ATTRIBUTE,
+            ];
         }
 
         foreach ($reflectionClass->getAttributes(AsSdcComponent::class) as $attribute) {
@@ -288,7 +303,7 @@ class ComponentMetadataResolver
             if ($sdcComponent->css) {
                 $assets[] = [
                     'path' => $sdcComponent->css,
-                    'type' => 'css',
+                    'type' => Asset::CSS,
                     'priority' => 0,
                     'attributes' => [],
                     'source' => ComponentMetadata::SOURCE_SDC_COMPONENT_ATTRIBUTE,
@@ -298,7 +313,7 @@ class ComponentMetadataResolver
             if ($sdcComponent->js) {
                 $assets[] = [
                     'path' => $sdcComponent->js,
-                    'type' => 'js',
+                    'type' => Asset::JS,
                     'priority' => 0,
                     'attributes' => [],
                     'source' => ComponentMetadata::SOURCE_SDC_COMPONENT_ATTRIBUTE,

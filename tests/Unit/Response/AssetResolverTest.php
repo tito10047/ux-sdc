@@ -43,21 +43,29 @@ final class AssetResolverTest extends TestCase
     }
 
     /**
-     * An asset registered without a type is a stylesheet or a script by its
-     * public path; any other is left out.
+     * An asset added to the registry without a type (AssetRegistry::addAsset()
+     * is public) gets the one its path tells; one of no known type is left
+     * out — never loaded as a script.
      */
-    public function testKeepsOnlyStylesheetsAndScripts(): void
+    public function testAnAssetWithoutATypeGetsTheOneItsPathTells(): void
     {
         $this->assertEquals(
             [
                 new ResolvedAsset('/assets/Alert/Alert-1a2b3c.css', 'css'),
                 new ResolvedAsset('https://cdn.example.com/x.js', 'js'),
+                new ResolvedAsset('https://cdn.example.com/font.woff2', 'font'),
+                new ResolvedAsset('https://cdn.example.com/hero.webp?v=2', 'image'),
+                new ResolvedAsset('https://cdn.example.com/font', 'font'),
             ],
             $this->createResolver(true)->resolve([
                 ['path' => 'Alert/Alert.css', 'type' => '', 'priority' => 0, 'attributes' => []],
                 ['path' => 'https://cdn.example.com/x.js', 'type' => '', 'priority' => 0, 'attributes' => []],
                 ['path' => 'https://cdn.example.com/font.woff2', 'type' => '', 'priority' => 0, 'attributes' => []],
-                ['path' => 'https://cdn.example.com/font.woff2', 'type' => 'font', 'priority' => 0, 'attributes' => []],
+                ['path' => 'https://cdn.example.com/hero.webp?v=2', 'type' => '', 'priority' => 0, 'attributes' => []],
+                ['path' => 'https://cdn.example.com/font', 'type' => 'font', 'priority' => 0, 'attributes' => []],
+                ['path' => 'https://cdn.example.com/lib', 'type' => '', 'priority' => 0, 'attributes' => []],
+                ['path' => 'https://cdn.example.com/movie.mp4', 'type' => '', 'priority' => 0, 'attributes' => []],
+                ['path' => 'https://cdn.example.com/movie.mp4', 'type' => 'video', 'priority' => 0, 'attributes' => []],
             ]),
         );
     }

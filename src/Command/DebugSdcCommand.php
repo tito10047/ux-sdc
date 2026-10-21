@@ -22,15 +22,16 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Tito10047\UX\Sdc\Attribute\Asset;
 use Tito10047\UX\Sdc\Debug\ComponentInspector;
 use Tito10047\UX\Sdc\Debug\ComponentReport;
-use Tito10047\UX\Sdc\Service\AssetType;
 use Tito10047\UX\Sdc\Service\ComponentMetadata;
 
 /**
- * Shows what the bundle adds to each component — template, CSS, JS, Stimulus
- * controller, routes — and what keeps any of it from loading. Anonymous
- * components are listed too, with the assets next to their template.
+ * Shows what the bundle adds to each component — template, CSS, JS, preloaded
+ * fonts and images, Stimulus controller, routes — and what keeps any of it
+ * from loading. Anonymous components are listed too, with the assets next to
+ * their template.
  *
  * It complements `debug:twig-component`, which shows the props and hooks of a
  * component.
@@ -65,8 +66,8 @@ final class DebugSdcCommand extends Command
             ])
             ->setHelp(<<<'EOF'
                 The <info>%command.name%</info> command displays the components of the application
-                as UX SDC renders them: the template, the CSS and JS with their public paths,
-                the Stimulus controller and the routes of the controllers next to the class.
+                as UX SDC renders them: the template, the CSS and JS and the preloaded fonts and
+                images with their public paths, the Stimulus controller and the routes of the controllers next to the class.
                 Anonymous components (a template without a class) are marked <comment>(anonymous)</comment>.
                 It flags (<fg=yellow>⚠</>) what keeps a part of a component from loading.
 
@@ -178,13 +179,14 @@ final class DebugSdcCommand extends Command
             $rows[] = [
                 ([] === $report->problems ? '' : self::PROBLEM) . OutputFormatter::escape($report->name),
                 $this->formatTemplate($report),
-                $this->formatAssets($report, AssetType::CSS, false),
-                $this->formatAssets($report, AssetType::JS, false),
+                $this->formatAssets($report, [Asset::CSS], false),
+                $this->formatAssets($report, [Asset::JS], false),
+                $this->formatAssets($report, [Asset::FONT, Asset::IMAGE], false),
                 $this->formatStimulusController($report, false),
             ];
         }
 
-        $io->table(['Component', 'Template', 'CSS', 'JS', 'Stimulus controller'], $rows);
+        $io->table(['Component', 'Template', 'CSS', 'JS', 'Preload', 'Stimulus controller'], $rows);
 
         $this->renderSummary($io, $reports);
     }
@@ -200,8 +202,9 @@ final class DebugSdcCommand extends Command
             ['Name', OutputFormatter::escape($report->name)],
             ['Class', null === $report->class ? '<comment>none (anonymous component)</comment>' : OutputFormatter::escape($report->class)],
             ['Template', $this->formatTemplate($report)],
-            ['CSS', $this->formatAssets($report, AssetType::CSS, true)],
-            ['JS', $this->formatAssets($report, AssetType::JS, true)],
+            ['CSS', $this->formatAssets($report, [Asset::CSS], true)],
+            ['JS', $this->formatAssets($report, [Asset::JS], true)],
+            ['Preload', $this->formatAssets($report, [Asset::FONT, Asset::IMAGE], true)],
             ['Stimulus controller', $this->formatStimulusController($report, true)],
             ['Routes', [] === $routes ? '-' : implode("\n", $routes)],
         ]);
@@ -262,14 +265,13 @@ final class DebugSdcCommand extends Command
     }
 
     /**
-     * @param AssetType::CSS|AssetType::JS $type
+     * @param list<string> $types the types of the assets listed
      */
-    private function formatAssets(ComponentReport $report, string $type, bool $detailed): string
+    private function formatAssets(ComponentReport $report, array $types, bool $detailed): string
     {
         $lines = [];
         foreach ($report->assets as $asset) {
-            // An asset of any other type is not loaded: listed with the JS, flagged.
-            if ($type !== (AssetType::CSS === $asset['type'] ? AssetType::CSS : AssetType::JS)) {
+            if (!\in_array($asset['type'], $types, true)) {
                 continue;
             }
 
@@ -295,7 +297,7 @@ final class DebugSdcCommand extends Command
      */
     private function hasProblem(array $asset): bool
     {
-        return false === $asset['mapped'] || !AssetType::isLoaded($asset['type']);
+        return false === $asset['mapped'];
     }
 
     /**

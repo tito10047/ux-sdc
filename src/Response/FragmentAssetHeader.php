@@ -33,6 +33,14 @@ use Symfony\Component\HttpFoundation\Response;
  * nonce of the page, unless the asset sets its own (`"nonce": "…"`) or opts
  * out of it (`"nonce": false`).
  *
+ * A client ignores an entry of a type it does not know, so a type can be
+ * added without raising the version.
+ *
+ * Fonts and images are not listed. They are only preloaded, and a preload is
+ * of use before the page has asked for the file; a fragment inserts the
+ * stylesheet that uses the font, or the markup that shows the image, right
+ * after its response arrives, which is when the browser fetches them anyway.
+ *
  * @internal
  */
 final class FragmentAssetHeader
@@ -73,6 +81,10 @@ final class FragmentAssetHeader
         $entries = [];
 
         foreach ($assets as $asset) {
+            if ($asset->isPreload()) {
+                continue;
+            }
+
             $entry = $this->entry($asset);
             $entries[$entry['type'] . ' ' . $entry['href']] ??= $entry;
         }

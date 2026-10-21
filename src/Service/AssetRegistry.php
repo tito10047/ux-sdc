@@ -15,8 +15,9 @@ use Symfony\Contracts\Service\ResetInterface;
 
 /**
  * Shape of a single asset, shared by the metadata resolver, the compiled metadata
- * cache and this registry. In resolved metadata `type` may be an empty string,
- * meaning "infer it from the path"; entries stored here always carry a type.
+ * cache and this registry. `type` is one of the type constants of #[Asset]; an
+ * asset added here with an empty type gets the one its path tells when the
+ * response is built, and one of no known type is not loaded.
  *
  * @phpstan-type SdcAsset array{path: string, type: string, priority: int, attributes: array<string, mixed>}
  */

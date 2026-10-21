@@ -35,6 +35,38 @@ final class ResolvedAssetTest extends TestCase
         $this->assertSame(['type' => 'module', 'nonce' => null], $asset->tagAttributes(null));
     }
 
+    public function testAFontIsPreloadedInCorsModeWithItsMimeType(): void
+    {
+        $asset = new ResolvedAsset('/assets/fonts/inter-1a2b.woff2', 'font');
+
+        $this->assertTrue($asset->isPreload());
+        $this->assertFalse($asset->isStylesheet());
+        $this->assertFalse($asset->isScript());
+        $this->assertFalse($asset->isModule());
+        $this->assertSame(['as' => 'font', 'type' => 'font/woff2', 'crossorigin' => true], $asset->tagAttributes('n0nce'));
+    }
+
+    public function testAnImageIsPreloadedWithoutCors(): void
+    {
+        $asset = new ResolvedAsset('/assets/hero-1a2b.avif', 'image', ['fetchpriority' => 'high']);
+
+        $this->assertTrue($asset->isPreload());
+        $this->assertSame(['as' => 'image', 'type' => 'image/avif', 'crossorigin' => null, 'fetchpriority' => 'high'], $asset->tagAttributes(null));
+    }
+
+    /**
+     * A URL without an extension has no MIME type to tell; the asset may set
+     * `type` and `crossorigin` itself, or leave them out.
+     */
+    public function testThePreloadAttributesOfTheAssetWin(): void
+    {
+        $asset = new ResolvedAsset('https://cdn.example.com/font', 'font', ['type' => 'font/woff2', 'crossorigin' => 'use-credentials']);
+        $this->assertSame(['as' => 'font', 'type' => 'font/woff2', 'crossorigin' => 'use-credentials'], $asset->tagAttributes(null));
+
+        $asset = new ResolvedAsset('/assets/logo.svg', 'image', ['type' => false]);
+        $this->assertSame(['as' => 'image', 'type' => false, 'crossorigin' => null], $asset->tagAttributes(null));
+    }
+
     /**
      * The defaults keep their place, so the tag renders the same attributes in
      * the same order whatever the asset overrides.
