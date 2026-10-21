@@ -34,7 +34,7 @@ class LiveComponentAssetIntegrationTest extends KernelTestCase
 
         /** @var SdcMetadataRegistry $metadataRegistry */
         $metadataRegistry = $container->get(SdcMetadataRegistry::class);
-        $assets = $metadataRegistry->getMetadata(LiveComponentWithAsset::class);
+        $assets = $metadataRegistry->getAssets(LiveComponentWithAsset::class);
 
         $this->assertCount(2, $assets);
         $this->assertEquals('LiveComponentWithAsset.css', $assets[0]['path']);

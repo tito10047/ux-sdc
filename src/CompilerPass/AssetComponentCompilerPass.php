@@ -17,7 +17,11 @@ use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 
 /**
- * @phpstan-import-type SdcMetadata from ComponentMetadataResolver
+ * Resolves the Twig paths co-located files are looked up in, for the runtime
+ * resolver and for the build-time one, and — with `ux_sdc.metadata_cache` on —
+ * dumps the metadata of every component into `sdc_metadata.php`.
+ *
+ * @phpstan-import-type SdcMetadataCache from SdcMetadataRegistry
  */
 final class AssetComponentCompilerPass implements CompilerPassInterface
 {
@@ -31,6 +35,15 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
 
     public function process(ContainerBuilder $container): void
     {
+        $twigRoots = $this->collectTwigRoots($container);
+
+        // Both pipelines look files up in the same Twig paths. Only a compiler
+        // pass sees the `twig.paths` of the application, which is why the
+        // runtime resolver gets them from here and not from SdcExtension.
+        if ($container->hasDefinition(ComponentMetadataResolver::class)) {
+            $container->getDefinition(ComponentMetadataResolver::class)->setArgument('$twigRoots', $twigRoots);
+        }
+
         if (!$container->hasDefinition(SdcMetadataRegistry::class)) {
             return;
         }
@@ -40,8 +53,8 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
 
         if (true !== $container->getParameter(self::METADATA_CACHE_PARAMETER)) {
             // The metadata is resolved on render. A file left behind by an earlier
-            // build with the cache on would still be read by SdcMetadataRegistry,
-            // which stays available, and describe components as they were then.
+            // build with the cache on would describe components as they were then;
+            // the registry does not read it, but nothing should be left to mislead.
             if (file_exists($cachePath)) {
                 unlink($cachePath);
             }
@@ -51,12 +64,15 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
 
         // Validated as a boolean node by the bundle configuration.
         $autoDiscovery = (bool) $container->getParameter('ux_sdc.auto_discovery');
-        $twigRoots = $this->collectTwigRoots($container);
 
-        $resolver = new ComponentMetadataResolver($twigRoots, $autoDiscovery);
-        $componentAssets = $this->processTaggedServices($container, $resolver);
+        // Files the resolver has to leave out are reported to the compiler log,
+        // the build-time counterpart of the `logger` service, which does not
+        // exist yet. The kernel keeps that log for debug containers only (and
+        // the profiler shows it), so the resolver is told it runs in debug: in
+        // a production build the report goes nowhere without any further check.
+        $resolver = new ComponentMetadataResolver($twigRoots, $autoDiscovery, new CompilerLogLogger($container, $this), true);
 
-        $this->dumpCache($cachePath, $componentAssets);
+        $this->dumpCache($cachePath, $this->resolveTaggedComponents($container, $resolver));
     }
 
     /**
@@ -83,7 +99,6 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
             }
         }
 
-        // Spracovanie twig paths
         if ($container->hasExtension('twig')) {
             $twigConfigs = $container->getExtensionConfig('twig');
             foreach ($twigConfigs as $config) {
@@ -113,11 +128,11 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
     }
 
     /**
-     * @return SdcMetadata
+     * @return SdcMetadataCache
      */
-    private function processTaggedServices(ContainerBuilder $container, ComponentMetadataResolver $resolver): array
+    private function resolveTaggedComponents(ContainerBuilder $container, ComponentMetadataResolver $resolver): array
     {
-        $componentAssets = [];
+        $metadata = [];
         $taggedServices = $container->findTaggedServiceIds('twig.component');
 
         foreach ($taggedServices as $id => $tags) {
@@ -128,18 +143,21 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
                 continue;
             }
 
-            $assets = $resolver->resolveMetadata($class, $class, $componentAssets);
+            $componentMetadata = $resolver->resolve($class);
 
-            if (!empty($assets)) {
-                $componentAssets[$class] = $assets;
+            if (!$componentMetadata->isEmpty()) {
+                $metadata[$class] = [
+                    'assets' => $componentMetadata->assets,
+                    'template' => $componentMetadata->template,
+                ];
             }
         }
 
-        return $componentAssets;
+        return $metadata;
     }
 
     /**
-     * @param SdcMetadata $data
+     * @param SdcMetadataCache $data
      */
     private function dumpCache(string $path, array $data): void
     {

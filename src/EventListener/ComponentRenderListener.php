@@ -36,13 +36,7 @@ final class ComponentRenderListener
 
         $this->setComponentNamespace($component);
 
-        $assets = $this->metadataRegistry->getMetadata($component::class);
-
-        if (!\is_array($assets) || [] === $assets) {
-            return;
-        }
-
-        $this->addAssets($assets);
+        $this->addAssets($this->metadataRegistry->getAssets($component::class));
     }
 
     #[AsEventListener(event: ControllerEvent::class)]
@@ -64,18 +58,12 @@ final class ComponentRenderListener
     public function onPreRender(PreRenderEvent $event): void
     {
         $component = $event->getComponent();
-        $templatePath = $this->metadataRegistry->getMetadata($component::class . '_template');
+        $template = $this->metadataRegistry->getTemplate($component::class);
 
-        if (\is_string($templatePath) && '' !== $templatePath) {
-            $event->setTemplate($templatePath);
+        if (null !== $template) {
+            $event->setTemplate($template);
         }
 
-        // Inject data-sdc-css and data-sdc-js attributes so they render via {{ attributes }}
-        $assets = $this->metadataRegistry->getMetadata($component::class);
-        if (!\is_array($assets) || [] === $assets) {
-            return;
-        }
-
-        $this->addAssets($assets);
+        $this->addAssets($this->metadataRegistry->getAssets($component::class));
     }
 }

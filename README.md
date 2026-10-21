@@ -195,6 +195,45 @@ component until the worker restarts.
 </head>
 ```
 
+### Where components can live
+
+Co-located files — the `.css`, `.js` and `.html.twig` next to a component class —
+are supported for components **inside `ux_components_dir`**. The bundle registers
+that directory both as a Twig path and as an AssetMapper path, so a file in it has a
+name Twig and AssetMapper agree on (`Alert/Alert.css` for
+`src_component/Alert/Alert.css`).
+
+Every Twig component is processed, wherever its class lives, but a co-located file
+outside every Twig path is **not loaded**: there is no name to load it by. A class
+in `src/Twig/Components/` with `Alert.css` next to it therefore gets no stylesheet.
+Either move the component into `ux_components_dir`, or reference the file explicitly
+by its AssetMapper logical path:
+
+```php
+#[AsTwigComponent]
+#[Asset('styles/alert.css')] // a file in assets/styles/, or any other AssetMapper path
+final class Alert {}
+```
+
+A file under another Twig path (for example `templates/`) is resolved relative to
+that path. That is fine for a template, but a stylesheet or script resolved that way
+loads only if the same directory is also an AssetMapper path; this layout is not
+supported.
+
+### Diagnostics
+
+Components degrade gracefully: a missing asset never breaks a page. The bundle logs
+why instead, through the application's `logger` (on the `ux_sdc` channel with
+MonologBundle):
+
+| Level | When | Logged |
+|-------|------|--------|
+| warning | A co-located file is outside every Twig path, so it is left out (see above). | in debug only; at build time (`metadata_cache: true`) into the container compiler log, shown in the profiler's *Logs* panel under *Container* |
+| warning | An HTML page with a `<head>` renders components with assets but does not call `render_component_assets()`. Fragments without a `<head>` (Turbo Frames, partials) are not reported. | in debug only |
+| error | `metadata_cache` is on but `%kernel.cache_dir%/sdc_metadata.php` does not exist — the cache was not warmed where the application runs, or the runtime cache directory differs from the build one. Pages still render, without component CSS and JS. | always |
+
+Every message says what to change.
+
 ## Usage
 
 ### Live Components

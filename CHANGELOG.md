@@ -19,6 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   files are picked up without `cache:clear`; `auto` means `false` when
   `kernel.debug` is on and `true` otherwise. The value selects services at build
   time and therefore cannot come from an environment variable.
+- Diagnostics for component assets that silently went missing, logged through the
+  application's `logger` service (channel `ux_sdc` with MonologBundle; the bundle
+  now requires `psr/log`). Each message says what to change:
+  - warning, in debug only: a CSS, JS or Twig file next to a component class is
+    outside every Twig path and is therefore not loaded. At build time
+    (`metadata_cache: true`) the warning goes to the container compiler log, which
+    the profiler shows under *Logs › Container*;
+  - warning, in debug only: an HTML page with a `<head>` renders components with
+    assets but has no `render_component_assets()` placeholder. Fragments without a
+    `<head>` (Turbo Frames, partials) are not reported;
+  - error, in every environment: `metadata_cache` is on but
+    `%kernel.cache_dir%/sdc_metadata.php` does not exist (cache not warmed where
+    the application runs, or a different runtime cache directory). The page is
+    still delivered, without component CSS and JS.
 
 ### Changed
 
@@ -34,8 +48,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     it empty. Rendered output is the same in both pipelines.
   Set `metadata_cache: true` or `false` to keep the previous behaviour of a
   particular environment.
+- **BC break:** `SdcMetadataRegistry::getMetadata()`, which returned the assets
+  of a class or, for a `<class>_template` key, its template
+  (`array|string|null`), is replaced by `getAssets(string $class): array` (always
+  a list, empty when there are none) and `getTemplate(string $class): ?string`.
+  Its constructor takes `bool $cacheEnabled` and an optional logger after
+  `$cachePath`. The `sdc_metadata.php` format changed to
+  `[class => ['assets' => [...], 'template' => ?string]]`; it is regenerated with
+  the container, so no action is needed for the file itself.
+- **BC break:** `ComponentMetadataResolver::resolveMetadata($class, $componentName, &$allMetadata)`
+  is replaced by `resolve(string $class): ComponentMetadata`, an immutable value
+  object with `assets` and `template`. The constructor takes an optional logger
+  and a `debug` flag.
+- **Behaviour change:** single-directory components are supported inside
+  `ux_components_dir` (see *Where components can live* in the README). A CSS or
+  JS file next to a component class outside every Twig path used to be
+  registered under its bare file name (`Alert.css`), which never resolved and
+  produced a broken `<link>`/`<script>`; it is now left out, and reported in
+  debug.
 
 ### Fixed
+
+- Without the metadata cache (`metadata_cache: false`, the default in debug), the
+  co-located files of a component in a directory added through `twig.paths`
+  were not found, although the build-time cache found them: the two pipelines
+  looked in different Twig paths. Both now use the same list, application
+  `twig.paths` included.
 
 - Component Twig templates are no longer published to `public/assets/`.
   `ux_components_dir` is registered as an AssetMapper path so that component

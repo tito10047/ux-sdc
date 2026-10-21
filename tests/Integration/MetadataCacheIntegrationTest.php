@@ -60,7 +60,7 @@ final class MetadataCacheIntegrationTest extends FunctionalTestCase
 
         /** @var SdcMetadataRegistry $registry */
         $registry = $container->get(SdcMetadataRegistry::class);
-        $this->assertSame($cacheExpected, null !== $registry->getMetadata(AutoDiscoveryComponent::class), 'The metadata in the registry.');
+        $this->assertSame($cacheExpected, [] !== $registry->getAssets(AutoDiscoveryComponent::class), 'The metadata in the registry.');
 
         // Without the cache, components are still registered with TwigComponent.
         $this->assertTrue($container->has(SdcAutoDiscoveryComponent::class));

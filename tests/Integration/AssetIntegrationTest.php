@@ -32,8 +32,7 @@ class AssetIntegrationTest extends IntegrationTestCase
         /** @var SdcMetadataRegistry $metadataRegistry */
         $metadataRegistry = $container->get(SdcMetadataRegistry::class);
 
-        $this->assertNotNull($metadataRegistry->getMetadata(TestComponent::class));
-        $assets = $metadataRegistry->getMetadata(TestComponent::class);
+        $assets = $metadataRegistry->getAssets(TestComponent::class);
         $this->assertCount(2, $assets);
 
         $paths = array_column($assets, 'path');

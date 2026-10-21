@@ -49,7 +49,7 @@ class AsSdcComponentIntegrationTest extends KernelTestCase
 
         /** @var SdcMetadataRegistry $metadataRegistry */
         $metadataRegistry = $container->get(SdcMetadataRegistry::class);
-        $assets = $metadataRegistry->getMetadata(SdcComponent::class);
+        $assets = $metadataRegistry->getAssets(SdcComponent::class);
 
         $this->assertCount(2, $assets);
 
@@ -68,7 +68,7 @@ class AsSdcComponentIntegrationTest extends KernelTestCase
 
         /** @var SdcMetadataRegistry $metadataRegistry */
         $metadataRegistry = $container->get(SdcMetadataRegistry::class);
-        $assets = $metadataRegistry->getMetadata(SdcComponentWithAsset::class);
+        $assets = $metadataRegistry->getAssets(SdcComponentWithAsset::class);
 
         $this->assertCount(3, $assets);
 

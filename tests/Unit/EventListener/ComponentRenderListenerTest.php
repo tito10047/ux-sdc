@@ -26,8 +26,11 @@ final class ComponentRenderListenerTest extends TestCase
         $componentClass = $component::class;
         $data = [
             $componentClass => [
-                ['path' => 'comp.css', 'type' => 'css', 'priority' => 10, 'attributes' => []]
-            ]
+                'assets' => [
+                    ['path' => 'comp.css', 'type' => 'css', 'priority' => 10, 'attributes' => []],
+                ],
+                'template' => null,
+            ],
         ];
         file_put_contents($cachePath, '<?php return ' . var_export($data, true) . ';');
 

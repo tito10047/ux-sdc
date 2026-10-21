@@ -11,6 +11,7 @@
 
 namespace Tito10047\UX\Sdc\EventListener;
 
+use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
@@ -29,11 +30,17 @@ final class AssetResponseListener
 {
     /**
      * @param non-empty-string $placeholder
+     * @param bool             $debug       a page missing the placeholder is reported only in
+     *                                      debug: it is a mistake in a template, and in
+     *                                      production it would be logged on every request
+     *                                      that renders the page
      */
     public function __construct(
         private AssetRegistry $assetRegistry,
         private AssetMapperInterface $assetMapper,
-        private string $placeholder = '<!-- __UX_TWIG_COMPONENT_ASSETS__ -->'
+        private string $placeholder = '<!-- __UX_TWIG_COMPONENT_ASSETS__ -->',
+        private ?LoggerInterface $logger = null,
+        private bool $debug = false,
     ) {
     }
 
@@ -80,7 +87,13 @@ final class AssetResponseListener
         // Streamed and binary responses have no content to inject into (false).
         $content = $response->getContent();
 
-        if (false === $content || !str_contains($content, $this->placeholder) || !$this->isHtmlResponse($request, $response)) {
+        if (false === $content || !$this->isHtmlResponse($request, $response)) {
+            return;
+        }
+
+        if (!str_contains($content, $this->placeholder)) {
+            $this->reportMissingPlaceholder($request, $content);
+
             return;
         }
 
@@ -125,6 +138,36 @@ final class AssetResponseListener
             $linkProvider = $linkProvider->withLink($link);
         }
         $request->attributes->set('_links', $linkProvider);
+    }
+
+    /**
+     * Components were rendered, but their assets have nowhere to go: the page
+     * does not call render_component_assets().
+     *
+     * Only a full document is reported. A fragment — a Turbo Frame or Stream,
+     * an htmx partial, a component rendered alone — has no <head> of its own;
+     * its components rely on the page it is inserted into, so it legitimately
+     * comes without the placeholder.
+     */
+    private function reportMissingPlaceholder(Request $request, string $content): void
+    {
+        if (!$this->debug || null === $this->logger || false === stripos($content, '</head>')) {
+            return;
+        }
+
+        $assets = $this->assetRegistry->getSortedAssets();
+        if ([] === $assets) {
+            return;
+        }
+
+        $this->logger->warning(
+            'The page "{uri}" renders components with assets ({assets}), but has no "{placeholder}" placeholder, so none of them is loaded. Call {{ render_component_assets() }} inside the <head> of the base layout.',
+            [
+                'uri' => $request->getRequestUri(),
+                'assets' => implode(', ', array_unique(array_column($assets, 'path'))),
+                'placeholder' => $this->placeholder,
+            ]
+        );
     }
 
     /**

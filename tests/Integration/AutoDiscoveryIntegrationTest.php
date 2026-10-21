@@ -20,6 +20,7 @@ use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\EventListener\AssetResponseListener;
 use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\AutoDiscovery\AutoDiscoveryComponent;
+use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\AutoDiscovery\SdcAutoDiscoveryComponent;
 use Twig\Environment;
 
 class AutoDiscoveryIntegrationTest extends IntegrationTestCase
@@ -32,16 +33,12 @@ class AutoDiscoveryIntegrationTest extends IntegrationTestCase
         /** @var SdcMetadataRegistry $metadataRegistry */
         $metadataRegistry = $container->get(SdcMetadataRegistry::class);
 
-        $this->assertNotNull($metadataRegistry->getMetadata(AutoDiscoveryComponent::class));
-        $this->assertNotNull($metadataRegistry->getMetadata(AutoDiscoveryComponent::class.'_template'));
-
-        $assets = $metadataRegistry->getMetadata(AutoDiscoveryComponent::class);
+        $assets = $metadataRegistry->getAssets(AutoDiscoveryComponent::class);
         $paths = array_column($assets, 'path');
         $this->assertContains('AutoDiscovery/AutoDiscoveryComponent.css', $paths);
         $this->assertContains('AutoDiscovery/AutoDiscoveryComponent.js', $paths);
 
-        $templatePath = $metadataRegistry->getMetadata(AutoDiscoveryComponent::class.'_template');
-        $this->assertStringEndsWith('AutoDiscoveryComponent.html.twig', $templatePath);
+        $this->assertSame('AutoDiscovery/AutoDiscoveryComponent.html.twig', $metadataRegistry->getTemplate(AutoDiscoveryComponent::class));
     }
 
     public function testAutoDiscoveryWorksWithSdcComponentAttribute(): void
@@ -52,16 +49,12 @@ class AutoDiscoveryIntegrationTest extends IntegrationTestCase
         /** @var SdcMetadataRegistry $metadataRegistry */
         $metadataRegistry = $container->get(SdcMetadataRegistry::class);
 
-        $this->assertNotNull($metadataRegistry->getMetadata(AutoDiscoveryComponent::class));
-        $this->assertNotNull($metadataRegistry->getMetadata(AutoDiscoveryComponent::class.'_template'));
-
-        $assets = $metadataRegistry->getMetadata(AutoDiscoveryComponent::class);
+        $assets = $metadataRegistry->getAssets(SdcAutoDiscoveryComponent::class);
         $paths = array_column($assets, 'path');
-        $this->assertContains('AutoDiscovery/AutoDiscoveryComponent.css', $paths);
-        $this->assertContains('AutoDiscovery/AutoDiscoveryComponent.js', $paths);
+        $this->assertContains('AutoDiscovery/SdcAutoDiscoveryComponent.css', $paths);
+        $this->assertContains('AutoDiscovery/SdcAutoDiscoveryComponent.js', $paths);
 
-        $templatePath = $metadataRegistry->getMetadata(AutoDiscoveryComponent::class.'_template');
-        $this->assertStringEndsWith('AutoDiscoveryComponent.html.twig', $templatePath);
+        $this->assertSame('AutoDiscovery/SdcAutoDiscoveryComponent.html.twig', $metadataRegistry->getTemplate(SdcAutoDiscoveryComponent::class));
     }
 
     public function testAutoDiscoveryFullRenderCycle(): void

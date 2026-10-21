@@ -13,6 +13,7 @@ namespace Tito10047\UX\Sdc\Tests\Unit\EventListener;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LogLevel;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -22,22 +23,21 @@ use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\WebLink\GenericLinkProvider;
 use Tito10047\UX\Sdc\EventListener\AssetResponseListener;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
+use Tito10047\UX\Sdc\Tests\TestLogger;
 
 final class AssetResponseListenerTest extends TestCase
 {
     private const PAGE = '<html><head>[[ASSETS]]</head><body></body></html>';
 
     private AssetRegistry $registry;
+    private TestLogger $logger;
     private AssetResponseListener $listener;
 
     protected function setUp(): void
     {
         $this->registry = new AssetRegistry();
-
-        $assetMapper = $this->createMock(AssetMapperInterface::class);
-        $assetMapper->method('getAsset')->willReturn(null);
-
-        $this->listener = new AssetResponseListener($this->registry, $assetMapper, '[[ASSETS]]');
+        $this->logger = new TestLogger();
+        $this->listener = $this->createListener(debug: true);
     }
 
     public function testOnKernelResponseReplacesPlaceholder(): void
@@ -209,6 +209,77 @@ final class AssetResponseListenerTest extends TestCase
             '<link rel="stylesheet" href="https://cdn.example.com/lib.css?v=1&amp;theme=&quot;dark&quot;">',
             (string) $response->getContent(),
         );
+    }
+
+    public function testWarnsInDebugWhenAPageWithAssetsHasNoPlaceholder(): void
+    {
+        $this->registry->addAsset('Alert/Alert.css', 'css');
+        $this->registry->addAsset('Alert/Alert.js', 'js');
+
+        $page = '<html><head><title>Shop</title></head><body></body></html>';
+        $response = $this->dispatch(new Response($page), Request::create('/shop?page=2'));
+
+        $this->assertSame($page, $response->getContent());
+
+        $warnings = $this->logger->recordsOf(LogLevel::WARNING);
+        $this->assertCount(1, $warnings);
+        $this->assertSame(
+            ['uri' => '/shop?page=2', 'assets' => 'Alert/Alert.css, Alert/Alert.js', 'placeholder' => '[[ASSETS]]'],
+            $warnings[0]['context'],
+        );
+        $this->assertStringContainsString('{placeholder}', $warnings[0]['message']);
+        $this->assertStringContainsString('render_component_assets()', $warnings[0]['message']);
+    }
+
+    /**
+     * @return iterable<string, array{bool, string, bool, array<string, string>, int}>
+     */
+    public static function provideResponsesThatAreNotReported(): iterable
+    {
+        $page = '<html><HEAD></HEAD><body></body></html>';
+
+        // [debug, content, has assets, response headers, request type]
+        yield 'not in debug' => [false, $page, true, [], HttpKernelInterface::MAIN_REQUEST];
+        yield 'no component with assets' => [true, $page, false, [], HttpKernelInterface::MAIN_REQUEST];
+        yield 'placeholder present' => [true, self::PAGE, true, [], HttpKernelInterface::MAIN_REQUEST];
+        yield 'fragment without a head' => [true, '<turbo-frame id="cart"><div class="alert"></div></turbo-frame>', true, [], HttpKernelInterface::MAIN_REQUEST];
+        yield 'not HTML' => [true, $page, true, ['Content-Type' => 'application/json'], HttpKernelInterface::MAIN_REQUEST];
+        yield 'sub-request' => [true, $page, true, [], HttpKernelInterface::SUB_REQUEST];
+    }
+
+    /**
+     * @param array<string, string> $headers
+     */
+    #[DataProvider('provideResponsesThatAreNotReported')]
+    public function testDoesNotWarn(bool $debug, string $content, bool $hasAssets, array $headers, int $requestType): void
+    {
+        $this->listener = $this->createListener($debug);
+        if ($hasAssets) {
+            $this->registry->addAsset('Alert/Alert.css', 'css');
+        }
+
+        $this->dispatch(new Response($content, 200, $headers), null, $requestType);
+
+        $this->assertSame([], $this->logger->records);
+    }
+
+    public function testDoesNotWarnLiveComponentRequests(): void
+    {
+        $this->registry->addAsset('Alert/Alert.css', 'css');
+
+        $request = new Request();
+        $request->headers->set('Accept', 'application/vnd.live-component+html');
+        $this->dispatch(new Response('<html><head></head><body></body></html>'), $request);
+
+        $this->assertSame([], $this->logger->records);
+    }
+
+    private function createListener(bool $debug): AssetResponseListener
+    {
+        $assetMapper = $this->createMock(AssetMapperInterface::class);
+        $assetMapper->method('getAsset')->willReturn(null);
+
+        return new AssetResponseListener($this->registry, $assetMapper, '[[ASSETS]]', $this->logger, $debug);
     }
 
     private function dispatch(Response $response, ?Request $request = null, int $requestType = HttpKernelInterface::MAIN_REQUEST): Response

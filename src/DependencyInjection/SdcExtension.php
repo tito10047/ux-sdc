@@ -14,9 +14,11 @@ namespace Tito10047\UX\Sdc\DependencyInjection;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
+use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
@@ -112,7 +114,12 @@ class SdcExtension extends Extension implements PrependExtensionInterface
         }
 
         $container->register(SdcMetadataRegistry::class)
-            ->setArgument('$cachePath', '%kernel.cache_dir%/sdc_metadata.php')
+            ->setArguments([
+                '$cachePath' => '%kernel.cache_dir%/sdc_metadata.php',
+                '$cacheEnabled' => $metadataCache,
+                '$logger' => new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+            ])
+            ->addTag('monolog.logger', ['channel' => 'ux_sdc'])
             ->setPublic(true); // Set to true for easier testing in Integration tests
     }
 
@@ -259,25 +266,15 @@ class SdcExtension extends Extension implements PrependExtensionInterface
      */
     private function registerMetadataResolver(ContainerBuilder $container, array $config): void
     {
-        $twigRoots = [];
-        if ($container->hasParameter('kernel.project_dir')) {
-            $twigRoots[] = '%kernel.project_dir%/src_component';
-        }
-
-        if ($container->hasParameter('twig.default_path')) {
-            $twigRoots[] = $container->getParameter('twig.default_path');
-        }
-
-        $twigRoots[] = $config['ux_components_dir'];
-
-        // V runtime prostredí (Extension::load) nemáme prístup k extension configom iných bundleov tak jednoducho ako v Compiler Pass.
-        // Ale pre dev prostredie to väčšinou stačí takto, alebo sa dajú pridať ďalšie cesty.
-
         $container->register(ComponentMetadataResolver::class)
             ->setArguments([
-                $twigRoots,
-                $config['auto_discovery'],
-            ]);
+                // Set by AssetComponentCompilerPass, which sees the Twig paths of the application.
+                '$twigRoots' => [],
+                '$autoDiscoveryEnabled' => $config['auto_discovery'],
+                '$logger' => new Reference('logger', ContainerInterface::NULL_ON_INVALID_REFERENCE),
+                '$debug' => '%kernel.debug%',
+            ])
+            ->addTag('monolog.logger', ['channel' => 'ux_sdc']);
     }
 
     private function registerClasses(ContainerBuilder $container, string $namespace, string $resource): void

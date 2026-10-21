@@ -12,7 +12,9 @@
 namespace Tito10047\UX\Sdc\Tests\Unit\Runtime;
 
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LogLevel;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
+use Tito10047\UX\Sdc\Tests\TestLogger;
 
 class SdcMetadataRegistryTest extends TestCase
 {
@@ -33,27 +35,79 @@ class SdcMetadataRegistryTest extends TestCase
         }
     }
 
-    public function testGetMetadataLoadsFromFile(): void
+    public function testReadsAssetsAndTemplateFromTheCacheFile(): void
     {
-        $data = [
-            'Alert' => [
-                'has_css' => true,
-                'has_js' => false,
-                'template' => 'Alert.html.twig',
-            ]
-        ];
-
-        file_put_contents($this->cachePath, '<?php return ' . var_export($data, true) . ';');
+        $asset = ['path' => 'Alert/Alert.css', 'type' => 'css', 'priority' => 0, 'attributes' => []];
+        $this->writeCache([
+            'App\Alert' => ['assets' => [$asset], 'template' => 'Alert/Alert.html.twig'],
+            'App\Icon' => ['assets' => [], 'template' => 'Icon/Icon.html.twig'],
+        ]);
 
         $registry = new SdcMetadataRegistry($this->cachePath);
 
-        $this->assertEquals($data['Alert'], $registry->getMetadata('Alert'));
-        $this->assertNull($registry->getMetadata('NonExistent'));
+        $this->assertSame([$asset], $registry->getAssets('App\Alert'));
+        $this->assertSame('Alert/Alert.html.twig', $registry->getTemplate('App\Alert'));
+        $this->assertSame([], $registry->getAssets('App\Icon'));
+        $this->assertSame('Icon/Icon.html.twig', $registry->getTemplate('App\Icon'));
     }
 
-    public function testGetMetadataReturnsEmptyIfFileDoesNotExist(): void
+    public function testUnknownClassHasNoAssetsAndNoTemplate(): void
+    {
+        $this->writeCache([]);
+
+        $registry = new SdcMetadataRegistry($this->cachePath);
+
+        $this->assertSame([], $registry->getAssets('App\Unknown'));
+        $this->assertNull($registry->getTemplate('App\Unknown'));
+    }
+
+    /**
+     * A deployment error: logged in every environment, as an error, and once.
+     */
+    public function testMissingCacheFileIsLoggedAsAnError(): void
+    {
+        $logger = new TestLogger();
+        $registry = new SdcMetadataRegistry($this->cachePath, true, $logger);
+
+        $this->assertSame([], $registry->getAssets('App\Alert'));
+        $this->assertNull($registry->getTemplate('App\Alert'));
+
+        $this->assertCount(1, $logger->records);
+        $this->assertSame(LogLevel::ERROR, $logger->records[0]['level']);
+        $this->assertSame($this->cachePath, $logger->records[0]['context']['path']);
+        $this->assertStringContainsString('{path}', $logger->records[0]['message']);
+        $this->assertStringContainsString('cache:warmup', $logger->records[0]['message']);
+    }
+
+    public function testMissingCacheFileWithoutLoggerIsEmpty(): void
     {
         $registry = new SdcMetadataRegistry($this->cachePath);
-        $this->assertNull($registry->getMetadata('Alert'));
+
+        $this->assertSame([], $registry->getAssets('App\Alert'));
+        $this->assertNull($registry->getTemplate('App\Alert'));
+    }
+
+    /**
+     * With the cache off nothing writes the file: its absence is expected, and a
+     * leftover file is not read.
+     */
+    public function testDisabledCacheIsEmptyAndSilent(): void
+    {
+        $logger = new TestLogger();
+        $registry = new SdcMetadataRegistry($this->cachePath, false, $logger);
+
+        $this->assertSame([], $registry->getAssets('App\Alert'));
+        $this->assertSame([], $logger->records);
+
+        $this->writeCache(['App\Alert' => ['assets' => [], 'template' => 'Alert/Alert.html.twig']]);
+        $this->assertNull((new SdcMetadataRegistry($this->cachePath, false, $logger))->getTemplate('App\Alert'));
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private function writeCache(array $data): void
+    {
+        file_put_contents($this->cachePath, '<?php return ' . var_export($data, true) . ';');
     }
 }

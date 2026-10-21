@@ -39,16 +39,22 @@ return static function (ContainerConfigurator $container): void {
     // ControllerAttributesListener (10000, Symfony 8.1+), which only applies the
     // headers of controller attributes such as #[Cache]. 64 keeps clear of the
     // default priority without claiming the top of the stack.
+    //
+    // The logger is optional, on the `ux_sdc` channel when MonologBundle is
+    // installed (the tag is ignored otherwise).
     $services->set(AssetResponseListener::class)
         ->args([
             service(AssetRegistry::class),
             service(AssetMapperInterface::class),
         ])
+        ->arg('$logger', service('logger')->nullOnInvalid())
+        ->arg('$debug', '%kernel.debug%')
         ->tag('kernel.event_listener', [
             'event' => 'kernel.response',
             'method' => 'onKernelResponse',
             'priority' => 64,
-        ]);
+        ])
+        ->tag('monolog.logger', ['channel' => 'ux_sdc']);
 
     $services->set(ComponentRenderListener::class)
         ->args([
