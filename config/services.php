@@ -159,6 +159,7 @@ return static function (ContainerConfigurator $container): void {
         ->args([
             service('.inner'),
             service('twig.loader'),
+            '%ux_sdc.ux_components_dir%',
         ]);
 
     $services->set(AssetExtension::class)
@@ -212,6 +213,8 @@ return static function (ContainerConfigurator $container): void {
                 service_closure('twig'),
                 '%ux_sdc.routing.enabled%',
                 class_exists(StimulusBundle::class),
+                // Where the Flex recipe puts config/routes/ux_sdc.yaml.
+                '%kernel.project_dir%/config',
             ])
             ->tag('maker.command');
     }

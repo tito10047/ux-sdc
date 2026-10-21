@@ -30,9 +30,12 @@ final class ComponentDirectoryTemplateFinderTest extends TestCase
      */
     public static function names(): iterable
     {
-        yield 'named after its path' => ['Alert:Alert', 'Alert/Alert.html.twig'];
+        yield 'named after its path' => ['components:Notice', 'components/Notice.html.twig'];
         yield 'index of a directory' => ['components:Panel', 'components/Panel/index.html.twig'];
-        yield 'trailing whitespace' => ['Alert:Alert ', 'Alert/Alert.html.twig'];
+        yield 'trailing whitespace' => ['components:Notice ', 'components/Notice.html.twig'];
+        // A component class takes its name before the finder is asked; a class that is none does not.
+        yield 'template of a component class, next to it' => ['Alert:Alert', null];
+        yield 'page of a controller, next to it' => ['Homepage:HomepageAction', null];
         yield 'only in another Twig path' => ['base', null];
         yield 'nowhere' => ['Missing', null];
     }
@@ -66,6 +69,6 @@ final class ComponentDirectoryTemplateFinderTest extends TestCase
             }
         };
 
-        return new ComponentDirectoryTemplateFinder($inner, $loader);
+        return new ComponentDirectoryTemplateFinder($inner, $loader, self::COMPONENTS_DIR);
     }
 }

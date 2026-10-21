@@ -235,6 +235,8 @@ final class DebugSdcCommandTest extends IntegrationTestCase
 
         // components/Alert/Alert.html.twig would be <twig:Alert:Alert>, which is the class.
         $this->assertSame(Alert::class, $components['Alert:Alert']['class']);
+        // The page of the AlertAction controller, next to it, is no component.
+        $this->assertArrayNotHasKey('Alert:AlertAction', $components);
     }
 
     #[DataProvider('metadataCache')]

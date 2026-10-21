@@ -50,9 +50,19 @@ final class MakeSdcComponent extends AbstractMaker
     private const PAGE_NAMESPACE = 'Page';
 
     /**
+     * The route import of the bundle, relative to the configuration directory:
+     * the file the Flex recipe adds, and the one the success message of
+     * --action tells to add without it.
+     */
+    private const ROUTE_IMPORT = 'routes/ux_sdc.yaml';
+
+    private const ROUTE_IMPORT_DISPLAY = 'config/' . self::ROUTE_IMPORT;
+
+    /**
      * @param \Closure(): Environment $twig
      * @param bool                    $routing        "ux_sdc.routing.enabled": whether the bundle loads the routes of the component directory
      * @param bool                    $stimulusBundle whether StimulusBundle is installed: the template of a component with a Stimulus controller calls its stimulus_controller()
+     * @param string|null             $configDir      the configuration directory of the application, where the Flex recipe of the bundle adds the route import; null to not look for it
      */
     public function __construct(
         private string $uxComponentsDir,
@@ -60,6 +70,7 @@ final class MakeSdcComponent extends AbstractMaker
         private \Closure $twig,
         private bool $routing = true,
         private bool $stimulusBundle = true,
+        private ?string $configDir = null,
     ) {
     }
 
@@ -384,12 +395,17 @@ EOF
                 \sprintf('            namespace: %s', rtrim((string) $this->componentNamespace, '\\')),
                 '        type: attribute',
             ];
+        } elseif (null !== $this->configDir && is_file($this->configDir . '/' . self::ROUTE_IMPORT)) {
+            // Most likely added by the Flex recipe; it holds the import the
+            // message would show otherwise.
+            $lines[] = \sprintf('The route import of the bundle in %s loads it.', self::ROUTE_IMPORT_DISPLAY);
+            $import = [];
         } else {
             $lines[] = Kernel::VERSION_ID >= 70400
                 ? 'A config/routes.yaml with "resource: routing.controllers", the default since Symfony 7.4, loads it, and so does the route import of the bundle. Without either, add the import:'
                 : 'The route import of the bundle loads it. If the application does not have it yet, add it:';
             $import = [
-                '    <comment># config/routes/ux_sdc.yaml</comment>',
+                \sprintf('    <comment># %s</comment>', self::ROUTE_IMPORT_DISPLAY),
                 '    ux_sdc:',
                 '        resource: .',
                 '        type: ux_sdc',
@@ -399,8 +415,7 @@ EOF
         return [
             ...$lines,
             '',
-            ...$import,
-            '',
+            ...([] !== $import ? [...$import, ''] : []),
             \sprintf('Check with <info>php bin/console debug:router %s</info>', $routeName),
         ];
     }

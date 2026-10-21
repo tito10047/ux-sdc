@@ -584,6 +584,12 @@ file (see [Where components can live](#where-components-can-live)):
 `templates/components/Button.css` is not served by AssetMapper, so it is left out
 and reported.
 
+A template next to a PHP file of the same name is not an anonymous component: it
+belongs to that class, as `Notice.html.twig` would to a `Notice.php`. That keeps
+the page of a controller — `Page/Homepage/HomepageAction.html.twig` next to
+`HomepageAction.php`, as [`--action`](#page-components-with---action) generates
+it — out of the components, of `debug:sdc` and of the metadata cache.
+
 An anonymous component gets no `controller` variable: its template name does not
 tell where the file is without looking it up on every render. Name its Stimulus
 controller instead — `{{ stimulus_controller('Notice--Notice') }}` for a
@@ -824,7 +830,8 @@ final class HomepageAction extends AbstractController
   `config/routes/ux_sdc.yaml` (created by the recipe, or step 5 of
   [Without the recipe](#without-the-recipe)), or on
   Symfony 7.4+ by `resource: routing.controllers` in `config/routes.yaml`. The
-  maker reminds you of the import. `ux_sdc.routing.enabled: false` turns off both
+  maker reminds you of the import, or says it is there when
+  `config/routes/ux_sdc.yaml` exists. `ux_sdc.routing.enabled: false` turns off both
   (see [Configuration reference](#configuration-reference)); the directory can
   then still be imported like any other, with `resource: {path: ../src_component/,
   namespace: App\Component}` and `type: attribute`. Check with

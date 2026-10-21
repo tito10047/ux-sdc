@@ -252,8 +252,10 @@ final class AssetComponentCompilerPassTest extends TestCase
     /**
      * ux_components_dir, a Twig path of the main namespace, holds anonymous
      * components under their path, where ComponentDirectoryTemplateFinder
-     * finds them. Without `twig_component.anonymous_template_directory`
-     * (deprecated in Twig Components 2.x), `components/` is looked in.
+     * finds them — except a template next to a PHP file of the same name,
+     * such as the page of a controller, which belongs to that class. Without
+     * `twig_component.anonymous_template_directory` (deprecated in Twig
+     * Components 2.x), `components/` is looked in.
      */
     public function testAnonymousTemplatesOfTheComponentDirectory(): void
     {
@@ -271,7 +273,7 @@ final class AssetComponentCompilerPassTest extends TestCase
             'components/Notice.html.twig' => ['Notice'],
             'components/Panel/index.html.twig' => ['Panel', 'Panel:index'],
             'Acme/components/Button.html.twig' => ['Acme:components:Button'],
-        ], $container->getDefinition(ComponentInspector::class)->getArgument('$anonymousTemplates'), 'The template next to Alert belongs to the class.');
+        ], $container->getDefinition(ComponentInspector::class)->getArgument('$anonymousTemplates'), 'The template next to Alert belongs to the class, the one next to the HomepageAction controller to that class.');
 
         $map = require $this->cachePath;
         $this->assertSame(['components/Notice.html.twig', 'Acme/components/Button.html.twig'], array_keys($map['anonymous']));

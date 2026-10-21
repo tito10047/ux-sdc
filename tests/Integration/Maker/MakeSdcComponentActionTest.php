@@ -15,10 +15,13 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\MakerBundle\Exception\RuntimeCommandException;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\Component\Routing\Loader\AttributeServicesLoader;
 use Symfony\UX\StimulusBundle\StimulusBundle;
+use Tito10047\UX\Sdc\Maker\MakeSdcComponent;
 use Tito10047\UX\Sdc\Tests\Integration\FunctionalTestCase;
 
 /**
@@ -35,6 +38,9 @@ final class MakeSdcComponentActionTest extends FunctionalTestCase
 
     /** An application with a layout.html.twig of its own, with a content block. */
     private const LAYOUT = __DIR__.'/../Fixtures/maker/layout';
+
+    /** The configuration directory of an application the Flex recipe was installed in. */
+    private const RECIPE_CONFIG = __DIR__.'/../Fixtures/maker/recipe/config';
 
     /** Neither base.html.twig nor layout.html.twig. */
     private const NO_LAYOUT = __DIR__.'/../Fixtures/maker';
@@ -197,6 +203,41 @@ final class MakeSdcComponentActionTest extends FunctionalTestCase
         $this->assertFileExists(self::COMPONENT_DIR.'/Page/Homepage/HomepageAction.html.twig');
     }
 
+    /**
+     * The files belong to the application: the licence header of the bundle's
+     * own templates stays out of them.
+     */
+    public function testGeneratedFilesHaveNoLicenceOfTheBundle(): void
+    {
+        $withStimulus = class_exists(StimulusBundle::class);
+        $this->runMaker(self::FLEX, ['name' => 'Page:Homepage', '--action' => true, '--stimulus' => $withStimulus])->assertCommandIsSuccessful();
+
+        $files = [];
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(self::COMPONENT_DIR.'/Page', \FilesystemIterator::SKIP_DOTS)) as $file) {
+            $this->assertInstanceOf(\SplFileInfo::class, $file);
+            $files[] = $file->getFilename();
+
+            $content = (string) file_get_contents($file->getPathname());
+            $this->assertStringNotContainsString('UX SDC Bundle', $content, $file->getFilename());
+            $this->assertStringNotContainsString('Môstka', $content, $file->getFilename());
+            $this->assertStringNotContainsString('LICENSE', $content, $file->getFilename());
+        }
+
+        sort($files);
+        $this->assertSame([
+            'Homepage.css',
+            'Homepage.html.twig',
+            'Homepage.php',
+            'HomepageAction.html.twig',
+            'HomepageAction.php',
+            ...($withStimulus ? ['Homepage_controller.js'] : []),
+        ], $files);
+        $this->assertStringStartsWith('/* Styles for Homepage component */', (string) file_get_contents(self::COMPONENT_DIR.'/Page/Homepage/Homepage.css'));
+        if ($withStimulus) {
+            $this->assertStringStartsWith("import { Controller } from '@hotwired/stimulus';", (string) file_get_contents(self::COMPONENT_DIR.'/Page/Homepage/Homepage_controller.js'));
+        }
+    }
+
     public function testSuccessMessageTellsHowTheRouteIsLoaded(): void
     {
         $display = $this->runMaker(self::FLEX, ['name' => 'Page:Homepage', '--action' => true])->getDisplay();
@@ -205,6 +246,37 @@ final class MakeSdcComponentActionTest extends FunctionalTestCase
         $this->assertStringContainsString('# config/routes/ux_sdc.yaml', $display);
         $this->assertStringContainsString('type: ux_sdc', $display);
         $this->assertSame(Kernel::VERSION_ID >= 70400, str_contains($display, 'resource: routing.controllers'));
+    }
+
+    /**
+     * The Flex recipe of the bundle adds config/routes/ux_sdc.yaml: the
+     * message says the route is loaded instead of showing the import again.
+     */
+    public function testSuccessMessageWithTheRouteImportOfTheRecipe(): void
+    {
+        self::bootKernel([
+            'twig' => ['default_path' => self::FLEX],
+            'compiler_passes' => [new class (self::RECIPE_CONFIG) implements CompilerPassInterface {
+                public function __construct(private readonly string $configDir)
+                {
+                }
+
+                public function process(ContainerBuilder $container): void
+                {
+                    $container->getDefinition(MakeSdcComponent::class)->setArgument(5, $this->configDir);
+                }
+            }],
+        ]);
+        $tester = new CommandTester((new Application(self::$kernel))->find('make:sdc-component'));
+        $tester->execute(['name' => 'Page:Homepage', '--action' => true], ['interactive' => false]);
+
+        $tester->assertCommandIsSuccessful();
+        $display = $tester->getDisplay();
+        $this->assertStringContainsString('The page is served at /homepage (route app_homepage) once its route is loaded.', $display);
+        $this->assertStringContainsString('The route import of the bundle in config/routes/ux_sdc.yaml loads it.', $display);
+        $this->assertStringContainsString('Check with php bin/console debug:router app_homepage', $display);
+        $this->assertStringNotContainsString('type: ux_sdc', $display);
+        $this->assertStringNotContainsString('routing.controllers', $display);
     }
 
     public function testSuccessMessageWithRoutingDisabledTellsToImportTheDirectory(): void

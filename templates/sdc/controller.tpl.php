@@ -1,3 +1,5 @@
+<?php
+
 /*
  * This file is part of the UX SDC Bundle
  *
@@ -7,6 +9,7 @@
  * file that was distributed with this source code.
  */
 
+?>
 import { Controller } from '@hotwired/stimulus';
 
 /* stimulusFetch: 'lazy' */

@@ -19,6 +19,7 @@ use Tito10047\UX\Sdc\Debug\ComponentInspector;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadata;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
+use Tito10047\UX\Sdc\Twig\ComponentDirectoryTemplateFinder;
 
 /**
  * Collects what the resolver needs to know about the application — its Twig
@@ -299,10 +300,13 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
      * Twig Components runs (`index.html.twig` is the template of its directory
      * from Twig Components 2.32 on, a template may be shadowed by another, a
      * class may take the name), so `debug:sdc` checks them then. Here, only the
-     * templates of component classes are left out: the template named in the
-     * registration of a class or given to it by Twig Components by default,
-     * and the `.html.twig` file named after a class, next to it — used by the
-     * class or not, it belongs to the class.
+     * templates of classes are left out: the template named in the
+     * registration of a component class or given to it by Twig Components by
+     * default, the `.html.twig` file named after a component class, next to it
+     * — used by the class or not, it belongs to the class — and, in the
+     * component directory, any template next to a PHP file of the same name,
+     * such as the page of a controller (see ComponentDirectoryTemplateFinder,
+     * which does not find them either).
      *
      * @param array<string, string|null> $twigRoots        existing directories, as real paths, => namespace (null for the main one)
      * @param list<class-string>         $componentClasses
@@ -317,9 +321,9 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
         foreach ($twigRoots as $root => $namespace) {
             if (null === $namespace) {
                 // Joined as Twig Components joins it: the directory, then "/".
-                $directories[] = [$root, $anonymousDirectory, rtrim($anonymousDirectory, '/') . '/', ''];
+                $directories[] = [$root, $anonymousDirectory, rtrim($anonymousDirectory, '/') . '/', '', false];
             } else {
-                $directories[] = [$root, self::BUNDLE_ANONYMOUS_DIRECTORY, '@' . $namespace . '/' . self::BUNDLE_ANONYMOUS_DIRECTORY . '/', $namespace . ':'];
+                $directories[] = [$root, self::BUNDLE_ANONYMOUS_DIRECTORY, '@' . $namespace . '/' . self::BUNDLE_ANONYMOUS_DIRECTORY . '/', $namespace . ':', false];
             }
         }
 
@@ -327,18 +331,24 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
         $componentsDir = \is_string($componentsDir) ? $this->resolveDirectory($container, $componentsDir) : null;
         // Looked up only when the directory is a Twig path, under the namespace SdcExtension gives it.
         if (null !== $componentsDir && \array_key_exists($componentsDir, $twigRoots)) {
-            $directories[] = [$componentsDir, '', '', ''];
+            $directories[] = [$componentsDir, '', '', '', true];
         }
 
         $classTemplates = $this->collectClassTemplateFiles($container, $resolver, $componentClasses);
 
         $templates = [];
-        foreach ($directories as [$root, $directory, $templatePrefix, $namePrefix]) {
+        foreach ($directories as [$root, $directory, $templatePrefix, $namePrefix, $isComponentsDir]) {
             foreach (self::findTemplates($root . ('' === trim($directory, '/') ? '' : '/' . trim($directory, '/'))) as $relativePath) {
                 $template = $templatePrefix . $relativePath;
 
                 $file = $resolver->locateTemplate($template);
                 if (null === $file || isset($classTemplates[$file]) || isset($templates[$template])) {
+                    continue;
+                }
+
+                // The rule of ComponentDirectoryTemplateFinder, which is what
+                // finds the templates of this directory at runtime.
+                if ($isComponentsDir && ComponentDirectoryTemplateFinder::belongsToClass($root . '/' . $relativePath)) {
                     continue;
                 }
 

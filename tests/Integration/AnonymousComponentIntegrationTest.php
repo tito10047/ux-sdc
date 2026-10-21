@@ -13,7 +13,7 @@ namespace Tito10047\UX\Sdc\Tests\Integration;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
-use Symfony\UX\LiveComponent\LiveComponentBundle;
+use Symfony\UX\TwigComponent\ComponentTemplateFinderInterface;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 
 /**
@@ -84,9 +84,9 @@ final class AnonymousComponentIntegrationTest extends FunctionalTestCase
         $dump = require $cachePath;
 
         $this->assertIsArray($dump);
-        // Without LiveComponent, LiveComponentWithAsset is a template and a stylesheet without a component class.
-        $expected = ['Anonymous/Icon/Icon.html.twig', 'Anonymous/Notice/Notice.html.twig', ...(class_exists(LiveComponentBundle::class) ? [] : ['LiveComponentWithAsset.html.twig'])];
-        $this->assertSame($expected, array_keys($dump['anonymous']));
+        // Neither Anonymous/Page/PageAction.html.twig nor, without LiveComponent,
+        // LiveComponentWithAsset.html.twig: each is next to a class of its name.
+        $this->assertSame(['Anonymous/Icon/Icon.html.twig', 'Anonymous/Notice/Notice.html.twig'], array_keys($dump['anonymous']));
 
         $registry = self::getContainer()->get(SdcMetadataRegistry::class);
         $this->assertInstanceOf(SdcMetadataRegistry::class, $registry);
@@ -98,6 +98,27 @@ final class AnonymousComponentIntegrationTest extends FunctionalTestCase
 
         $this->assertTrue($registry->getAnonymousComponentMetadata('Anonymous/Plain/index.html.twig')->isEmpty());
         $this->assertTrue($registry->getAnonymousComponentMetadata('AutoDiscovery/AutoDiscoveryComponent.html.twig')->isEmpty());
+    }
+
+    /**
+     * A template next to a PHP class of its name belongs to that class — here
+     * the page of a controller, which `make:sdc-component --action` generates
+     * next to the component — and is no anonymous component: not found at
+     * runtime, not in the build-time cache, whatever the assets next to it.
+     */
+    #[DataProvider('metadataCache')]
+    public function testTheTemplateOfAClassIsNoAnonymousComponent(bool $metadataCache): void
+    {
+        self::bootKernel(['configs' => ['metadata_cache' => $metadataCache]]);
+
+        $finder = self::getContainer()->get('ux.twig_component.component_template_finder');
+        $this->assertInstanceOf(ComponentTemplateFinderInterface::class, $finder);
+        $this->assertNull($finder->findAnonymousComponentTemplate('Anonymous:Page:PageAction'));
+        $this->assertSame('Anonymous/Notice/Notice.html.twig', $finder->findAnonymousComponentTemplate('Anonymous:Notice:Notice'));
+
+        $registry = self::getContainer()->get(SdcMetadataRegistry::class);
+        $this->assertInstanceOf(SdcMetadataRegistry::class, $registry);
+        $this->assertTrue($registry->getAnonymousComponentMetadata('Anonymous/Page/PageAction.html.twig')->isEmpty());
     }
 
     /**

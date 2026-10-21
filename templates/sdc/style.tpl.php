@@ -1,3 +1,5 @@
+<?php
+
 /*
  * This file is part of the UX SDC Bundle
  *
@@ -7,6 +9,7 @@
  * file that was distributed with this source code.
  */
 
+?>
 /* Styles for <?= $component_name ?> component */
 @layer components {
 	.<?= \Symfony\Bundle\MakerBundle\Str::asSnakeCase($component_name) ?>{
