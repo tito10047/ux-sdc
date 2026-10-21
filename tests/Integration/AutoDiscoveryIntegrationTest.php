@@ -26,7 +26,7 @@ class AutoDiscoveryIntegrationTest extends IntegrationTestCase
 {
     public function testAutoDiscoveryCollectsAssetsAndTemplate(): void
     {
-        self::bootKernel(['configs' => ['auto_discovery' => true]]);
+        self::bootKernel(['configs' => ['auto_discovery' => true, 'metadata_cache' => true]]);
         $container = self::getContainer();
 
         /** @var SdcMetadataRegistry $metadataRegistry */
@@ -46,7 +46,7 @@ class AutoDiscoveryIntegrationTest extends IntegrationTestCase
 
     public function testAutoDiscoveryWorksWithSdcComponentAttribute(): void
     {
-        self::bootKernel(['configs' => ['auto_discovery' => true]]);
+        self::bootKernel(['configs' => ['auto_discovery' => true, 'metadata_cache' => true]]);
         $container = self::getContainer();
 
         /** @var SdcMetadataRegistry $metadataRegistry */

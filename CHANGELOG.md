@@ -12,6 +12,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ux_sdc.exclude_templates_from_asset_map` (default `true`): keeps the Twig
   templates of `ux_components_dir` out of the AssetMapper. Set it to `false`
   only if you really want them mapped.
+- `ux_sdc.metadata_cache` (`auto` | `true` | `false`, default `auto`): selects
+  where component metadata (asset paths and template) comes from. `true` resolves
+  it once, when the container is built, into `%kernel.cache_dir%/sdc_metadata.php`;
+  `false` resolves it on render from the files next to the component class, so new
+  files are picked up without `cache:clear`; `auto` means `false` when
+  `kernel.debug` is on and `true` otherwise. The value selects services at build
+  time and therefore cannot come from an environment variable.
+
+### Changed
+
+- **Behaviour change:** the metadata pipeline is now selected by the debug flag
+  instead of the environment name. Until now only an environment named exactly
+  `dev` resolved metadata on render; every other one, debug or not, used the
+  build-time cache. With the default `metadata_cache: auto`:
+  - any environment running with debug on (`staging` with `APP_DEBUG=1`,
+    `prod_debug`, …) now resolves metadata on render;
+  - a `dev` environment running with debug off now uses the build-time cache;
+  - `test` with debug on (the Symfony default for `APP_ENV=test`) now resolves
+    metadata on render, so a test that reads `SdcMetadataRegistry` directly finds
+    it empty. Rendered output is the same in both pipelines.
+  Set `metadata_cache: true` or `false` to keep the previous behaviour of a
+  particular environment.
 
 ### Fixed
 

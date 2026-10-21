@@ -43,7 +43,7 @@ class AsSdcComponentIntegrationTest extends KernelTestCase
 
     public function testSdcComponentAssetsAreCollected(): void
     {
-        $kernel = new TestKernel([]);
+        $kernel = new TestKernel(['metadata_cache' => true]);
         $kernel->boot();
         $container = $kernel->getContainer();
 
@@ -62,7 +62,7 @@ class AsSdcComponentIntegrationTest extends KernelTestCase
 
     public function testSdcComponentWithAssetAttribute(): void
     {
-        $kernel = new TestKernel([]);
+        $kernel = new TestKernel(['metadata_cache' => true]);
         $kernel->boot();
         $container = $kernel->getContainer();
 

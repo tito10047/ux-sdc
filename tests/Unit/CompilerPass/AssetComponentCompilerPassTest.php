@@ -44,16 +44,7 @@ final class AssetComponentCompilerPassTest extends TestCase
 
     public function testProcess(): void
     {
-        $container = new ContainerBuilder();
-        $container->setParameter('ux_sdc.auto_discovery', false);
-
-        $registryDefinition = new Definition(SdcMetadataRegistry::class);
-        $registryDefinition->setArgument('$cachePath', $this->cachePath);
-        $container->setDefinition(SdcMetadataRegistry::class, $registryDefinition);
-
-        $componentDefinition = new Definition(MockComponent::class);
-        $componentDefinition->addTag('twig.component', ['key' => 'test_component']);
-        $container->setDefinition('test_component_service', $componentDefinition);
+        $container = $this->createContainer(metadataCache: true);
 
         $pass = new AssetComponentCompilerPass();
         $pass->process($container);
@@ -64,5 +55,45 @@ final class AssetComponentCompilerPassTest extends TestCase
         $this->assertArrayHasKey(MockComponent::class, $map);
         $this->assertSame('test.css', $map[MockComponent::class][0]['path']);
         $this->assertSame(5, $map[MockComponent::class][0]['priority']);
+    }
+
+    public function testNothingIsDumpedWithoutMetadataCache(): void
+    {
+        $container = $this->createContainer(metadataCache: false);
+
+        (new AssetComponentCompilerPass())->process($container);
+
+        $this->assertFileDoesNotExist($this->cachePath);
+    }
+
+    /**
+     * Switching `metadata_cache` from true to false rebuilds the container in the
+     * same cache directory: the file of the previous build must not survive it.
+     */
+    public function testStaleCacheIsRemovedWithoutMetadataCache(): void
+    {
+        (new AssetComponentCompilerPass())->process($this->createContainer(metadataCache: true));
+        $this->assertFileExists($this->cachePath);
+
+        (new AssetComponentCompilerPass())->process($this->createContainer(metadataCache: false));
+
+        $this->assertFileDoesNotExist($this->cachePath);
+    }
+
+    private function createContainer(bool $metadataCache): ContainerBuilder
+    {
+        $container = new ContainerBuilder();
+        $container->setParameter('ux_sdc.auto_discovery', false);
+        $container->setParameter(AssetComponentCompilerPass::METADATA_CACHE_PARAMETER, $metadataCache);
+
+        $registryDefinition = new Definition(SdcMetadataRegistry::class);
+        $registryDefinition->setArgument('$cachePath', $this->cachePath);
+        $container->setDefinition(SdcMetadataRegistry::class, $registryDefinition);
+
+        $componentDefinition = new Definition(MockComponent::class);
+        $componentDefinition->addTag('twig.component', ['key' => 'test_component']);
+        $container->setDefinition('test_component_service', $componentDefinition);
+
+        return $container;
     }
 }

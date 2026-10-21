@@ -40,7 +40,7 @@ An agent skill for this bundle is available at **[tito10047/ux-sdc-skills](https
 
 For agents other than Claude Code, the skill is a plain directory of Markdown following the [agentskills.io](https://agentskills.io) layout; `AGENTS.md`, `CLAUDE.md` and `llms.txt` are provided as well.
 
-It covers the recommended project structure and the `make:sdc-component --action` page workflow, asset discovery and injection, Stimulus controller naming, Live Component asset headers, and the differences between the `dev` and `prod` pipelines — plus a set of failure modes with their root causes, including several that are not documented here:
+It covers the recommended project structure and the `make:sdc-component --action` page workflow, asset discovery and injection, Stimulus controller naming, Live Component asset headers, and the build-time and runtime metadata pipelines (`metadata_cache`) — plus a set of failure modes with their root causes, including several that are not documented here:
 
 - Routes on co-located `--action` controllers reach the router through autoconfiguration, which requires `controllers: { resource: routing.controllers }` in `config/routes.yaml`. That loader arrived in Symfony 7.4; on earlier versions add an explicit routing resource for the component directory, or every generated page returns 404.
 - Use exactly one component attribute per class. `#[AsSdcComponent]` does not need `#[AsTwigComponent]`, and `#[AsLiveComponent]` does not need `#[AsSdcComponent]`; stacking two fails the container with *"another component already has this name"*.
@@ -168,7 +168,23 @@ ux_sdc:
     # Its Twig templates are kept out of the asset map (and out of public/assets/);
     # set this to false only if you want them mapped.
     exclude_templates_from_asset_map: true
+    # Where component metadata (CSS/JS paths and the template) comes from:
+    #   true  - resolved once, when the container is built, and cached in
+    #           %kernel.cache_dir%/sdc_metadata.php. No filesystem lookups on render.
+    #   false - resolved on render from the files next to each component class, so
+    #           a new or renamed CSS/JS/Twig file is picked up without cache:clear.
+    #   auto  - false when kernel.debug is on, true otherwise.
+    metadata_cache: auto
 ```
+
+`metadata_cache` follows the debug flag, not the environment name: a `staging`
+environment running with `APP_DEBUG=1` resolves metadata on render, and `prod` or
+`test` without debug use the cache. The choice is made when the container is built,
+so the option cannot come from an environment variable. With `true`, the cache is
+rebuilt with the container: adding or removing an asset file next to a component
+then needs a `cache:clear` (editing an existing file does not). With `false`, a
+long-running worker (FrankenPHP, RoadRunner) remembers what it resolved for a
+component until the worker restarts.
 
 4. **Add the placeholder to your base template:**
    Place this in your `<head>` to define where the collected assets should be injected:

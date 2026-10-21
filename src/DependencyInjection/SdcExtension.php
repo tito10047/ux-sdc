@@ -12,6 +12,7 @@
 namespace Tito10047\UX\Sdc\DependencyInjection;
 
 use Symfony\Component\AssetMapper\AssetMapperInterface;
+use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
@@ -19,7 +20,10 @@ use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
+use Tito10047\UX\Sdc\CompilerPass\AssetComponentCompilerPass;
 use Tito10047\UX\Sdc\CompilerPass\StimulusControllerPathsCompilerPass;
+use Tito10047\UX\Sdc\EventListener\ComponentRenderListener;
+use Tito10047\UX\Sdc\EventListener\DevComponentRenderListener;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 
@@ -50,12 +54,11 @@ class SdcExtension extends Extension implements PrependExtensionInterface
 
         $this->registerMetadataResolver($container, $config);
 
-        $env = $container->hasParameter('kernel.environment') ? $container->getParameter('kernel.environment') : 'prod';
-        if ($env === 'dev') {
-            $container->removeDefinition('Tito10047\UX\Sdc\EventListener\ComponentRenderListener');
-        } else {
-            $container->removeDefinition('Tito10047\UX\Sdc\EventListener\DevComponentRenderListener');
-        }
+        // One decision, made here and read by AssetComponentCompilerPass too: the
+        // pass dumps the metadata cache exactly when the listener reading it is kept.
+        $metadataCache = $this->isMetadataCacheEnabled($container, $config['metadata_cache']);
+        $container->setParameter(AssetComponentCompilerPass::METADATA_CACHE_PARAMETER, $metadataCache);
+        $container->removeDefinition($metadataCache ? DevComponentRenderListener::class : ComponentRenderListener::class);
 
         if ($container->hasDefinition('Tito10047\UX\Sdc\EventListener\AssetResponseListener')) {
             $container->getDefinition('Tito10047\UX\Sdc\EventListener\AssetResponseListener')
@@ -156,6 +159,43 @@ class SdcExtension extends Extension implements PrependExtensionInterface
                 ],
             ]);
         }
+    }
+
+    /**
+     * Resolves `metadata_cache`, where "auto" follows kernel.debug: a debug
+     * container resolves metadata on render, any other uses the build-time cache.
+     * The environment name plays no part, so `staging` or `prod_debug` get the
+     * pipeline their debug flag calls for.
+     */
+    private function isMetadataCacheEnabled(ContainerBuilder $container, bool|string $metadataCache): bool
+    {
+        if (\is_bool($metadataCache)) {
+            return $metadataCache;
+        }
+
+        // Configuration lets through nothing else but environment variable
+        // placeholders. The value picks services when the container is built,
+        // so it could never follow a variable that changes afterwards.
+        if ('auto' !== $metadataCache) {
+            throw new InvalidConfigurationException('The "ux_sdc.metadata_cache" option cannot come from an environment variable: it selects services when the container is built. Set it to true, false or "auto".');
+        }
+
+        // Every kernel sets it. A container built without one is a production
+        // build as far as anything else is concerned, so it gets the cache.
+        if (!$container->hasParameter('kernel.debug')) {
+            return true;
+        }
+
+        // kernel.debug may be bound to an environment variable. The listeners are
+        // chosen now, once, so the variable is read now, at build time.
+        $debug = $container->resolveEnvPlaceholders($container->getParameter('kernel.debug'), true);
+        $isDebug = \is_bool($debug) ? $debug : filter_var($debug, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
+
+        if (null === $isDebug) {
+            throw new InvalidConfigurationException(\sprintf('The "ux_sdc.metadata_cache" option is "auto", which follows the "kernel.debug" parameter, but that parameter resolves to %s, which cannot be read as a boolean. Set "ux_sdc.metadata_cache" to true or false.', \is_scalar($debug) ? var_export($debug, true) : get_debug_type($debug)));
+        }
+
+        return !$isDebug;
     }
 
     /**

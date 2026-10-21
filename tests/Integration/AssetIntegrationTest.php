@@ -26,7 +26,7 @@ class AssetIntegrationTest extends IntegrationTestCase
 {
     public function testCompilerPassCollectsAssets(): void
     {
-        self::bootKernel();
+        self::bootKernel(['configs' => ['metadata_cache' => true]]);
         $container = self::getContainer();
 
         /** @var SdcMetadataRegistry $metadataRegistry */

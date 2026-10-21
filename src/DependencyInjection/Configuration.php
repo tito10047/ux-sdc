@@ -40,6 +40,14 @@ class Configuration implements ConfigurationInterface
                     ->defaultTrue()
                     ->info('Či sa majú automaticky hľadať asety v adresári komponentu.')
                 ->end()
+                // An enum rather than a boolean node, so that "auto" can sit next to
+                // true and false; the comparison is strict. Environment variables
+                // get past an enum node and are rejected by SdcExtension.
+                ->enumNode('metadata_cache')
+                    ->values(['auto', true, false])
+                    ->defaultValue('auto')
+                    ->info('How component metadata (assets and template) is found. true: once, when the container is built, into %kernel.cache_dir%/sdc_metadata.php; asset files added or removed later need a cache:clear. false: on render, from the files next to the component class, so new files are picked up without clearing the cache. auto: false when kernel.debug is on, true otherwise.')
+                ->end()
                 ->booleanNode('exclude_templates_from_asset_map')
                     ->defaultTrue()
                     ->info('Keep the Twig templates (*.twig) of ux_components_dir out of the AssetMapper, so that asset-map:compile does not publish them to public/assets/. The directory itself stays mapped for the component CSS and JS.')

@@ -23,9 +23,9 @@ use Twig\Environment;
 
 class DevRuntimeAutodiscoveryTest extends IntegrationTestCase
 {
-    public function testRuntimeAutodiscoveryInDev(): void
+    public function testRuntimeAutodiscoveryWithoutMetadataCache(): void
     {
-        $kernel = self::bootKernel(['configs' => ['auto_discovery' => true], 'environment' => 'dev']);
+        $kernel = self::bootKernel(['configs' => ['auto_discovery' => true, 'metadata_cache' => false]]);
         $container = self::getContainer();
 
         $assetMapper = $this->createMock(AssetMapperInterface::class);
@@ -45,8 +45,8 @@ class DevRuntimeAutodiscoveryTest extends IntegrationTestCase
         }
 
         // Render template with component
-        // V dev prostredí by mal DevComponentRenderListener zachytiť PreRenderEvent
-        // a vykonať autodiscovery.
+        // Without the metadata cache, DevComponentRenderListener resolves the
+        // assets on PreRenderEvent.
         $html = $twig->render('auto_discovery.html.twig');
 
         // Overíme, že template bola nájdená (inak by twig vyhodil chybu ak by ju nenašiel cez alias)
@@ -76,7 +76,7 @@ class DevRuntimeAutodiscoveryTest extends IntegrationTestCase
 
     public function testRuntimeAutodiscoveryIsDisabledWhenConfigDisabled(): void
     {
-        $kernel = self::bootKernel(['configs' => ['auto_discovery' => false], 'environment' => 'dev']);
+        $kernel = self::bootKernel(['configs' => ['auto_discovery' => false, 'metadata_cache' => false]]);
         $container = self::getContainer();
 
         $assetMapper = $this->createMock(AssetMapperInterface::class);

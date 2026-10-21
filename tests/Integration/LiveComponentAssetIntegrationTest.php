@@ -28,7 +28,7 @@ class LiveComponentAssetIntegrationTest extends KernelTestCase
             self::markTestSkipped('symfony/ux-live-component is not installed.');
         }
 
-        $kernel = new TestKernel(['auto_discovery' => true]);
+        $kernel = new TestKernel(['auto_discovery' => true, 'metadata_cache' => true]);
         $kernel->boot();
         $container = $kernel->getContainer();
 

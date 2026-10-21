@@ -11,47 +11,36 @@
 
 namespace Tito10047\UX\Sdc\Tests\Integration;
 
-use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\UX\TwigComponent\ComponentRendererInterface;
 
-class StimulusIntegrationTest extends KernelTestCase
+class StimulusIntegrationTest extends IntegrationTestCase
 {
-    protected static function getKernelClass(): string
+    /**
+     * Each value selects a different render listener, and both of them hand the
+     * component namespace to the Stimulus trait.
+     *
+     * @return iterable<string, array{bool}>
+     */
+    public static function provideMetadataCache(): iterable
     {
-        return TestKernel::class;
+        yield 'metadata resolved on render' => [false];
+        yield 'metadata cached at build time' => [true];
     }
 
-    public function testStimulusTraitReceivesNamespaceInDev(): void
+    #[DataProvider('provideMetadataCache')]
+    public function testStimulusTraitReceivesNamespace(bool $metadataCache): void
     {
-        self::bootKernel(['environment' => 'dev']);
-        $container = self::getContainer();
+        self::bootKernel(['configs' => ['metadata_cache' => $metadataCache]]);
 
         /** @var ComponentRendererInterface $renderer */
-        $renderer = $container->get('ux.twig_component.component_renderer');
+        $renderer = self::getContainer()->get('ux.twig_component.component_renderer');
 
-        // We need to render the component to trigger the event
+        // The fixture template prints {{ controller }}: the class name relative to
+        // the namespace the listener sets on PostMountEvent. Without it the trait
+        // throws; with a wrong one the name keeps a namespace prefix.
         $html = $renderer->createAndRender('stimulus_component');
 
-        // The component instance should have been updated by the listener.
-        // But how to get the instance? The renderer doesn't return it easily.
-        // We can check the rendered output if it exposes the controller.
-
-        // Let's assume the template uses {{ controller }}
-        // We need a template for our component.
-
-        $this->assertStringContainsString('StimulusComponent', $html);
-    }
-
-    public function testStimulusTraitReceivesNamespaceInProd(): void
-    {
-        self::bootKernel(['environment' => 'prod']);
-        $container = self::getContainer();
-
-        /** @var ComponentRendererInterface $renderer */
-        $renderer = $container->get('ux.twig_component.component_renderer');
-
-        $html = $renderer->createAndRender('stimulus_component');
-
-        $this->assertStringContainsString('StimulusComponent', $html);
+        $this->assertSame('StimulusComponent', trim($html));
     }
 }

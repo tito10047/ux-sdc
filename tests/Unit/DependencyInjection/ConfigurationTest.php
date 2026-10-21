@@ -30,6 +30,7 @@ class ConfigurationTest extends TestCase
         $this->assertNull($config['component_namespace']);
         $this->assertTrue($config['stimulus']['enabled']);
         $this->assertTrue($config['auto_discovery']);
+        $this->assertSame('auto', $config['metadata_cache']);
         $this->assertEquals('<!-- __UX_TWIG_COMPONENT_ASSETS__ -->', $config['placeholder']);
     }
 
@@ -69,5 +70,46 @@ class ConfigurationTest extends TestCase
         $this->expectException(InvalidConfigurationException::class);
 
         (new Processor())->processConfiguration(new Configuration(), [['placeholder' => $placeholder]]);
+    }
+
+    /**
+     * @return iterable<string, array{bool|string}>
+     */
+    public static function provideMetadataCacheValues(): iterable
+    {
+        yield 'auto' => ['auto'];
+        yield 'true' => [true];
+        yield 'false' => [false];
+    }
+
+    #[DataProvider('provideMetadataCacheValues')]
+    public function testMetadataCacheAcceptsAutoAndBooleans(bool|string $value): void
+    {
+        $config = (new Processor())->processConfiguration(new Configuration(), [['metadata_cache' => $value]]);
+
+        $this->assertSame($value, $config['metadata_cache']);
+    }
+
+    /**
+     * @return iterable<string, array{mixed}>
+     */
+    public static function provideInvalidMetadataCacheValues(): iterable
+    {
+        // Loosely equal to true or false, but none of them is one.
+        yield 'the string "true"' => ['true'];
+        yield 'the string "false"' => ['false'];
+        yield 'an empty string' => [''];
+        yield 'one' => [1];
+        yield 'zero' => [0];
+        yield 'null' => [null];
+        yield 'another word' => ['always'];
+    }
+
+    #[DataProvider('provideInvalidMetadataCacheValues')]
+    public function testMetadataCacheRejectsAnythingElse(mixed $value): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+
+        (new Processor())->processConfiguration(new Configuration(), [['metadata_cache' => $value]]);
     }
 }

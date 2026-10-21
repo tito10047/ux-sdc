@@ -21,6 +21,14 @@ use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
  */
 final class AssetComponentCompilerPass implements CompilerPassInterface
 {
+    /**
+     * Whether the metadata is resolved at build time, as resolved by SdcExtension
+     * from `ux_sdc.metadata_cache`: always a boolean.
+     *
+     * A build parameter (leading dot): it is not dumped into the compiled container.
+     */
+    public const METADATA_CACHE_PARAMETER = '.ux_sdc.metadata_cache';
+
     public function process(ContainerBuilder $container): void
     {
         if (!$container->hasDefinition(SdcMetadataRegistry::class)) {
@@ -30,8 +38,10 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
         $registryDefinition = $container->getDefinition(SdcMetadataRegistry::class);
         $cachePath = $container->getParameterBag()->resolveValue($registryDefinition->getArgument('$cachePath'));
 
-        $env = $container->hasParameter('kernel.environment') ? $container->getParameter('kernel.environment') : 'test';
-        if ($env === 'dev') {
+        if (true !== $container->getParameter(self::METADATA_CACHE_PARAMETER)) {
+            // The metadata is resolved on render. A file left behind by an earlier
+            // build with the cache on would still be read by SdcMetadataRegistry,
+            // which stays available, and describe components as they were then.
             if (file_exists($cachePath)) {
                 unlink($cachePath);
             }

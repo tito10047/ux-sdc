@@ -36,6 +36,11 @@ final class DevComponentRenderListener
      * AssetRegistry, which is reset. Clearing this cache as well would only make
      * every request re-run reflection and filesystem lookups.
      *
+     * The listener is used when `ux_sdc.metadata_cache` resolves to false, debug
+     * or not. Under PHP-FPM each request gets a fresh instance, so an asset file
+     * added next to a component shows up on the next request; a long-running
+     * worker picks it up once the worker restarts.
+     *
      * @var SdcMetadata
      */
     private array $runtimeMetadata = [];
