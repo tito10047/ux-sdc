@@ -22,6 +22,7 @@ use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Tito10047\UX\Sdc\Maker\MakeSdcComponent;
 use Tito10047\UX\Sdc\Routing\ComponentRouteLoader;
 use Tito10047\UX\Sdc\Command\DebugSdcCommand;
+use Tito10047\UX\Sdc\DataCollector\RequestTrace;
 use Tito10047\UX\Sdc\Debug\ComponentInspector;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\abstract_arg;
@@ -57,6 +58,7 @@ return static function (ContainerConfigurator $container): void {
         ->args([service(AssetTagRenderer::class)])
         ->arg('$logger', service('logger')->nullOnInvalid())
         ->arg('$debug', '%kernel.debug%')
+        ->arg('$trace', service(RequestTrace::class)->nullOnInvalid())
         ->tag('monolog.logger', ['channel' => 'ux_sdc']);
 
     $services->set(FragmentAssetHeader::class)
@@ -90,6 +92,7 @@ return static function (ContainerConfigurator $container): void {
         ])
         ->arg('$logger', service('logger')->nullOnInvalid())
         ->arg('$debug', '%kernel.debug%')
+        ->arg('$trace', service(RequestTrace::class)->nullOnInvalid())
         ->tag('kernel.event_listener', [
             'event' => 'kernel.response',
             'method' => 'onKernelResponse',
@@ -104,12 +107,16 @@ return static function (ContainerConfigurator $container): void {
     // `kernel.controller` to a controller implementing ComponentNamespaceInterface:
     // a page controller using the Stimulus trait, or a LiveComponent, which is the
     // controller of its own re-render request and is never mounted in it.
+    //
+    // RequestTrace, here and above, exists only for the web profiler
+    // (config/profiler.php); anywhere else these services get null.
     $services->set(ComponentRenderListener::class)
         ->args([
             service(SdcMetadataRegistry::class),
             service(AssetRegistry::class),
             service(StimulusControllerNameResolver::class),
             '%ux_sdc.component_namespace%',
+            service(RequestTrace::class)->nullOnInvalid(),
         ])
         ->tag('kernel.event_listener', [
             'event' => 'Symfony\UX\TwigComponent\Event\PostMountEvent',
@@ -130,6 +137,7 @@ return static function (ContainerConfigurator $container): void {
             service(AssetRegistry::class),
             service(StimulusControllerNameResolver::class),
             '%ux_sdc.component_namespace%',
+            service(RequestTrace::class)->nullOnInvalid(),
         ])
         ->tag('kernel.event_listener', [
             'event' => 'Symfony\UX\TwigComponent\Event\PostMountEvent',

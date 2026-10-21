@@ -18,6 +18,7 @@ use Symfony\Component\WebLink\GenericLinkProvider;
 use Symfony\Component\WebLink\Link;
 use Tito10047\UX\Sdc\Attribute\Asset;
 use Tito10047\UX\Sdc\Csp\NonceProviderInterface;
+use Tito10047\UX\Sdc\DataCollector\RequestTrace;
 
 /**
  * Puts the tags of the assets into a page, where its placeholder is, and the
@@ -33,11 +34,13 @@ use Tito10047\UX\Sdc\Csp\NonceProviderInterface;
 final class PageAssetInjector
 {
     /**
-     * @param non-empty-string $placeholder
-     * @param bool             $debug       an import map that comes after the tags is reported
-     *                                      only in debug: it is a mistake in a template, and in
-     *                                      production it would be logged on every request that
-     *                                      renders the page
+     * @param non-empty-string  $placeholder
+     * @param bool              $debug       an import map that comes after the tags is reported
+     *                                       only in debug: it is a mistake in a template, and in
+     *                                       production it would be logged on every request that
+     *                                       renders the page
+     * @param RequestTrace|null $trace       records an import map that comes after the tags, for
+     *                                       the profiler; null without it
      */
     public function __construct(
         private readonly AssetTagRenderer $tagRenderer,
@@ -45,6 +48,7 @@ final class PageAssetInjector
         private readonly ?NonceProviderInterface $nonceProvider = null,
         private readonly ?LoggerInterface $logger = null,
         private readonly bool $debug = false,
+        private readonly ?RequestTrace $trace = null,
     ) {
     }
 
@@ -165,7 +169,7 @@ final class PageAssetInjector
      */
     private function reportImportMapAfterModules(Request $request, string $content): void
     {
-        if (!$this->debug || null === $this->logger) {
+        if (!$this->debug || (null === $this->logger && null === $this->trace)) {
             return;
         }
 
@@ -177,7 +181,9 @@ final class PageAssetInjector
             return;
         }
 
-        $this->logger->warning(
+        $this->trace?->importMapAfterModules($request);
+
+        $this->logger?->warning(
             'The page "{uri}" injects component scripts, which are ES modules, before its import map: an import map that comes after a module script is ignored by browsers that do not merge import maps, and the bare imports of the page then fail to resolve. Call {{ render_component_assets() }} after {{ importmap() }}.',
             ['uri' => $request->getRequestUri()]
         );

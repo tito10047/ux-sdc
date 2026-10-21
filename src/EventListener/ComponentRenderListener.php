@@ -14,6 +14,7 @@ namespace Tito10047\UX\Sdc\EventListener;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\UX\TwigComponent\Event\PostMountEvent;
 use Symfony\UX\TwigComponent\Event\PreRenderEvent;
+use Tito10047\UX\Sdc\DataCollector\RequestTrace;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
 use Tito10047\UX\Sdc\Service\StimulusControllerNameResolver;
@@ -33,7 +34,8 @@ final class ComponentRenderListener
         private SdcMetadataRegistry $metadataRegistry,
         private AssetRegistry $assetRegistry,
         private StimulusControllerNameResolver $controllerNameResolver,
-        private ?string $componentNamespace = null
+        private ?string $componentNamespace = null,
+        private ?RequestTrace $trace = null,
     ) {
     }
 
@@ -67,7 +69,9 @@ final class ComponentRenderListener
     {
         $metadata = $event->getMetadata();
         if ($metadata->isAnonymous()) {
-            $this->addAssets($this->metadataRegistry->getAnonymousComponentMetadata($metadata->getTemplate())->assets);
+            $componentMetadata = $this->metadataRegistry->getAnonymousComponentMetadata($metadata->getTemplate());
+            $this->addAssets($componentMetadata->assets);
+            $this->traceRender($event, $componentMetadata);
 
             return;
         }
@@ -82,5 +86,11 @@ final class ComponentRenderListener
         $this->addAssets($this->metadataRegistry->getAssets($component::class));
 
         $this->setStimulusController($event);
+
+        // Only the profiler needs the whole metadata; rendering takes just the
+        // assets and the template, without building an object per render.
+        if (null !== $this->trace) {
+            $this->traceRender($event, $this->metadataRegistry->getComponentMetadata($component::class));
+        }
     }
 }

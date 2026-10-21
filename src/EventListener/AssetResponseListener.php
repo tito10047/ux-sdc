@@ -14,6 +14,7 @@ namespace Tito10047\UX\Sdc\EventListener;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
+use Tito10047\UX\Sdc\DataCollector\RequestTrace;
 use Tito10047\UX\Sdc\Response\AssetResolver;
 use Tito10047\UX\Sdc\Response\FragmentAssetHeader;
 use Tito10047\UX\Sdc\Response\PageAssetInjector;
@@ -47,11 +48,13 @@ final class AssetResponseListener
     public const HEADER_VERSION = FragmentAssetHeader::VERSION;
 
     /**
-     * @param non-empty-string $placeholder
-     * @param bool             $debug       a page missing the placeholder is reported only in
-     *                                      debug: it is a mistake in a template, and in
-     *                                      production it would be logged on every request that
-     *                                      renders the page
+     * @param non-empty-string  $placeholder
+     * @param bool              $debug       a page missing the placeholder is reported only in
+     *                                       debug: it is a mistake in a template, and in
+     *                                       production it would be logged on every request that
+     *                                       renders the page
+     * @param RequestTrace|null $trace       records how each response got the assets, for the
+     *                                       profiler; null without it
      */
     public function __construct(
         private readonly AssetRegistry $assetRegistry,
@@ -62,24 +65,36 @@ final class AssetResponseListener
         private readonly string $placeholder = '<!-- __UX_TWIG_COMPONENT_ASSETS__ -->',
         private readonly ?LoggerInterface $logger = null,
         private readonly bool $debug = false,
+        private readonly ?RequestTrace $trace = null,
     ) {
     }
 
     public function onKernelResponse(ResponseEvent $event): void
     {
+        $request = $event->getRequest();
+
         // Components rendered in a sub-request land in the same registry and are
         // injected into the main response; a fragment never gets them itself.
         if (!$event->isMainRequest()) {
+            $this->trace?->responseHandled($request, RequestTrace::OUTCOME_SUB_REQUEST);
+
             return;
         }
 
-        $request = $event->getRequest();
         $response = $event->getResponse();
 
         // Streamed and binary responses have no content to look into (false).
         $content = $response->getContent();
 
-        if (false === $content || !$this->responseClassifier->isHtml($request, $response)) {
+        if (false === $content) {
+            $this->trace?->responseHandled($request, RequestTrace::OUTCOME_STREAMED, $this->assetRegistry->getSortedAssets());
+
+            return;
+        }
+
+        if (!$this->responseClassifier->isHtml($request, $response)) {
+            $this->trace?->responseHandled($request, RequestTrace::OUTCOME_NOT_HTML, $this->assetRegistry->getSortedAssets());
+
             return;
         }
 
@@ -89,13 +104,17 @@ final class AssetResponseListener
         // the response is a whole page with the placeholder, as a Turbo Frame
         // response often is.
         if ($this->responseClassifier->isFragment($request, $response)) {
-            $this->fragmentAssetHeader->addTo($request, $response, $this->resolveAssets());
+            $assets = $this->resolveAssets();
+            $this->fragmentAssetHeader->addTo($request, $response, $assets);
+            $this->trace?->responseHandled($request, RequestTrace::OUTCOME_FRAGMENT, $this->assetRegistry->getSortedAssets(), $assets);
 
             return;
         }
 
         if (str_contains($content, $this->placeholder)) {
-            $this->pageAssetInjector->inject($request, $response, $content, $this->resolveAssets());
+            $assets = $this->resolveAssets();
+            $this->pageAssetInjector->inject($request, $response, $content, $assets);
+            $this->trace?->responseHandled($request, RequestTrace::OUTCOME_INJECTED, $this->assetRegistry->getSortedAssets(), $assets);
 
             return;
         }
@@ -105,7 +124,14 @@ final class AssetResponseListener
         // placeholder, which is reported. Either way the header is all it can
         // carry the assets in.
         $this->reportMissingPlaceholder($request, $content);
-        $this->fragmentAssetHeader->addTo($request, $response, $this->resolveAssets());
+        $assets = $this->resolveAssets();
+        $this->fragmentAssetHeader->addTo($request, $response, $assets);
+        $this->trace?->responseHandled(
+            $request,
+            self::isDocument($content) ? RequestTrace::OUTCOME_MISSING_PLACEHOLDER : RequestTrace::OUTCOME_PARTIAL,
+            $this->assetRegistry->getSortedAssets(),
+            $assets,
+        );
     }
 
     /**
@@ -128,7 +154,7 @@ final class AssetResponseListener
      */
     private function reportMissingPlaceholder(Request $request, string $content): void
     {
-        if (!$this->debug || null === $this->logger || false === stripos($content, '</head>')) {
+        if (!$this->debug || null === $this->logger || !self::isDocument($content)) {
             return;
         }
 
@@ -145,5 +171,14 @@ final class AssetResponseListener
                 'placeholder' => $this->placeholder,
             ]
         );
+    }
+
+    /**
+     * Whether the HTML is a whole document, which has a <head> of its own,
+     * rather than a fragment inserted into one.
+     */
+    private static function isDocument(string $content): bool
+    {
+        return false !== stripos($content, '</head>');
     }
 }

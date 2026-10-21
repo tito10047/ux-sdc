@@ -32,15 +32,24 @@ use Tito10047\UX\Sdc\Service\AssetType;
 final class ResolvedAsset
 {
     /**
-     * @param string                                         $path       the public path, or the URL linked as it is
+     * The path the component declared: an AssetMapper logical path, or a URL.
+     * The same as $path when the asset map does not know it.
+     */
+    public readonly string $declaredPath;
+
+    /**
+     * @param string                                         $path         the public path, or the URL linked as it is
      * @param Asset::CSS|Asset::JS|Asset::FONT|Asset::IMAGE $type
-     * @param array<string, mixed>                           $attributes the attributes the asset declares
+     * @param array<string, mixed>                           $attributes   the attributes the asset declares
+     * @param string|null                                    $declaredPath the path the component declared, when not $path
      */
     public function __construct(
         public readonly string $path,
         public readonly string $type,
         public readonly array $attributes = [],
+        ?string $declaredPath = null,
     ) {
+        $this->declaredPath = $declaredPath ?? $path;
     }
 
     public function isStylesheet(): bool

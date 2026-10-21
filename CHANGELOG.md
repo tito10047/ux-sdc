@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A web profiler panel (*UX SDC*), in debug with the profiler enabled: the
+  components a request rendered and the assets each contributed (discovered,
+  `#[Asset]`, `#[AsSdcComponent]`), how the response got them (tags at the
+  placeholder, preload, `X-SDC-Assets` header, or nothing and why), and the
+  problems of that request — missing placeholder, import map after the modules,
+  assets outside the asset map, an oversized header, component metadata
+  problems. The toolbar shows the number of components and assets, in yellow
+  when there is a problem. Nothing is recorded outside the profiler.
 - `ux_sdc.exclude_templates_from_asset_map` (default `true`): keeps the Twig
   templates of `ux_components_dir` out of the AssetMapper. Set it to `false`
   only if you really want them mapped.

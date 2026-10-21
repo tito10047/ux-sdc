@@ -58,7 +58,7 @@ final class AssetResolver
             $type = '' === $asset['type'] ? AssetType::fromPath($path) : $asset['type'];
 
             if (\in_array($type, AssetType::ALL, true)) {
-                $resolved[] = new ResolvedAsset($path, $type, $asset['attributes']);
+                $resolved[] = new ResolvedAsset($path, $type, $asset['attributes'], $asset['path']);
             }
         }
 

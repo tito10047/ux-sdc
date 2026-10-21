@@ -910,6 +910,32 @@ The bundle also logs what goes wrong while rendering, through the application's
 
 Every message says what to change.
 
+### Web profiler
+
+With WebProfilerBundle (or just the FrameworkBundle profiler) in a debug
+environment, the *UX SDC* panel shows what one request did:
+
+- every component it rendered — name, class (or *anonymous component*), template,
+  how many times — with the assets each asked for and where each was declared
+  (`discovered`, `#[Asset]`, `#[AsSdcComponent]`);
+- the assets of the response and how they got there: tags at the placeholder
+  (with or without a `Link: preload`), a preload tag for a font or an image, an
+  `X-SDC-Assets` entry for a Live Component, Turbo or partial response — or
+  nothing, for a response that is not HTML, a streamed response or a
+  sub-request (whose components are listed with the main request);
+- which component asked for each asset, so an asset asked for by several renders
+  shows up once, with all of them;
+- the problems of that request: a page without the placeholder, an import map
+  after the component modules, an asset path the asset map does not know, an
+  asset of a type the bundle does not load, an `X-SDC-Assets` header too long for
+  a proxy, the files next to a rendered component that had to be left out, and a
+  component with assets rendered after the response got them (in the body of a
+  streamed response).
+
+The toolbar shows the number of components and loaded assets, in yellow when
+there is a problem. The panel exists only in a debug container with the
+profiler enabled; anywhere else nothing is recorded.
+
 ## Known limitations
 
 - **Fragments render before their stylesheets load.** The loader adds the

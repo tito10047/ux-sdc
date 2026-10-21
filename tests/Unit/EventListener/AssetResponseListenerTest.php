@@ -23,11 +23,13 @@ use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\WebLink\GenericLinkProvider;
 use Tito10047\UX\Sdc\Csp\NonceProviderInterface;
+use Tito10047\UX\Sdc\DataCollector\RequestTrace;
 use Tito10047\UX\Sdc\EventListener\AssetResponseListener;
 use Tito10047\UX\Sdc\Response\AssetResolver;
 use Tito10047\UX\Sdc\Response\AssetTagRenderer;
 use Tito10047\UX\Sdc\Response\FragmentAssetHeader;
 use Tito10047\UX\Sdc\Response\PageAssetInjector;
+use Tito10047\UX\Sdc\Response\ResolvedAsset;
 use Tito10047\UX\Sdc\Response\ResponseClassifier;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
 use Tito10047\UX\Sdc\Tests\TestLogger;
@@ -751,11 +753,67 @@ final class AssetResponseListenerTest extends TestCase
     }
 
     /**
+     * @return iterable<string, array{Response, array<string, string>, int, string}>
+     */
+    public static function provideTracedResponses(): iterable
+    {
+        yield 'page' => [new Response(self::PAGE), [], HttpKernelInterface::MAIN_REQUEST, RequestTrace::OUTCOME_INJECTED];
+        yield 'Turbo Frame' => [new Response(self::PAGE), ['HTTP_TURBO_FRAME' => 'cart'], HttpKernelInterface::MAIN_REQUEST, RequestTrace::OUTCOME_FRAGMENT];
+        yield 'partial' => [new Response('<div>Cart</div>'), [], HttpKernelInterface::MAIN_REQUEST, RequestTrace::OUTCOME_PARTIAL];
+        yield 'page without the placeholder' => [new Response('<html><head></head><body></body></html>'), [], HttpKernelInterface::MAIN_REQUEST, RequestTrace::OUTCOME_MISSING_PLACEHOLDER];
+        yield 'JSON' => [new Response('{}', 200, ['Content-Type' => 'application/json']), [], HttpKernelInterface::MAIN_REQUEST, RequestTrace::OUTCOME_NOT_HTML];
+        yield 'streamed' => [new StreamedResponse(), [], HttpKernelInterface::MAIN_REQUEST, RequestTrace::OUTCOME_STREAMED];
+        yield 'sub-request' => [new Response(self::PAGE), [], HttpKernelInterface::SUB_REQUEST, RequestTrace::OUTCOME_SUB_REQUEST];
+    }
+
+    /**
+     * @param array<string, string> $server
+     */
+    #[DataProvider('provideTracedResponses')]
+    public function testRecordsHowTheResponseGotTheAssets(Response $response, array $server, int $requestType, string $outcome): void
+    {
+        $trace = new RequestTrace();
+        $this->listener = $this->createListener(true, trace: $trace);
+        $this->registry->addAsset('Alert/Alert.css', 'css');
+        $request = Request::create('/', server: $server);
+
+        $this->dispatch($response, $request, $requestType);
+
+        $handled = $trace->getHandledResponse($request);
+        $this->assertNotNull($handled);
+        $this->assertSame($outcome, $handled['outcome']);
+
+        if (RequestTrace::OUTCOME_SUB_REQUEST === $outcome) {
+            $this->assertSame([], $handled['registered'], 'The main response records the assets.');
+        } else {
+            $this->assertSame($this->registry->getSortedAssets(), $handled['registered']);
+        }
+
+        if (\in_array($outcome, [RequestTrace::OUTCOME_INJECTED, RequestTrace::OUTCOME_FRAGMENT, RequestTrace::OUTCOME_PARTIAL, RequestTrace::OUTCOME_MISSING_PLACEHOLDER], true)) {
+            $this->assertEquals([new ResolvedAsset('/assets/Alert/Alert-1a2b3c.css', 'css', [], 'Alert/Alert.css')], $handled['resolved']);
+        } else {
+            $this->assertSame([], $handled['resolved']);
+        }
+    }
+
+    public function testRecordsAnImportMapAfterTheModulesInTheTrace(): void
+    {
+        $trace = new RequestTrace();
+        $this->listener = $this->createListener(true, trace: $trace);
+        $this->registry->addAsset('Alert/Alert.js', 'js');
+        $request = new Request();
+
+        $this->dispatch(new Response('<head>[[ASSETS]]<script type="importmap">{}</script></head>'), $request);
+
+        $this->assertTrue($trace->hasImportMapAfterModules($request));
+    }
+
+    /**
      * The listener with its collaborators, all of them real: this test covers
      * the output of the whole response path. The asset map knows
      * Alert/Alert.css and Alert/Alert.js.
      */
-    private function createListener(bool $debug, ?NonceProviderInterface $nonceProvider = null): AssetResponseListener
+    private function createListener(bool $debug, ?NonceProviderInterface $nonceProvider = null, ?RequestTrace $trace = null): AssetResponseListener
     {
         $assetMapper = $this->createMock(AssetMapperInterface::class);
         $assetMapper->method('getAsset')->willReturnCallback(static fn (string $logicalPath): ?MappedAsset => match ($logicalPath) {
@@ -768,11 +826,12 @@ final class AssetResponseListenerTest extends TestCase
             $this->registry,
             new AssetResolver($assetMapper, $this->logger, $debug),
             new ResponseClassifier(),
-            new PageAssetInjector(new AssetTagRenderer(), '[[ASSETS]]', $nonceProvider, $this->logger, $debug),
+            new PageAssetInjector(new AssetTagRenderer(), '[[ASSETS]]', $nonceProvider, $this->logger, $debug, $trace),
             new FragmentAssetHeader($this->logger, $debug),
             '[[ASSETS]]',
             $this->logger,
             $debug,
+            $trace,
         );
     }
 

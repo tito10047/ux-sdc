@@ -54,7 +54,7 @@ class TestKernel extends Kernel
      * @param list<class-string> $services registered autowired and autoconfigured, the way an application's services.yaml registers its classes
      * @param array      $twigComponentConfig loaded as a separate twig_component config, the way an application's own config/packages/twig_component.yaml would be
      * @param array<string, string> $attributeRoutes PSR-4 directories whose #[Route] attributes are loaded, namespace => directory, the way a `resource: {path, namespace}, type: attribute` entry of config/routes.yaml loads them
-     * @param list<array{0: string, 1: string|null}> $routeImports further route imports, [resource, type], the way the other entries of config/routes.yaml or config/routes/*.yaml would, e.g. ['.', 'ux_sdc'] or ['routing.controllers', null]
+     * @param list<array{0: string, 1: string|null, 2?: string}> $routeImports further route imports, [resource, type, prefix], the way the other entries of config/routes.yaml or config/routes/*.yaml would, e.g. ['.', 'ux_sdc'] or ['routing.controllers', null]
      * @param list<BundleInterface> $extraBundles further bundles of the application, e.g. NelmioSecurityBundle
      * @param array<string, array> $extensionConfigs configuration of further extensions, alias => config, the way config/packages/*.yaml would
      */
@@ -127,8 +127,13 @@ class TestKernel extends Kernel
         foreach ($this->attributeRoutes as $namespace => $directory) {
             $routes->import(['path' => $directory, 'namespace' => $namespace], 'attribute');
         }
-        foreach ($this->routeImports as [$resource, $type]) {
-            $routes->import($resource, $type);
+        foreach ($this->routeImports as $import) {
+            $imported = $routes->import($import[0], $import[1]);
+            if (isset($import[2])) {
+                $imported->prefix($import[2]);
+            }
+            // The routes are added when the configurator is destructed: now, before the next import.
+            unset($imported);
         }
 
         if (class_exists(LiveComponentBundle::class)) {

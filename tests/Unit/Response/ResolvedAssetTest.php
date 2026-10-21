@@ -99,4 +99,10 @@ final class ResolvedAssetTest extends TestCase
     {
         $this->assertSame($module, (new ResolvedAsset('/a.js', 'js', $attributes))->isModule());
     }
+
+    public function testTheDeclaredPathIsThePathUnlessGiven(): void
+    {
+        $this->assertSame('/build/a.css', (new ResolvedAsset('/build/a.css', 'css'))->declaredPath);
+        $this->assertSame('Alert/Alert.css', (new ResolvedAsset('/assets/Alert/Alert-1a2b.css', 'css', [], 'Alert/Alert.css'))->declaredPath);
+    }
 }

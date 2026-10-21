@@ -17,6 +17,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\WebLink\GenericLinkProvider;
 use Symfony\Component\WebLink\Link;
 use Tito10047\UX\Sdc\Csp\NonceProviderInterface;
+use Tito10047\UX\Sdc\DataCollector\RequestTrace;
 use Tito10047\UX\Sdc\Response\AssetTagRenderer;
 use Tito10047\UX\Sdc\Response\PageAssetInjector;
 use Tito10047\UX\Sdc\Response\ResolvedAsset;
@@ -164,6 +165,26 @@ final class PageAssetInjectorTest extends TestCase
         $logger->records = [];
         $this->createInjector(null, $logger)->inject(new Request(), new Response($page), $page, [new ResolvedAsset('/a.js', 'js', ['type' => false])]);
         $this->assertSame([], $logger->records, 'A classic script does not need the import map.');
+    }
+
+    /**
+     * The profiler gets the problem with or without a logger, and only for the request it concerns.
+     */
+    public function testRecordsTheImportMapAfterModuleScriptsInTheTrace(): void
+    {
+        $page = '<head>[[ASSETS]]<script type="importmap">{}</script></head>';
+        $trace = new RequestTrace();
+        $request = new Request();
+        $other = new Request();
+
+        $injector = new PageAssetInjector(new AssetTagRenderer(), '[[ASSETS]]', debug: true, trace: $trace);
+        $injector->inject($request, new Response($page), $page, [new ResolvedAsset('/a.js', 'js')]);
+
+        $this->assertTrue($trace->hasImportMapAfterModules($request));
+        $this->assertFalse($trace->hasImportMapAfterModules($other));
+
+        $injector->inject($other, new Response($page), $page, [new ResolvedAsset('/a.js', 'js', ['type' => false])]);
+        $this->assertFalse($trace->hasImportMapAfterModules($other), 'A classic script does not need the import map.');
     }
 
     private function createInjector(?NonceProviderInterface $nonceProvider = null, ?TestLogger $logger = null): PageAssetInjector

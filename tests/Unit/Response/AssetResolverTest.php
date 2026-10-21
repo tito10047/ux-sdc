@@ -31,8 +31,8 @@ final class AssetResolverTest extends TestCase
     {
         $this->assertEquals(
             [
-                new ResolvedAsset('/assets/Alert/Alert-1a2b3c.css', 'css'),
-                new ResolvedAsset('/assets/Alert/Alert-4d5e6f.js', 'js', ['defer' => true]),
+                new ResolvedAsset('/assets/Alert/Alert-1a2b3c.css', 'css', [], 'Alert/Alert.css'),
+                new ResolvedAsset('/assets/Alert/Alert-4d5e6f.js', 'js', ['defer' => true], 'Alert/Alert.js'),
             ],
             $this->createResolver(true)->resolve([
                 ['path' => 'Alert/Alert.css', 'type' => 'css', 'priority' => 0, 'attributes' => []],
@@ -51,7 +51,7 @@ final class AssetResolverTest extends TestCase
     {
         $this->assertEquals(
             [
-                new ResolvedAsset('/assets/Alert/Alert-1a2b3c.css', 'css'),
+                new ResolvedAsset('/assets/Alert/Alert-1a2b3c.css', 'css', [], 'Alert/Alert.css'),
                 new ResolvedAsset('https://cdn.example.com/x.js', 'js'),
                 new ResolvedAsset('https://cdn.example.com/font.woff2', 'font'),
                 new ResolvedAsset('https://cdn.example.com/hero.webp?v=2', 'image'),

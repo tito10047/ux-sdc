@@ -54,11 +54,12 @@ final class FragmentAssetHeader
     public const VERSION = 1;
 
     /**
-     * Half of the smallest default buffer nginx reads all the response headers
-     * of an upstream into (4k), the rest being for the other headers — a
-     * Content-Security-Policy and a few cookies easily take 1–2 KB.
+     * The length of the header reported as too long: half of the smallest
+     * default buffer nginx reads all the response headers of an upstream into
+     * (4k), the rest being for the other headers — a Content-Security-Policy
+     * and a few cookies easily take 1–2 KB.
      */
-    private const SIZE_WARNING = 2048;
+    public const SIZE_WARNING = 2048;
 
     /**
      * @param bool $debug a header too long for a proxy is reported only in debug: it

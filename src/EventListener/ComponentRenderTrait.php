@@ -13,6 +13,7 @@ namespace Tito10047\UX\Sdc\EventListener;
 
 use Symfony\UX\TwigComponent\Event\PreRenderEvent;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
+use Tito10047\UX\Sdc\Service\ComponentMetadata;
 use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
 
 /**
@@ -40,6 +41,22 @@ trait ComponentRenderTrait
                 $asset['attributes']
             );
         }
+    }
+
+    /**
+     * Records the render for the profiler, once the template is final. Without
+     * the profiler there is no trace, and nothing to do.
+     */
+    private function traceRender(PreRenderEvent $event, ComponentMetadata $componentMetadata): void
+    {
+        $metadata = $event->getMetadata();
+
+        $this->trace?->componentRendered(
+            $metadata->getName(),
+            $metadata->isAnonymous() ? null : $metadata->getClass(),
+            $event->getTemplate(),
+            $componentMetadata,
+        );
     }
 
     /**

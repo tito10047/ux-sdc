@@ -59,6 +59,12 @@ class SdcExtension extends Extension implements PrependExtensionInterface
         $loader = new PhpFileLoader($container, new FileLocator(__DIR__ . '/../../config'));
         $loader->load('services.php');
 
+        // The web profiler panel. ProfilerCompilerPass takes it out again
+        // when the container has no profiler.
+        if (true === $this->kernelDebug($container)) {
+            $loader->load('profiler.php');
+        }
+
         $container->setParameter('ux_sdc.auto_discovery', $config['auto_discovery']);
         $container->setParameter('ux_sdc.ux_components_dir', $config['ux_components_dir']);
 
@@ -278,16 +284,33 @@ class SdcExtension extends Extension implements PrependExtensionInterface
             return true;
         }
 
-        // kernel.debug may be bound to an environment variable. The listeners are
-        // chosen now, once, so the variable is read now, at build time.
-        $debug = $container->resolveEnvPlaceholders($container->getParameter('kernel.debug'), true);
-        $isDebug = \is_bool($debug) ? $debug : filter_var($debug, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
+        $isDebug = $this->kernelDebug($container);
 
         if (null === $isDebug) {
+            $debug = $container->resolveEnvPlaceholders($container->getParameter('kernel.debug'), true);
+
             throw new InvalidConfigurationException(\sprintf('The "ux_sdc.metadata_cache" option is "auto", which follows the "kernel.debug" parameter, but that parameter resolves to %s, which cannot be read as a boolean. Set "ux_sdc.metadata_cache" to true or false.', \is_scalar($debug) ? var_export($debug, true) : get_debug_type($debug)));
         }
 
         return !$isDebug;
+    }
+
+    /**
+     * kernel.debug, which may be bound to an environment variable. The services
+     * that depend on it are chosen now, once, so the variable is read now, at
+     * build time.
+     *
+     * @return bool|null null when the container has no such parameter, or it cannot be read as a boolean
+     */
+    private function kernelDebug(ContainerBuilder $container): ?bool
+    {
+        if (!$container->hasParameter('kernel.debug')) {
+            return null;
+        }
+
+        $debug = $container->resolveEnvPlaceholders($container->getParameter('kernel.debug'), true);
+
+        return \is_bool($debug) ? $debug : filter_var($debug, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
     }
 
     /**
