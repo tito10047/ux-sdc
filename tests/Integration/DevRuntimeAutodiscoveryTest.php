@@ -70,7 +70,7 @@ class DevRuntimeAutodiscoveryTest extends IntegrationTestCase
         $finalHtml = $response->getContent();
 
         // The co-located CSS and JS were found and injected.
-        $this->assertStringContainsString('<link rel="stylesheet" href="/assets/AutoDiscovery/AutoDiscoveryComponent.css">', $finalHtml);
+        $this->assertStringContainsString('<link rel="stylesheet" href="/assets/AutoDiscovery/AutoDiscoveryComponent.css" data-turbo-track="dynamic">', $finalHtml);
         $this->assertStringContainsString('<script src="/assets/AutoDiscovery/AutoDiscoveryComponent.js" type="module"></script>', $finalHtml);
     }
 

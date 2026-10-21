@@ -52,7 +52,7 @@ final class CspNonceFunctionalTest extends FunctionalTestCase
 
         $this->assertSame(2, substr_count($html, \sprintf(' nonce="%s"></script>', FixedNonceProvider::SCRIPT_NONCE)), 'The module and the classic script.');
         $this->assertMatchesRegularExpression(\sprintf('~<script src="[^"]+" type="module" nonce="%s"></script>~', FixedNonceProvider::SCRIPT_NONCE), $html);
-        $this->assertMatchesRegularExpression(\sprintf('~<link rel="stylesheet" href="[^"]+" nonce="%s">~', preg_quote(FixedNonceProvider::STYLE_NONCE, '~')), $html);
+        $this->assertMatchesRegularExpression(\sprintf('~<link rel="stylesheet" href="[^"]+" nonce="%s" data-turbo-track="dynamic">~', preg_quote(FixedNonceProvider::STYLE_NONCE, '~')), $html);
     }
 
     public function testTagsGetTheNonceNelmioPutsInThePolicy(): void
@@ -114,7 +114,7 @@ final class CspNonceFunctionalTest extends FunctionalTestCase
         $nonce = $match[1];
 
         $this->assertMatchesRegularExpression(\sprintf('~<script src="[^"]+" nonce="%s"></script>~', preg_quote($nonce, '~')), $html, 'The classic script.');
-        $this->assertMatchesRegularExpression(\sprintf('~<link rel="stylesheet" href="[^"]+" nonce="%s">~', preg_quote($nonce, '~')), $html);
+        $this->assertMatchesRegularExpression(\sprintf('~<link rel="stylesheet" href="[^"]+" nonce="%s" data-turbo-track="dynamic">~', preg_quote($nonce, '~')), $html);
         $this->assertMatchesRegularExpression(\sprintf("~script-src [^;]*'nonce-%s'~", preg_quote($nonce, '~')), $policy);
         $this->assertMatchesRegularExpression(\sprintf("~style-src [^;]*'nonce-%s'~", preg_quote($nonce, '~')), $policy);
 

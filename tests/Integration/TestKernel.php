@@ -114,6 +114,15 @@ class TestKernel extends Kernel
             ->controller(TemplateController::class)
             ->requirements(['template' => '.+\\.twig']);
 
+        // The same as Turbo Streams, the way a controller answering them sets the
+        // request format, with no Content-Type of its own:
+        // GET /stream/turbo_stream.html.twig. The format has to be registered
+        // (`framework.request.formats`, or symfony/ux-turbo).
+        $routes->add('sdc_test_stream', '/stream/{template}')
+            ->controller(TemplateController::class)
+            ->defaults(['_format' => 'turbo_stream'])
+            ->requirements(['template' => '.+\\.twig']);
+
         // Before the LiveComponent route: imported without a prefix, it matches any /{a}/{b}.
         foreach ($this->attributeRoutes as $namespace => $directory) {
             $routes->import(['path' => $directory, 'namespace' => $namespace], 'attribute');

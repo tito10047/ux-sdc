@@ -105,6 +105,6 @@ final class TemplateResolutionIntegrationTest extends FunctionalTestCase
         $css = $assetMapper->getAsset($logicalPath)?->publicPath;
 
         $this->assertNotNull($css, \sprintf('"%s" is not in the asset map.', $logicalPath));
-        $this->assertSame(1, substr_count($html, \sprintf('<link rel="stylesheet" href="%s">', $css)), \sprintf('"%s" is not linked once.', $logicalPath));
+        $this->assertSame(1, substr_count($html, \sprintf('<link rel="stylesheet" href="%s" data-turbo-track="dynamic">', $css)), \sprintf('"%s" is not linked once.', $logicalPath));
     }
 }

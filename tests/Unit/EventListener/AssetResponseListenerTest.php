@@ -51,7 +51,7 @@ final class AssetResponseListenerTest extends TestCase
         $response = $this->dispatch(new Response(self::PAGE), $request);
 
         $this->assertSame(
-            '<html><head><link rel="stylesheet" href="style.css">' . "\n" . '<script src="app.js" type="module"></script>' . "\n" . '</head><body></body></html>',
+            '<html><head><link rel="stylesheet" href="style.css" data-turbo-track="dynamic">' . "\n" . '<script src="app.js" type="module"></script>' . "\n" . '</head><body></body></html>',
             $response->getContent(),
         );
 
@@ -66,7 +66,7 @@ final class AssetResponseListenerTest extends TestCase
         $response = $this->dispatch(new Response('<head>[[ASSETS]]</head><body>[[ASSETS]]<p>[[ASSETS]]</p></body>'));
 
         $this->assertSame(
-            '<head><link rel="stylesheet" href="style.css">' . "\n" . '<script src="app.js" type="module"></script>' . "\n" . '</head><body><p></p></body>',
+            '<head><link rel="stylesheet" href="style.css" data-turbo-track="dynamic">' . "\n" . '<script src="app.js" type="module"></script>' . "\n" . '</head><body><p></p></body>',
             $response->getContent(),
         );
     }
@@ -126,7 +126,7 @@ final class AssetResponseListenerTest extends TestCase
 
         $response = $this->dispatch(new Response(self::PAGE, 200, ['Content-Type' => 'application/xhtml+xml']));
 
-        $this->assertStringContainsString('<link rel="stylesheet" href="style.css">', (string) $response->getContent());
+        $this->assertStringContainsString('<link rel="stylesheet" href="style.css" data-turbo-track="dynamic">', (string) $response->getContent());
     }
 
     public function testResponseWithoutContentTypeFollowsTheRequestFormat(): void
@@ -151,6 +151,7 @@ final class AssetResponseListenerTest extends TestCase
 
         $this->assertFalse($response->getContent());
         $this->assertFalse($request->attributes->has('_links'));
+        $this->assertFalse($response->headers->has('X-SDC-Assets'));
     }
 
     public function testLeavesSubRequestsAlone(): void
@@ -172,10 +173,10 @@ final class AssetResponseListenerTest extends TestCase
         $request->headers->set('Accept', 'application/vnd.live-component+html');
         $response = $this->dispatch(new Response('<div></div>'), $request, HttpKernelInterface::SUB_REQUEST);
 
-        $this->assertFalse($response->headers->has('X-SDC-Assets-CSS'));
+        $this->assertFalse($response->headers->has('X-SDC-Assets'));
     }
 
-    public function testSendsAssetsAsHeadersToLiveComponentRequests(): void
+    public function testListsTheAssetsOfALiveComponentRequestInAHeader(): void
     {
         $this->registry->addAsset('style.css', 'css');
         $this->registry->addAsset('app.js', 'js');
@@ -185,9 +186,227 @@ final class AssetResponseListenerTest extends TestCase
         $request->headers->set('Accept', 'application/vnd.live-component+html');
         $response = $this->dispatch(new Response('<div></div>'), $request);
 
-        $this->assertSame('style.css', $response->headers->get('X-SDC-Assets-CSS'));
-        $this->assertSame('app.js', $response->headers->get('X-SDC-Assets-JS'));
+        $this->assertSame(
+            '{"v":1,"assets":[{"type":"css","href":"style.css","attributes":{"data-turbo-track":"dynamic"}},{"type":"module","href":"app.js"}]}',
+            $response->headers->get('X-SDC-Assets'),
+        );
         $this->assertSame('<div></div>', $response->getContent());
+        $this->assertFalse($request->attributes->has('_links'));
+    }
+
+    /**
+     * @return iterable<string, array{Request, Response}>
+     */
+    public static function provideFragmentResponses(): iterable
+    {
+        $page = '<html><head><title>Cart</title>[[ASSETS]]</head><body><turbo-frame id="cart"></turbo-frame></body></html>';
+
+        $request = new Request();
+        $request->headers->set('Accept', 'application/vnd.live-component+html');
+        yield 'Live Component request' => [$request, new Response('<div></div>')];
+
+        $request = new Request();
+        $request->headers->set('Accept', 'application/vnd.live-component+html, */*;q=0.8');
+        yield 'Live Component request accepting more types' => [$request, new Response('<div></div>')];
+
+        yield 'Live Component response' => [new Request(), new Response('<div></div>', 200, ['Content-Type' => 'application/vnd.live-component+html'])];
+
+        $request = new Request();
+        $request->headers->set('Turbo-Frame', 'cart');
+        yield 'Turbo Frame request answered with a whole page' => [$request, new Response($page)];
+
+        $request = new Request();
+        $request->headers->set('Turbo-Frame', 'cart');
+        yield 'Turbo Frame request answered with a whole page without the placeholder' => [$request, new Response(str_replace('[[ASSETS]]', '', $page))];
+
+        yield 'Turbo Stream response' => [new Request(), new Response('<turbo-stream action="append" target="cart"><template>[[ASSETS]]</template></turbo-stream>', 200, ['Content-Type' => 'text/vnd.turbo-stream.html; charset=UTF-8'])];
+
+        // What ux-turbo does: the format is registered, the controller sets it,
+        // Response::prepare() derives the Content-Type after this listener ran.
+        $request = new Request();
+        $request->setFormat('turbo_stream', 'text/vnd.turbo-stream.html');
+        $request->setRequestFormat('turbo_stream');
+        yield 'Turbo Stream request format' => [$request, new Response('<turbo-stream action="append" target="cart"><template></template></turbo-stream>')];
+    }
+
+    /**
+     * The client keeps only a part of the response, so tags would be lost even
+     * where the response has the placeholder; the content is left alone.
+     */
+    #[DataProvider('provideFragmentResponses')]
+    public function testListsTheAssetsOfAFragmentResponseInAHeader(Request $request, Response $response): void
+    {
+        $provider = $this->createNonceProvider('script-n0nce', 'style-n0nce');
+        $this->listener = $this->createListener(true, $provider);
+        $this->registry->addAsset('Alert/Alert.css', 'css');
+        $content = $response->getContent();
+
+        $response = $this->dispatch($response, $request);
+
+        $this->assertSame(
+            '{"v":1,"assets":[{"type":"css","href":"/assets/Alert/Alert-1a2b3c.css","attributes":{"data-turbo-track":"dynamic"}}]}',
+            $response->headers->get('X-SDC-Assets'),
+        );
+        $this->assertSame($content, $response->getContent());
+        $this->assertFalse($request->attributes->has('_links'));
+        $this->assertSame(['script' => 0, 'style' => 0], $provider->calls, 'The nonce is the one of the page the assets are added to.');
+        $this->assertSame([], $this->logger->records, 'A fragment is not a page missing its placeholder.');
+    }
+
+    /**
+     * A Turbo Drive visit, or a Turbo form submission answered with a page
+     * (Turbo accepts streams with every submission): Turbo merges the <head>.
+     */
+    public function testInjectsIntoAPageRequestedByTurbo(): void
+    {
+        $this->registry->addAsset('style.css', 'css');
+
+        $request = new Request();
+        $request->headers->set('Accept', 'text/vnd.turbo-stream.html, text/html, application/xhtml+xml');
+        $response = $this->dispatch(new Response(self::PAGE), $request);
+
+        $this->assertStringContainsString('<link rel="stylesheet" href="style.css" data-turbo-track="dynamic">', (string) $response->getContent());
+        $this->assertFalse($response->headers->has('X-SDC-Assets'));
+    }
+
+    /**
+     * An htmx partial, a fragment fetch()ed by the application: the header is
+     * the only way to tell the page about the assets.
+     */
+    public function testListsTheAssetsOfAResponseWithoutThePlaceholderInAHeader(): void
+    {
+        $this->registry->addAsset('Alert/Alert.js', 'js');
+
+        $response = $this->dispatch(new Response('<div class="alert"></div>'));
+
+        $this->assertSame('{"v":1,"assets":[{"type":"module","href":"/assets/Alert/Alert-4d5e6f.js"}]}', $response->headers->get('X-SDC-Assets'));
+        $this->assertSame('<div class="alert"></div>', $response->getContent());
+        $this->assertSame([], $this->logger->records);
+    }
+
+    /**
+     * @return iterable<string, array{Response, int}>
+     */
+    public static function provideResponsesWithoutHeader(): iterable
+    {
+        // [response, request type]
+        yield 'page with the placeholder' => [new Response(self::PAGE), HttpKernelInterface::MAIN_REQUEST];
+        yield 'not HTML' => [new Response('{}', 200, ['Content-Type' => 'application/json']), HttpKernelInterface::MAIN_REQUEST];
+        yield 'sub-request' => [new Response('<div></div>'), HttpKernelInterface::SUB_REQUEST];
+    }
+
+    #[DataProvider('provideResponsesWithoutHeader')]
+    public function testSendsNoHeader(Response $response, int $requestType): void
+    {
+        $this->registry->addAsset('style.css', 'css');
+
+        $response = $this->dispatch($response, null, $requestType);
+
+        $this->assertFalse($response->headers->has('X-SDC-Assets'));
+    }
+
+    public function testSendsNoHeaderWithoutAssets(): void
+    {
+        $this->registry->addAsset('font.woff2', '');
+
+        $request = new Request();
+        $request->headers->set('Turbo-Frame', 'cart');
+        $response = $this->dispatch(new Response('<turbo-frame id="cart"></turbo-frame>'), $request);
+
+        $this->assertFalse($response->headers->has('X-SDC-Assets'));
+    }
+
+    /**
+     * Each entry carries what the tag of a full page would get, but the nonce
+     * and the `type` that makes a module script.
+     */
+    public function testTheHeaderCarriesTheAttributesOfTheTags(): void
+    {
+        $this->registry->addAsset('app.js', 'js', attributes: ['defer' => true, 'async' => false, 'data-id' => 'a"b', 'nonce' => null]);
+        $this->registry->addAsset('legacy.js', 'js', attributes: ['type' => false]);
+        $this->registry->addAsset('old.js', 'js', attributes: ['type' => 'text/javascript', 'integrity' => 'sha384-x', 'crossorigin' => 'anonymous']);
+        $this->registry->addAsset('own.css', 'css', attributes: ['nonce' => 'own', 'media' => 'print']);
+        $this->registry->addAsset('untracked.css', 'css', attributes: ['data-turbo-track' => false]);
+
+        $response = $this->dispatch(new Response('<div></div>'));
+
+        $this->assertSame(
+            ['v' => 1, 'assets' => [
+                ['type' => 'module', 'href' => 'app.js', 'attributes' => ['nonce' => false, 'defer' => true, 'data-id' => 'a"b']],
+                ['type' => 'script', 'href' => 'legacy.js'],
+                ['type' => 'script', 'href' => 'old.js', 'attributes' => ['type' => 'text/javascript', 'integrity' => 'sha384-x', 'crossorigin' => 'anonymous']],
+                ['type' => 'css', 'href' => 'own.css', 'attributes' => ['nonce' => 'own', 'data-turbo-track' => 'dynamic', 'media' => 'print']],
+                ['type' => 'css', 'href' => 'untracked.css'],
+            ]],
+            json_decode((string) $response->headers->get('X-SDC-Assets'), true, flags: \JSON_THROW_ON_ERROR),
+        );
+    }
+
+    /**
+     * A URL with a comma, which split the comma-separated headers of earlier
+     * versions, and the same file asked for by its logical path and its URL.
+     */
+    public function testListsEachAssetOnce(): void
+    {
+        $this->registry->addAsset('Alert/Alert.css', 'css');
+        $this->registry->addAsset('/assets/Alert/Alert-1a2b3c.css', 'css');
+        $this->registry->addAsset('https://cdn.example.com/a,b.js', 'js');
+
+        $response = $this->dispatch(new Response('<div></div>'));
+
+        $this->assertSame(
+            '{"v":1,"assets":[{"type":"css","href":"/assets/Alert/Alert-1a2b3c.css","attributes":{"data-turbo-track":"dynamic"}},{"type":"module","href":"https://cdn.example.com/a,b.js"}]}',
+            $response->headers->get('X-SDC-Assets'),
+        );
+    }
+
+    public function testTheHeaderIsAscii(): void
+    {
+        $this->registry->addAsset('https://cdn.example.com/štýl.css', 'css', attributes: ['data-turbo-track' => false]);
+        $this->registry->addAsset("https://cdn.example.com/\xff.js", 'js');
+
+        $value = (string) $this->dispatch(new Response('<div></div>'))->headers->get('X-SDC-Assets');
+
+        $this->assertSame(
+            '{"v":1,"assets":[{"type":"css","href":"https://cdn.example.com/\\u0161t\\u00fdl.css"},{"type":"module","href":"https://cdn.example.com/\\ufffd.js"}]}',
+            $value,
+        );
+        $this->assertSame(['https://cdn.example.com/štýl.css', "https://cdn.example.com/\u{fffd}.js"], array_column(json_decode($value, true, flags: \JSON_THROW_ON_ERROR)['assets'], 'href'));
+    }
+
+    public function testWarnsInDebugAboutAHeaderTooLongForAProxy(): void
+    {
+        for ($i = 0; $i < 40; ++$i) {
+            $this->registry->addAsset(sprintf('https://cdn.example.com/components/Component%d/Component%d.css', $i, $i), 'css');
+        }
+
+        $response = $this->dispatch(new Response('<div></div>'), Request::create('/cart'));
+
+        $this->assertTrue($response->headers->has('X-SDC-Assets'), 'Still sent.');
+        $warnings = $this->logger->recordsOf(LogLevel::WARNING);
+        $this->assertCount(1, $warnings);
+        $this->assertSame(
+            ['header' => 'X-SDC-Assets', 'uri' => '/cart', 'size' => \strlen((string) $response->headers->get('X-SDC-Assets')), 'count' => 40],
+            $warnings[0]['context'],
+        );
+        $this->assertStringContainsString('fastcgi_buffer_size', $warnings[0]['message']);
+
+        $this->logger->records = [];
+        $this->listener = $this->createListener(false);
+        $this->dispatch(new Response('<div></div>'));
+        $this->assertSame([], $this->logger->records, 'Not outside debug.');
+    }
+
+    public function testDoesNotWarnAboutAHeaderOfUsualSize(): void
+    {
+        for ($i = 0; $i < 10; ++$i) {
+            $this->registry->addAsset(sprintf('/assets/UI/Component%d/Component%d-0123456789abcdef.css', $i, $i), 'css');
+            $this->registry->addAsset(sprintf('/assets/UI/Component%d/Component%d-0123456789abcdef.js', $i, $i), 'js');
+        }
+
+        $this->dispatch(new Response('<div></div>'));
+
+        $this->assertSame([], $this->logger->records);
     }
 
     public function testRendersBooleanAttributesLikeTwigComponents(): void
@@ -246,7 +465,7 @@ final class AssetResponseListenerTest extends TestCase
         $response = $this->dispatch(new Response(self::PAGE));
 
         $this->assertSame(
-            '<html><head><link rel="stylesheet" href="style.css" nonce="style&quot;n0nce">' . "\n"
+            '<html><head><link rel="stylesheet" href="style.css" nonce="style&quot;n0nce" data-turbo-track="dynamic">' . "\n"
             . '<script src="app.js" type="module" nonce="script-n0nce"></script>' . "\n"
             . '<script src="legacy.js" nonce="script-n0nce"></script>' . "\n"
             . '</head><body></body></html>',
@@ -264,7 +483,18 @@ final class AssetResponseListenerTest extends TestCase
         $content = (string) $this->dispatch(new Response(self::PAGE))->getContent();
 
         $this->assertStringContainsString('<script src="app.js" type="module"></script>', $content);
-        $this->assertStringContainsString('<link rel="stylesheet" href="style.css" nonce="own">', $content);
+        $this->assertStringContainsString('<link rel="stylesheet" href="style.css" nonce="own" data-turbo-track="dynamic">', $content);
+    }
+
+    public function testAStylesheetCanOptOutOfTurboTracking(): void
+    {
+        $this->registry->addAsset('style.css', 'css', attributes: ['data-turbo-track' => false]);
+        $this->registry->addAsset('app.css', 'css', attributes: ['data-turbo-track' => 'reload']);
+
+        $content = (string) $this->dispatch(new Response(self::PAGE))->getContent();
+
+        $this->assertStringContainsString('<link rel="stylesheet" href="style.css">', $content);
+        $this->assertStringContainsString('<link rel="stylesheet" href="app.css" data-turbo-track="reload">', $content);
     }
 
     public function testInjectsWithoutANonceWhenTheProviderHasNone(): void
@@ -275,7 +505,7 @@ final class AssetResponseListenerTest extends TestCase
 
         $content = (string) $this->dispatch(new Response(self::PAGE))->getContent();
 
-        $this->assertStringContainsString('<link rel="stylesheet" href="style.css">', $content);
+        $this->assertStringContainsString('<link rel="stylesheet" href="style.css" data-turbo-track="dynamic">', $content);
         $this->assertStringContainsString('<script src="app.js" type="module"></script>', $content);
     }
 
@@ -318,21 +548,6 @@ final class AssetResponseListenerTest extends TestCase
         $this->dispatch($response, $request);
 
         $this->assertSame(['script' => 0, 'style' => 0], $provider->calls);
-    }
-
-    public function testSendsClassicScriptsInTheirOwnHeaderToLiveComponentRequests(): void
-    {
-        $this->registry->addAsset('app.js', 'js');
-        $this->registry->addAsset('legacy.js', 'js', attributes: ['type' => false]);
-        $this->registry->addAsset('old.js', 'js', attributes: ['type' => 'text/javascript']);
-
-        $request = new Request();
-        $request->headers->set('Accept', 'application/vnd.live-component+html');
-        $response = $this->dispatch(new Response('<div></div>'), $request);
-
-        $this->assertSame('app.js', $response->headers->get('X-SDC-Assets-JS'));
-        $this->assertSame('legacy.js,old.js', $response->headers->get('X-SDC-Assets-JS-Classic'));
-        $this->assertFalse($response->headers->has('X-SDC-Assets-CSS'));
     }
 
     public function testWarnsInDebugWhenTheImportMapComesAfterModuleScripts(): void
@@ -394,7 +609,7 @@ final class AssetResponseListenerTest extends TestCase
         $response = $this->dispatch(new Response(self::PAGE));
 
         $this->assertStringContainsString(
-            '<link rel="stylesheet" href="https://cdn.example.com/lib.css?v=1&amp;theme=&quot;dark&quot;">',
+            '<link rel="stylesheet" href="https://cdn.example.com/lib.css?v=1&amp;theme=&quot;dark&quot;" data-turbo-track="dynamic">',
             (string) $response->getContent(),
         );
     }
@@ -408,6 +623,7 @@ final class AssetResponseListenerTest extends TestCase
         $response = $this->dispatch(new Response($page), Request::create('/shop?page=2'));
 
         $this->assertSame($page, $response->getContent());
+        $this->assertTrue($response->headers->has('X-SDC-Assets'), 'Of use to a Turbo Drive visit, at least.');
 
         $warnings = $this->logger->recordsOf(LogLevel::WARNING);
         $this->assertCount(1, $warnings);
@@ -469,8 +685,8 @@ final class AssetResponseListenerTest extends TestCase
 
         $response = $this->dispatch(new Response(self::PAGE));
 
-        $this->assertStringContainsString('<link rel="stylesheet" href="/assets/Alert/Alert-1a2b3c.css">', (string) $response->getContent());
-        $this->assertStringContainsString('<link rel="stylesheet" href="css/typo.css">', (string) $response->getContent(), 'Still linked as it is.');
+        $this->assertStringContainsString('<link rel="stylesheet" href="/assets/Alert/Alert-1a2b3c.css" data-turbo-track="dynamic">', (string) $response->getContent());
+        $this->assertStringContainsString('<link rel="stylesheet" href="css/typo.css" data-turbo-track="dynamic">', (string) $response->getContent(), 'Still linked as it is.');
 
         $warnings = $this->logger->recordsOf(LogLevel::WARNING);
         $this->assertCount(1, $warnings);
@@ -487,7 +703,7 @@ final class AssetResponseListenerTest extends TestCase
         $request->headers->set('Accept', 'application/vnd.live-component+html');
         $response = $this->dispatch(new Response('<div></div>'), $request);
 
-        $this->assertSame('css/typo.css', $response->headers->get('X-SDC-Assets-CSS'));
+        $this->assertStringContainsString('"href":"css/typo.css"', (string) $response->headers->get('X-SDC-Assets'));
         $this->assertCount(1, $this->logger->recordsOf(LogLevel::WARNING));
     }
 

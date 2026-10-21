@@ -82,7 +82,7 @@ final class MetadataCacheIntegrationTest extends FunctionalTestCase
         $this->assertNotNull($js, 'The component script is not in the asset map.');
 
         $this->assertStringContainsString('data-testid="auto-discovery-component"', $html);
-        $this->assertSame(1, substr_count($html, \sprintf('<link rel="stylesheet" href="%s">', $css)));
+        $this->assertSame(1, substr_count($html, \sprintf('<link rel="stylesheet" href="%s" data-turbo-track="dynamic">', $css)));
         $this->assertSame(1, substr_count($html, \sprintf('<script src="%s" type="module"></script>', $js)));
     }
 }

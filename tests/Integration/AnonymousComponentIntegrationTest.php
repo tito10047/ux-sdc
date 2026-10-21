@@ -129,7 +129,7 @@ final class AnonymousComponentIntegrationTest extends FunctionalTestCase
      */
     private function linkedStylesheets(string $html): array
     {
-        preg_match_all('~<link rel="stylesheet" href="([^"]+)">~', $html, $matches);
+        preg_match_all('~<link rel="stylesheet" href="([^"]+)" data-turbo-track="dynamic">~', $html, $matches);
 
         return $matches[1];
     }

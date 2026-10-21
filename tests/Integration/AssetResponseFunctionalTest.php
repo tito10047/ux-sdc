@@ -101,7 +101,7 @@ final class AssetResponseFunctionalTest extends FunctionalTestCase
 
         $this->assertStringContainsString('data-testid="auto-discovery-component"', $html);
         $this->assertStringNotContainsString('__UX_TWIG_COMPONENT_ASSETS__', $html);
-        $this->assertSame(1, substr_count($html, sprintf('<link rel="stylesheet" href="%s">', $css)));
+        $this->assertSame(1, substr_count($html, sprintf('<link rel="stylesheet" href="%s" data-turbo-track="dynamic">', $css)));
         $this->assertSame(1, substr_count($html, sprintf('<script src="%s" type="module"></script>', $js)));
 
         // The script is a module, which is not preloaded (see ModuleScriptFunctionalTest).

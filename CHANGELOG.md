@@ -98,6 +98,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The loader controller gives the assets of a Live re-render the nonce of the page.
 - Warning, in debug only: a page has its import map after
   `render_component_assets()`, so component module scripts come before it.
+- Turbo Frames and Streams get the assets of the components they bring: their
+  responses (a `Turbo-Frame` request, a `text/vnd.turbo-stream.html` response or
+  the `turbo_stream` request format) list them in the `X-SDC-Assets` header — a
+  frame response even when it is a whole page with the placeholder, since Turbo
+  drops its `<head>` — and the loader controller adds the missing ones on
+  `turbo:before-fetch-response`. So does any other HTML response without the
+  placeholder (an htmx partial, a fragment fetched by the application), for a
+  script of its own to read. The loader does not depend on Turbo and does
+  nothing without it; it also takes the script nonce from Turbo's
+  `<meta name="csp-nonce">` when no script of the page has one.
+- Warning, in debug only: the `X-SDC-Assets` header of a response is longer than
+  2 KB — nginx in front of PHP-FPM answers 502 once all the response headers
+  exceed `fastcgi_buffer_size` (4k or 8k by default).
 
 ### Changed
 
@@ -207,9 +220,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fetches a module in the wrong mode, so it was downloaded twice; a
   `rel="modulepreload"` header would start loading modules before the import map
   is parsed). Stylesheets and classic scripts keep theirs.
-- Live re-render headers: `X-SDC-Assets-JS` lists module scripts, the new
-  `X-SDC-Assets-JS-Classic` the scripts that opted out; the loader controller
-  inserts them accordingly. Until now every script was inserted as a classic one.
+- **BC break:** the `X-SDC-Assets-CSS` and `X-SDC-Assets-JS` headers of Live
+  re-renders are replaced by one `X-SDC-Assets` header, JSON:
+  `{"v":1,"assets":[{"type":"css","href":"…","attributes":{…}},{"type":"module","href":"…"}]}`.
+  Each entry says whether it is a stylesheet, a module or a classic script, and
+  carries the attributes of the tag (`defer`, `integrity`, `media`, …), which the
+  comma-separated headers dropped; a URL with a comma no longer splits in two.
+  The loader controller builds the elements like the tags of a full page and
+  inserts module scripts as modules (every script used to be inserted as a
+  classic one). Code reading the old headers has to read the new one; the
+  format is documented in the README and versioned by `v`.
+- **Behaviour change:** injected stylesheets carry `data-turbo-track="dynamic"`,
+  so Turbo Drive (8.0+) removes the stylesheets of components the next page does
+  not render instead of keeping every stylesheet a visit ever loaded. Opt out per
+  asset with `attributes: ['data-turbo-track' => false]`; without Turbo the
+  attribute does nothing.
+- A Live Component request is recognised by an `Accept` header that lists
+  `application/vnd.live-component+html` among other types too, not only by one
+  that is exactly that.
 
 ### Fixed
 

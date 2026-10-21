@@ -45,7 +45,7 @@ final class ModuleScriptFunctionalTest extends FunctionalTestCase
         $this->assertStringContainsString('data-testid="esm-widget"', $html);
         $this->assertSame(1, substr_count($html, \sprintf('<script src="%s" type="module"></script>', $module)));
         $this->assertSame(1, substr_count($html, \sprintf('<script src="%s"></script>', $classic)));
-        $this->assertSame(1, substr_count($html, \sprintf('<link rel="stylesheet" href="%s">', $css)));
+        $this->assertSame(1, substr_count($html, \sprintf('<link rel="stylesheet" href="%s" data-turbo-track="dynamic">', $css)));
         $this->assertStringNotContainsString('nonce', $html, 'No nonce without a nonce provider.');
 
         // The import map of the page precedes the module script.

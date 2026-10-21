@@ -181,7 +181,8 @@ The component name is the class name relative to `component_namespace`, with
 attribute to choose another one: `#[AsSdcComponent('Alert')]`.
 
 On a page that renders an Alert, the `<head>` gets
-`<link rel="stylesheet" href="/assets/Alert/Alert-….css">` and the response a
+`<link rel="stylesheet" href="/assets/Alert/Alert-….css" data-turbo-track="dynamic">`
+(see [Turbo](#turbo) for the attribute) and the response a
 `Link: </assets/Alert/Alert-….css>; rel="preload"; as="style"` header. A page
 without an Alert gets neither.
 
@@ -246,7 +247,7 @@ final class Chart {}
 | `path` | AssetMapper logical path (`styles/reset.css`) or a URL. Required — `#[Asset]` without a path is ignored. |
 | `type` | `css` or `js`. When omitted, a path ending in `.css` is a stylesheet and **anything else is loaded as a script**, so do not declare fonts or images this way. |
 | `priority` | Higher comes first in `<head>`. Default `0`. |
-| `attributes` | Extra HTML attributes for the tag. `true` renders a bare attribute, `false` and `null` leave it out. They override the ones the bundle sets: `'type' => false` loads a classic script (see below), `'nonce' => false` leaves the [CSP nonce](#content-security-policy-nonces) out. |
+| `attributes` | Extra HTML attributes for the tag. `true` renders a bare attribute, `false` and `null` leave it out. They override the ones the bundle sets: `'type' => false` loads a classic script (see below), `'nonce' => false` leaves the [CSP nonce](#content-security-policy-nonces) out, `'data-turbo-track' => false` the [Turbo mark](#turbo) of a stylesheet. |
 
 `#[Asset]` is for files that are *not* next to the class. It does not switch
 discovery on or off; `auto_discovery` does.
@@ -302,7 +303,7 @@ ux_sdc:
 ```
 
 ```html
-<link rel="stylesheet" href="/assets/Alert/Alert-9c2e1d0.css" nonce="Xr2Lq…">
+<link rel="stylesheet" href="/assets/Alert/Alert-9c2e1d0.css" nonce="Xr2Lq…" data-turbo-track="dynamic">
 <script src="/assets/Alert/Alert-3b1f2a4.js" type="module" nonce="Xr2Lq…"></script>
 ```
 
@@ -453,12 +454,13 @@ nothing to declare them with.
 
 Live Components get their assets like any other component on the first render.
 When a re-render brings a component that is not on the page yet, the response
-cannot carry new `<link>` tags; the bundle sends the asset URLs in the
-`X-SDC-Assets-CSS`, `X-SDC-Assets-JS` (modules) and `X-SDC-Assets-JS-Classic`
-headers instead, and a Stimulus controller shipped with the bundle adds the
-missing ones to `<head>` — with the CSP nonce it finds on the page's own `<script>`
-and `<link>`/`<style>` elements, since the policy that applies is the one the page
-was loaded with.
+cannot carry new `<link>` tags; the bundle lists the assets in the
+[`X-SDC-Assets` header](#the-x-sdc-assets-header) instead, and a Stimulus
+controller shipped with the bundle, the *loader*, adds the missing ones to
+`<head>` — with the CSP nonce it finds on the page's own `<script>` and
+`<link>`/`<style>` elements, since the policy that applies is the one the page
+was loaded with. The same controller does it for [Turbo](#turbo) Frames and
+Streams.
 
 Attach the controller once, to `<body>`:
 
@@ -519,6 +521,80 @@ final class Search
 
 `controller` is set on every re-render too; on the root element it is added next to
 the `live` controller (`data-controller="Search--Search live"`).
+
+## Turbo
+
+Turbo Drive loads every page with `fetch()` and merges its `<head>` into the
+current one, so component assets need nothing special: keep
+`{{ render_component_assets() }}` in `<head>`, and Turbo adds the stylesheets and
+scripts of the next page. Component stylesheets carry
+`data-turbo-track="dynamic"`, which makes Turbo (8.0+) also remove the ones the next
+page does not render on navigation — without it every stylesheet a visit ever
+loaded would stay, and a component's global rule (`body { overflow: hidden }` in a
+modal) would go on applying to the pages after it. An asset opts out with
+`attributes: ['data-turbo-track' => false]`. Never mark component assets
+`"reload"`: the set changes from page to page, and every such change would be a
+full reload. Scripts get no mark — Turbo never removes a script; a module that
+was already loaded is not run again.
+
+A Turbo Frame or Stream keeps only the frame or the streams of the response, so
+tags in its `<head>` would be lost. Those responses get the
+[`X-SDC-Assets` header](#the-x-sdc-assets-header) instead — even a whole page
+with the placeholder, which is what a frame request is often answered with — and
+the [loader controller](#live-components) adds what the page is missing on
+`turbo:before-fetch-response`, before Turbo renders the frame or the streams. It is
+the same controller as for Live Components, attached the same way; it does not
+depend on Turbo and does nothing without it.
+
+### The X-SDC-Assets header
+
+The listener decides per main HTML response (a Content-Type with `html`, or none
+and an `html`-ish request format):
+
+| Response | Assets |
+|----------|--------|
+| Live Component re-render (`Accept: application/vnd.live-component+html`, or a response of that type) | header |
+| Turbo Frame request (`Turbo-Frame` request header) | header, even when the page has the placeholder |
+| Turbo Stream (`text/vnd.turbo-stream.html` response, or the `turbo_stream` request format) | header |
+| Any other response with the placeholder — a page, a Turbo Drive visit | tags |
+| Any other response without it — an htmx partial, a component fetched by your own script | header |
+
+Sub-requests, non-HTML and streamed responses get neither, and neither does a
+response that rendered no component with assets.
+
+The value is JSON, ASCII-only (anything else is a `\u` escape), with the assets
+in the order of the tags of a full page:
+
+```
+X-SDC-Assets: {"v":1,"assets":[{"type":"css","href":"/assets/Alert/Alert-9c2e1d0.css","attributes":{"data-turbo-track":"dynamic"}},{"type":"module","href":"/assets/Alert/Alert-3b1f2a4.js"},{"type":"script","href":"https://cdn.example.com/chart.umd.js","attributes":{"defer":true}}]}
+```
+
+- `v` — the version of the format, `1`. It changes when an older client would
+  misread the value; a client ignores a version it does not know.
+- `type` — `css` (stylesheet), `module` (module script) or `script` (classic
+  script).
+- `href` — the public path or URL, as in the `href`/`src` of the tag.
+- `attributes` — left out when empty: the attributes the tag of a full page
+  gets after `rel`/`href`/`src` and a module's `type="module"`, in that order — a
+  string, or `true` for a bare attribute. The CSP nonce is not among them: the
+  client uses the nonce of the page, unless the asset sets its own (`"nonce": "…"`)
+  or none (`"nonce": false`).
+
+The loader resolves `href` against the document, skips an asset the document
+already has (any `<link rel="stylesheet">` or `<script src>` with the same URL),
+and builds the others attribute by attribute in that order, so that Turbo, which
+compares `<head>` elements by their markup, takes them for the tags of a full page.
+Read the header from your own script the same way when you insert fragments
+yourself.
+
+The header lists the assets of the components rendered for that response, which
+for a fragment is usually a handful — about 60–100 bytes each. A reverse proxy
+fails a response whose headers do not fit its buffer: nginx in front of PHP-FPM
+answers *502 upstream sent too big header* past `fastcgi_buffer_size` (4k or 8k by
+default, for all the headers together). In debug the bundle logs a warning when the
+header alone is longer than 2 KB; raise the buffer
+(`fastcgi_buffer_size 16k;`, `proxy_buffer_size` behind `proxy_pass`) if a fragment
+legitimately renders that many components.
 
 ## Generating components
 
@@ -708,8 +784,9 @@ component until the worker restarts.
    `Link` header listener) replaces the first placeholder in an HTML main response
    with the tags, sorted by priority — scripts as ES modules, with the CSP nonce
    when a provider is configured — and adds a `Link: rel="preload"` header for each
-   stylesheet and classic script. For a Live Component re-render it sets the
-   `X-SDC-Assets-*` headers instead. The registry is reset between requests, so long-running workers do not
+   stylesheet and classic script. A Live Component re-render, a Turbo Frame or
+   Stream, and any other HTML response without the placeholder get the
+   [`X-SDC-Assets` header](#the-x-sdc-assets-header) instead. The registry is reset between requests, so long-running workers do not
    carry assets over.
 
 Components rendered in a sub-request (`render(controller(...))`) end up in the
@@ -763,7 +840,8 @@ The bundle also logs what goes wrong while rendering, through the application's
 | Level | When | Logged |
 |-------|------|--------|
 | warning | A co-located template is outside every Twig path, or a co-located CSS/JS file outside every AssetMapper path, so it is left out (see [Where components can live](#where-components-can-live)). | in debug only; at build time (`metadata_cache: true`) into the container compiler log, shown in the profiler's *Logs* panel under *Container* |
-| warning | An HTML page with a `<head>` renders components with assets but does not call `render_component_assets()`. Fragments without a `<head>` (Turbo Frames, partials) are not reported. | in debug only |
+| warning | An HTML page with a `<head>` renders components with assets but does not call `render_component_assets()`. Fragments without a `<head>` (partials) and Live Component and Turbo responses are not reported. | in debug only |
+| warning | The `X-SDC-Assets` header of a fragment is longer than 2 KB, which a reverse proxy may reject (see [the header](#the-x-sdc-assets-header)). | in debug only |
 | warning | The page has its import map after `render_component_assets()`, so component modules come before it. | in debug only |
 | warning | A component asset path is not in the asset map (a typo in `#[Asset]`, a file AssetMapper does not serve), so it is linked as it is. URLs (`https://…`, `//…`, `/…`) are linked as they are on purpose and not reported. | in debug only |
 | error | `metadata_cache` is on but `%kernel.cache_dir%/sdc_metadata.php` does not exist — the cache was not warmed where the application runs, or the runtime cache directory differs from the build one. Pages still render, without component CSS and JS. | always |
@@ -772,13 +850,13 @@ Every message says what to change.
 
 ## Known limitations
 
-- **Turbo Frames and Streams.** Turbo takes only the frame or stream from the
-  response and ignores its `<head>`, and only Live Component requests get the
-  `X-SDC-Assets-*` headers. The CSS and JS of a component that first appears in a
-  frame or stream are therefore not loaded unless the page already has them.
-- **Assets added by a Live re-render** keep whether a script is a module and get
-  the CSP nonce of the page, but no other `attributes` of `#[Asset]` (`defer`,
-  `integrity`, …): those do not travel with the headers.
+- **Fragments render before their stylesheets load.** The loader adds the
+  stylesheets of a Live re-render or a Turbo Frame/Stream as the response arrives,
+  but neither Live Components nor Turbo wait for them, so a component that is new
+  to the page may show unstyled for a moment.
+- **Turbo Streams over WebSocket or SSE** (Mercure, `<turbo-stream-source>`) come
+  without HTTP headers: the assets of a component that first appears through one
+  are not loaded unless the page already has them.
 - **Streamed responses.** Components rendered while a `StreamedResponse` is being
   sent are registered after `kernel.response` and get no assets.
 - **ESI.** Each ESI fragment is its own main request; assets of its components do

@@ -86,8 +86,13 @@ class LiveComponentAssetIntegrationTest extends KernelTestCase
                 $this->assertNotNull($jsPath);
 
                 $response = $testComponent->response();
-                $this->assertStringContainsString($cssPath, (string) $response->headers->get('X-SDC-Assets-CSS'));
-                $this->assertStringContainsString($jsPath, (string) $response->headers->get('X-SDC-Assets-JS'));
+                $this->assertSame(
+                    ['v' => 1, 'assets' => [
+                        ['type' => 'css', 'href' => $cssPath, 'attributes' => ['data-turbo-track' => 'dynamic']],
+                        ['type' => 'module', 'href' => $jsPath],
+                    ]],
+                    json_decode((string) $response->headers->get('X-SDC-Assets'), true, flags: \JSON_THROW_ON_ERROR),
+                );
             }
         };
         $testCase->doTest();
