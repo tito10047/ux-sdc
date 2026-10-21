@@ -34,6 +34,8 @@ use Symfony\Component\Routing\RouteCollection;
  * The directory is imported the way `resource: {path, namespace}, type: attribute`
  * imports it, so a route loaded by both (or by `routing.controllers` too) gets
  * the same name each time and the router keeps one of them.
+ *
+ * @internal The `type: ux_sdc` route import is the public contract, not this class.
  */
 final class ComponentRouteLoader extends Loader
 {

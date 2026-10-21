@@ -25,6 +25,8 @@ namespace Tito10047\UX\Sdc\Service;
  *
  * @phpstan-type SdcComponentAsset array{path: string, type: string, priority: int, attributes: array<string, mixed>, source: self::SOURCE_*}
  * @phpstan-type SdcProblem array{message: string, context: array<string, string>}
+ *
+ * @internal
  */
 final class ComponentMetadata
 {

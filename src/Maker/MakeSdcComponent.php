@@ -27,6 +27,12 @@ use Symfony\Component\HttpKernel\Kernel;
 use Twig\Environment;
 use Twig\Error\Error as TwigError;
 
+/**
+ * `make:sdc-component`: a component class with its template, stylesheet and,
+ * optionally, a Stimulus controller and a page controller.
+ *
+ * @internal The command name and its options are the public contract, not this class.
+ */
 final class MakeSdcComponent extends AbstractMaker
 {
     /**

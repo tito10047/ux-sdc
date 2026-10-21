@@ -30,6 +30,10 @@ use Tito10047\UX\Sdc\DependencyInjection\SdcExtension;
  */
 class SdcBundle extends Bundle
 {
+    /**
+     * The identifier of the loader controller, the `sdc_loader_controller`
+     * Twig global: `<body {{ stimulus_controller(sdc_loader_controller) }}>`.
+     */
     public const STIMULUS_CONTROLLER = 'tito10047--ux-sdc--sdc-loader';
 
     public function getContainerExtension(): ?ExtensionInterface

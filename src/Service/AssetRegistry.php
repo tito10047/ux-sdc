@@ -20,6 +20,8 @@ use Symfony\Contracts\Service\ResetInterface;
  * response is built, and one of no known type is not loaded.
  *
  * @phpstan-type SdcAsset array{path: string, type: string, priority: int, attributes: array<string, mixed>}
+ *
+ * @internal Components declare their assets with #[Asset] and #[AsSdcComponent].
  */
 final class AssetRegistry implements ResetInterface
 {

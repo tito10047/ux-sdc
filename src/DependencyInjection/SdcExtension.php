@@ -37,7 +37,13 @@ use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 use Tito10047\UX\Sdc\Twig\AssetExtension;
 
-class SdcExtension extends Extension implements PrependExtensionInterface
+/**
+ * Loads the `ux_sdc` configuration and prepends the Twig, AssetMapper and
+ * Twig Components configuration the component directory needs.
+ *
+ * @internal
+ */
+final class SdcExtension extends Extension implements PrependExtensionInterface
 {
     /**
      * The Twig namespace `ux_components_dir` is registered under, besides the
@@ -45,6 +51,11 @@ class SdcExtension extends Extension implements PrependExtensionInterface
      * directory and of no other.
      */
     public const TWIG_NAMESPACE = 'component';
+
+    /**
+     * Deprecated since 1.0, removed in 2.0: use `ux_sdc.ux_components_dir`.
+     */
+    private const LEGACY_COMPONENTS_DIR_PARAMETER = 'app.ui_components.dir';
 
     public function getAlias(): string
     {
@@ -114,15 +125,10 @@ class SdcExtension extends Extension implements PrependExtensionInterface
 
         $this->configureRouting($container, $namespace, $this->isConfigEnabled($container, $config['routing']), $uxComponentsDir);
 
-        // A convenience alias of ux_sdc.ux_components_dir, for applications that
-        // want to point their own configuration at the same directory.
-        //
-        // A parameter, and only a parameter. There used to be a service of this
-        // name here too, registered with "string" as its class: nothing ever
-        // instantiated it, but `lint:container` walks every definition and died
-        // on 'class "string" does not exist', which took away the one command
-        // that tells an application whether its container is sound.
-        $container->setParameter('app.ui_components.dir', $config['ux_components_dir']);
+        // The old name of ux_sdc.ux_components_dir, kept for BC until 2.0. The
+        // app.* parameters belong to the application, not to a bundle.
+        $container->setParameter(self::LEGACY_COMPONENTS_DIR_PARAMETER, $config['ux_components_dir']);
+        $container->deprecateParameter(self::LEGACY_COMPONENTS_DIR_PARAMETER, 'tito10047/ux-sdc', '1.0', 'The parameter "%s" is deprecated, use "ux_sdc.ux_components_dir" instead.');
 
         $container->register(SdcMetadataRegistry::class)
             ->setArguments([

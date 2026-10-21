@@ -48,8 +48,10 @@ use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
  *
  * @phpstan-import-type SdcComponentAsset from ComponentMetadata
  * @phpstan-import-type SdcProblem from ComponentMetadata
+ *
+ * @internal
  */
-class ComponentMetadataResolver
+final class ComponentMetadataResolver
 {
     /**
      * @var list<array{string, string}> real path with a trailing directory separator, and namespace ('' for the main one)

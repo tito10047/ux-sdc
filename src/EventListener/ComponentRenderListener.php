@@ -25,6 +25,8 @@ use Tito10047\UX\Sdc\Service\StimulusControllerNameResolver;
  *
  * Its events are tagged in config/services.php; SdcExtension keeps either this
  * listener or DevComponentRenderListener.
+ *
+ * @internal
  */
 final class ComponentRenderListener
 {

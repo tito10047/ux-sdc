@@ -90,6 +90,38 @@ class SdcExtensionDefinitionsTest extends TestCase
         $this->assertFalse($container->hasAlias('app.ui_components.dir'));
     }
 
+    public function testTheLegacyComponentsDirectoryParameterIsDeprecated(): void
+    {
+        $container = $this->buildContainer();
+
+        $this->assertSame(
+            $container->getParameterBag()->all()['ux_sdc.ux_components_dir'],
+            $container->getParameterBag()->all()['app.ui_components.dir'],
+        );
+        $this->assertSame(
+            ['tito10047/ux-sdc', '1.0', 'The parameter "%s" is deprecated, use "ux_sdc.ux_components_dir" instead.', 'app.ui_components.dir'],
+            $container->getParameterBag()->allDeprecated()['app.ui_components.dir'] ?? null,
+        );
+
+        $deprecations = [];
+        set_error_handler(static function (int $level, string $message) use (&$deprecations): bool {
+            $deprecations[] = $message;
+
+            return true;
+        }, \E_USER_DEPRECATED);
+
+        try {
+            $container->getParameter('ux_sdc.ux_components_dir');
+            $this->assertSame([], $deprecations, 'Only the old name is deprecated.');
+
+            $container->getParameter('app.ui_components.dir');
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertSame(['Since tito10047/ux-sdc 1.0: The parameter "app.ui_components.dir" is deprecated, use "ux_sdc.ux_components_dir" instead.'], $deprecations);
+    }
+
     private function buildContainer(): ContainerBuilder
     {
         $container = new ContainerBuilder();

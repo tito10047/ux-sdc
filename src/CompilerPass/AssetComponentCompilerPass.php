@@ -39,6 +39,8 @@ use Tito10047\UX\Sdc\Twig\ComponentDirectoryTemplateFinder;
  * @phpstan-import-type SdcMetadataCache from SdcMetadataRegistry
  * @phpstan-import-type SdcComponentAsset from ComponentMetadata
  * @phpstan-import-type SdcProblem from ComponentMetadata
+ *
+ * @internal
  */
 final class AssetComponentCompilerPass implements CompilerPassInterface
 {

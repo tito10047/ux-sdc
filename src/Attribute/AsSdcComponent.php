@@ -14,6 +14,11 @@ namespace Tito10047\UX\Sdc\Attribute;
 use Attribute;
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
 
+/**
+ * #[AsTwigComponent] with a stylesheet and a script that do not follow the
+ * naming convention of the files discovered next to the class. They are
+ * AssetMapper logical paths or URLs, loaded in addition to those files.
+ */
 #[Attribute(Attribute::TARGET_CLASS)]
 class AsSdcComponent extends AsTwigComponent
 {

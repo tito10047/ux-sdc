@@ -18,6 +18,8 @@ use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
 
 /**
  * @phpstan-import-type SdcAsset from AssetRegistry
+ *
+ * @internal
  */
 trait ComponentRenderTrait
 {

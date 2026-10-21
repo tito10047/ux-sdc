@@ -16,6 +16,11 @@ use Twig\Extension\AbstractExtension;
 use Twig\Extension\GlobalsInterface;
 use Twig\TwigFunction;
 
+/**
+ * Provides `render_component_assets()` and the `sdc_loader_controller` global.
+ *
+ * @internal The function and the global are the public contract, not this class.
+ */
 final class AssetExtension extends AbstractExtension implements GlobalsInterface
 {
     public function __construct(

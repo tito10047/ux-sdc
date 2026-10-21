@@ -29,6 +29,8 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
  * (priority 0, registered by FrameworkBundle, hence before any pass of this
  * bundle at the same priority). Nothing to do before Symfony 7.4, where the tag
  * is never set.
+ *
+ * @internal
  */
 final class ComponentRoutesCompilerPass implements CompilerPassInterface
 {

@@ -33,6 +33,8 @@ use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
  *
  * Runs before AttributeAutoconfigurationPass (priority 100), after every
  * extension has registered its configurators.
+ *
+ * @internal
  */
 final class SdcComponentAttributePass implements CompilerPassInterface
 {

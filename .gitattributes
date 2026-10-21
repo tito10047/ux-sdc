@@ -1,7 +1,7 @@
 # Kept out of the archive Composer installs (`git archive`, dist downloads):
 # what a consumer of the bundle needs is src/, config/, assets/, templates/,
-# composer.json and the documentation (README.md, CHANGELOG.md, LICENSE.md,
-# benchmark.md, which the README links to).
+# composer.json and the documentation (README.md, docs/, UPGRADE.md,
+# CHANGELOG.md, LICENSE.md, and benchmark.md, which docs/ links to).
 
 # Repository metadata
 /.gitattributes export-ignore

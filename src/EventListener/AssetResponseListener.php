@@ -33,6 +33,8 @@ use Tito10047\UX\Sdc\Service\AssetRegistry;
  *
  * Registered on `kernel.response` in `config/services.php`, where its priority
  * is explained.
+ *
+ * @internal The `X-SDC-Assets` header it sends is the public contract, not this class or its constants.
  */
 final class AssetResponseListener
 {

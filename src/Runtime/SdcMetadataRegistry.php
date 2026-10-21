@@ -33,8 +33,10 @@ use Tito10047\UX\Sdc\Service\ComponentMetadata;
  *     components: array<string, array{assets: list<SdcComponentAsset>, template: string|null, problems: list<SdcProblem>}>,
  *     anonymous: array<string, array{assets: list<SdcComponentAsset>, problems: list<SdcProblem>}>,
  * }
+ *
+ * @internal The cache format changes when the bundle needs it to; `debug:sdc --format=json` shows the same metadata.
  */
-class SdcMetadataRegistry
+final class SdcMetadataRegistry
 {
     private const EMPTY = ['components' => [], 'anonymous' => []];
 

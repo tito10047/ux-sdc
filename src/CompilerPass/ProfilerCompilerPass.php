@@ -29,6 +29,8 @@ use Tito10047\UX\Sdc\DataCollector\SdcDataCollector;
  * FrameworkBundle registers it, and its extension may come after this one —
  * so it is decided here rather than in SdcExtension. ProfilerPass of
  * FrameworkBundle makes the same check.
+ *
+ * @internal
  */
 final class ProfilerCompilerPass implements CompilerPassInterface
 {

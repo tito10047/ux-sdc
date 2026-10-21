@@ -34,6 +34,8 @@ use Symfony\Component\DependencyInjection\Exception\LogicException;
  * ?AutoImportLocator) from StimulusBundle 2.13 to 3.x; the argument is still
  * looked up by name, so that a future change fails loudly here rather than
  * handing the component directory to a different argument.
+ *
+ * @internal
  */
 final class StimulusControllerPathsCompilerPass implements CompilerPassInterface
 {

@@ -25,6 +25,8 @@ use Tito10047\UX\Sdc\Service\StimulusControllerNameResolver;
  * (`ux_sdc.metadata_cache` false). The resolver caches it per class and template.
  *
  * Wired like ComponentRenderListener, which it replaces in that mode.
+ *
+ * @internal
  */
 final class DevComponentRenderListener
 {
