@@ -76,6 +76,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `#[AsSdcComponent]` works on Symfony 6.4 and 7.0. There a class carrying only
+  `#[AsSdcComponent]` was never registered as a Twig component ("Unknown
+  component"), because their dependency injection autoconfigures an attribute by
+  its exact class and did not recognise the subclass of `#[AsTwigComponent]`.
+  The bundle now registers TwigComponent's own configurator for it. Symfony 7.1
+  and later were not affected. PHP 8.1 with Symfony 6.4 is now part of the CI
+  test matrix, so the lowest supported versions are actually tested.
+
 - Without the metadata cache (`metadata_cache: false`, the default in debug), the
   co-located files of a component in a directory added through `twig.paths`
   were not found, although the build-time cache found them: the two pipelines

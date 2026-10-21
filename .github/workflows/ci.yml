@@ -55,6 +55,14 @@ jobs:
                     - '8.0.*'
                 operating-system:
                     - "ubuntu-latest"
+                # composer.json allows PHP 8.1, which only Symfony 6.4 still
+                # supports (7.0 needs 8.2) and which resolves Symfony UX to 2.x
+                # (3.0 needs 8.4). One job instead of 8.1 in the axis above and
+                # two more excludes.
+                include:
+                    -   php-version: "8.1"
+                        symfony: '6.4.*'
+                        operating-system: "ubuntu-latest"
                 exclude:
                     -   php-version: "8.2"
                         symfony: '8.0.*'

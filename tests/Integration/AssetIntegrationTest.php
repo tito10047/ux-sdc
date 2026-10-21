@@ -87,7 +87,7 @@ class AssetIntegrationTest extends IntegrationTestCase
         // 4. Verify Link headers (preload)
         $linkProvider = $request->attributes->get('_links');
         $this->assertNotNull($linkProvider);
-        $links = iterator_to_array($linkProvider->getLinks());
+        $links = [...$linkProvider->getLinks()];
         $this->assertCount(2, $links);
 
         $linkPaths = array_map(fn ($l) => $l->getHref(), $links);

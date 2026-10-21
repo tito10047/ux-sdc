@@ -31,10 +31,12 @@ class MakeSdcComponentTest extends IntegrationTestCase
 
     protected function tearDown(): void
     {
-        parent::tearDown();
+        // Before parent::tearDown(): getContainer() would boot the kernel again
+        // after it was shut down, and leave it booted for the next test class.
         $this->removeDir(self::getContainer()->getParameter('ux_sdc.ux_components_dir') . '/UI');
         $this->removeDir(self::getContainer()->getParameter('ux_sdc.ux_components_dir') . '/Alert');
         $this->removeDir(self::getContainer()->getParameter('ux_sdc.ux_components_dir') . '/Page');
+        parent::tearDown();
     }
 
     private function removeDir(string $dir): void

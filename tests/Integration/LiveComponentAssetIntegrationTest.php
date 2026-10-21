@@ -12,6 +12,7 @@
 namespace Tito10047\UX\Sdc\Tests\Integration;
 
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\LiveComponentWithAsset;
 
@@ -75,9 +76,18 @@ class LiveComponentAssetIntegrationTest extends KernelTestCase
                 $this->assertStringContainsString('Live Component With Asset', $rendered);
                 $this->assertStringContainsString('controller: LiveComponentWithAsset', $rendered);
 
+                // The digest format is AssetMapper's business and differs between
+                // its versions, so the expected URL comes from AssetMapper itself.
+                /** @var AssetMapperInterface $assetMapper */
+                $assetMapper = self::getContainer()->get('asset_mapper');
+                $cssPath = $assetMapper->getPublicPath('LiveComponentWithAsset.css');
+                $jsPath = $assetMapper->getPublicPath('LiveComponentWithAsset.js');
+                $this->assertNotNull($cssPath);
+                $this->assertNotNull($jsPath);
+
                 $response = $testComponent->response();
-                $this->assertStringContainsString('/assets/LiveComponentWithAsset-maoG0wF.css', $response->headers->get('X-SDC-Assets-CSS'));
-                $this->assertStringContainsString('/assets/LiveComponentWithAsset-maoG0wF.js', $response->headers->get('X-SDC-Assets-JS'));
+                $this->assertStringContainsString($cssPath, (string) $response->headers->get('X-SDC-Assets-CSS'));
+                $this->assertStringContainsString($jsPath, (string) $response->headers->get('X-SDC-Assets-JS'));
             }
         };
         $testCase->doTest();

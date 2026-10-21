@@ -135,12 +135,12 @@ final class AssetComponentCompilerPassTest extends TestCase
                 return 'twig';
             }
         });
-        $container->loadFromExtension('twig', ['paths' => [\dirname(__DIR__) . '/Service/Fixtures/' => 'Fixtures', \dirname(__DIR__) . '/../Twig']]);
+        $container->loadFromExtension('twig', ['paths' => [\dirname(__DIR__) . '/Service/Fixtures/' => 'Fixtures', \dirname(__DIR__) . '/../Integration']]);
 
         (new AssetComponentCompilerPass())->process($container);
 
         $this->assertSame(
-            [realpath(__DIR__), realpath(\dirname(__DIR__) . '/Service/Fixtures'), realpath(\dirname(__DIR__) . '/../Twig')],
+            [realpath(__DIR__), realpath(\dirname(__DIR__) . '/Service/Fixtures'), realpath(\dirname(__DIR__) . '/../Integration')],
             $container->getDefinition(ComponentMetadataResolver::class)->getArgument('$twigRoots'),
         );
     }
