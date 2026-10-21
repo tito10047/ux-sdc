@@ -97,7 +97,7 @@ jobs:
                     tools: flex, php-coveralls
             -   name: Get composer cache directory
                 id: composer-cache
-                run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+                run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
             -   name: "Cache dependencies"
                 uses: "actions/cache@v4"
                 with:
@@ -147,26 +147,40 @@ jobs:
             -   name: Execute tests via PHPUnit
                 run: vendor/bin/phpunit
 
+    # Installs the bundle from this checkout into a fresh Symfony skeleton,
+    # builds it for production and checks the pages a web server serves, in
+    # dev and in prod; tests_e2e/run_e2e.sh says what exactly. The newest
+    # skeleton with and without LiveComponent, and the oldest Symfony and PHP
+    # the bundle supports (UX 2.x), where the routes of --action pages load
+    # only through the route import of the recipe.
     e2e-tests:
-        name: "E2E Test"
+        name: "E2E (${{ matrix.variant }}, PHP ${{ matrix.php-version }}, skeleton ${{ matrix.skeleton || 'newest' }})"
         runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    -   variant: full
+                        php-version: "8.5"
+                        skeleton: ""
+                    -   variant: no-live
+                        php-version: "8.5"
+                        skeleton: ""
+                    -   variant: full
+                        php-version: "8.1"
+                        skeleton: "6.4.*"
         steps:
-            -   name: Checkout bundle code
+            -   name: Checkout
                 uses: actions/checkout@v4
+            -   name: "Install PHP"
+                uses: "shivammathur/setup-php@v2"
                 with:
-                    path: my-bundle
-            -   name: Setup PHP
-                uses: shivammathur/setup-php@v2
-                with:
-                    php-version: '8.2'
-                    extensions: mbstring, xml, ctype, iconv
+                    php-version: "${{ matrix.php-version }}"
                     tools: composer
-            # Through the environment: a branch name is chosen by whoever opens
-            # the pull request, and an expression in `run` lands in the script as code.
-            -   name: Run E2E tests
+            -   name: Run the E2E test
                 env:
-                    BRANCH: ${{ github.head_ref || github.ref_name }}
-                run: ./my-bundle/tests_e2e/run_e2e.sh "$BRANCH"
+                    E2E_SKELETON: ${{ matrix.skeleton }}
+                run: tests_e2e/run_e2e.sh "${{ matrix.variant }}"
 
     # The bundle supports symfony/ux-twig-component ^2.20|^3.0. The matrix gets
     # UX 2.x wherever UX 3 cannot install — PHP below 8.4, or Symfony 6.4 — and
