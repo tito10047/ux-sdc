@@ -82,16 +82,15 @@ class AssetIntegrationTest extends IntegrationTestCase
         // 3. Verify assets are injected
         $this->assertStringNotContainsString('<!-- __UX_TWIG_COMPONENT_ASSETS__ -->', $finalHtml);
         $this->assertStringContainsString('<link rel="stylesheet" href="/assets/css/test.css">', $finalHtml);
-        $this->assertStringContainsString('<script src="/assets/js/test.js"></script>', $finalHtml);
+        $this->assertStringContainsString('<script src="/assets/js/test.js" type="module"></script>', $finalHtml);
 
-        // 4. Verify Link headers (preload)
+        // 4. Verify Link headers (preload): the stylesheet only, a module script gets none
         $linkProvider = $request->attributes->get('_links');
         $this->assertNotNull($linkProvider);
         $links = [...$linkProvider->getLinks()];
-        $this->assertCount(2, $links);
+        $this->assertCount(1, $links);
 
         $linkPaths = array_map(fn ($l) => $l->getHref(), $links);
         $this->assertContains('/assets/css/test.css', $linkPaths);
-        $this->assertContains('/assets/js/test.js', $linkPaths);
     }
 }

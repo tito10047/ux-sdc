@@ -83,6 +83,6 @@ final class MetadataCacheIntegrationTest extends FunctionalTestCase
 
         $this->assertStringContainsString('data-testid="auto-discovery-component"', $html);
         $this->assertSame(1, substr_count($html, \sprintf('<link rel="stylesheet" href="%s">', $css)));
-        $this->assertSame(1, substr_count($html, \sprintf('<script src="%s"></script>', $js)));
+        $this->assertSame(1, substr_count($html, \sprintf('<script src="%s" type="module"></script>', $js)));
     }
 }

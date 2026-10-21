@@ -20,6 +20,7 @@ use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Filesystem\Exception\IOException;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\HttpKernel\Bundle\BundleInterface;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\UX\TwigComponent\TwigComponentBundle;
 use Symfony\UX\LiveComponent\LiveComponentBundle;
@@ -54,6 +55,8 @@ class TestKernel extends Kernel
      * @param array      $twigComponentConfig loaded as a separate twig_component config, the way an application's own config/packages/twig_component.yaml would be
      * @param array<string, string> $attributeRoutes PSR-4 directories whose #[Route] attributes are loaded, namespace => directory, the way a `resource: {path, namespace}, type: attribute` entry of config/routes.yaml loads them
      * @param list<array{0: string, 1: string|null}> $routeImports further route imports, [resource, type], the way the other entries of config/routes.yaml or config/routes/*.yaml would, e.g. ['.', 'ux_sdc'] or ['routing.controllers', null]
+     * @param list<BundleInterface> $extraBundles further bundles of the application, e.g. NelmioSecurityBundle
+     * @param array<string, array> $extensionConfigs configuration of further extensions, alias => config, the way config/packages/*.yaml would
      */
     public function __construct(
         string|array $configs = [],
@@ -67,6 +70,8 @@ class TestKernel extends Kernel
         private readonly array $twigComponentConfig = [],
         private readonly array $attributeRoutes = [],
         private readonly array $routeImports = [],
+        private readonly array $extraBundles = [],
+        private readonly array $extensionConfigs = [],
     ) {
         if (is_string($configs)) {
             $environment = $configs;
@@ -98,7 +103,7 @@ class TestKernel extends Kernel
             $bundles[] = new StimulusBundle();
         }
 
-        return $bundles;
+        return [...$bundles, ...$this->extraBundles];
     }
 
     protected function configureRoutes(RoutingConfigurator $routes): void
@@ -149,6 +154,10 @@ class TestKernel extends Kernel
 
         if ([] !== $this->twigConfig) {
             $container->loadFromExtension('twig', $this->twigConfig);
+        }
+
+        foreach ($this->extensionConfigs as $alias => $config) {
+            $container->loadFromExtension($alias, $config);
         }
 
         foreach ($this->services as $class) {

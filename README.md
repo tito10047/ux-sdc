@@ -105,7 +105,11 @@ AssetMapper, and a debug container picks it up as soon as it is created.
 
 `render_component_assets()` prints a placeholder. When the response is sent, it is
 replaced with the tags of the components rendered on the page. Put it last in
-`<head>`, so component styles come after the application's own.
+`<head>`, so component styles come after the application's own — and in any case
+**after `{{ importmap() }}`**: component scripts are ES modules (see
+[Scripts are ES modules](#scripts-are-es-modules)), and an import map has to come
+before every module script of the page. In debug, the bundle logs a warning when
+it finds the import map after the placeholder.
 
 For Live Components, also add the loader controller to `<body>` — see
 [Live Components](#live-components).
@@ -233,7 +237,7 @@ use Tito10047\UX\Sdc\Attribute\Asset;
 
 #[AsTwigComponent]
 #[Asset('styles/reset.css', priority: 10)]
-#[Asset('https://cdn.example.com/chart.js', type: 'js', attributes: ['defer' => true])]
+#[Asset('https://cdn.example.com/chart.umd.js', type: 'js', attributes: ['type' => false, 'defer' => true])]
 final class Chart {}
 ```
 
@@ -242,10 +246,82 @@ final class Chart {}
 | `path` | AssetMapper logical path (`styles/reset.css`) or a URL. Required — `#[Asset]` without a path is ignored. |
 | `type` | `css` or `js`. When omitted, a path ending in `.css` is a stylesheet and **anything else is loaded as a script**, so do not declare fonts or images this way. |
 | `priority` | Higher comes first in `<head>`. Default `0`. |
-| `attributes` | Extra HTML attributes for the tag. `true` renders a bare attribute, `false` and `null` leave it out. |
+| `attributes` | Extra HTML attributes for the tag. `true` renders a bare attribute, `false` and `null` leave it out. They override the ones the bundle sets: `'type' => false` loads a classic script (see below), `'nonce' => false` leaves the [CSP nonce](#content-security-policy-nonces) out. |
 
 `#[Asset]` is for files that are *not* next to the class. It does not switch
 discovery on or off; `auto_discovery` does.
+
+### Scripts are ES modules
+
+AssetMapper serves JavaScript as ES modules, so every component script — discovered,
+from `#[AsSdcComponent(js: …)]` or from `#[Asset]` — is loaded as one:
+
+```html
+<script src="/assets/Alert/Alert-3b1f2a4.js" type="module"></script>
+```
+
+A component script can therefore `import` what the application's import map
+provides (`import { Controller } from '@hotwired/stimulus'`) and files next to it
+(`import './format.js'`). Like every module, it runs once the page is parsed, in
+strict mode, with its own scope: a top-level `var` or `function` is not a global.
+
+The import map must come first. A browser that does not merge import maps ignores
+one that comes after a module script, and then the bare imports of the whole
+page fail — the application's own entrypoint included. Keep
+`{{ render_component_assets() }}` after `{{ importmap('app') }}`; in debug the
+bundle logs a warning when it is not.
+
+A script that is not a module (a UMD build from a CDN, a file that relies on its
+top-level variables being global) opts out with the `type` attribute:
+
+```php
+#[Asset('https://cdn.example.com/chart.umd.js', attributes: ['type' => false])]
+```
+
+`'type' => false` leaves the attribute out, which is a classic script; any other
+value is used as it is. Do not reach for `nomodule` instead: browsers that support
+modules do not run a `nomodule` script at all.
+
+Stylesheets and classic scripts are announced early with a
+`Link: <…>; rel="preload"` response header. Module scripts are not:
+`rel="preload"; as="script"` would make the browser download them twice, and
+`rel="modulepreload"` in a header starts loading modules before the import map
+is parsed. The browser fetches a module as soon as it parses its tag.
+
+### Content Security Policy nonces
+
+Under a policy with nonces (`script-src 'nonce-…'`), the injected tags need the
+nonce of the response. Point `csp_nonce_provider` at a service that supplies it.
+With [NelmioSecurityBundle](https://github.com/nelmio/NelmioSecurityBundle) and
+its `csp` feature on, the bundle ships one:
+
+```yaml
+# config/packages/ux_sdc.yaml
+ux_sdc:
+    csp_nonce_provider: Tito10047\UX\Sdc\Csp\NelmioNonceProvider
+```
+
+```html
+<link rel="stylesheet" href="/assets/Alert/Alert-9c2e1d0.css" nonce="Xr2Lq…">
+<script src="/assets/Alert/Alert-3b1f2a4.js" type="module" nonce="Xr2Lq…"></script>
+```
+
+Nelmio adds a nonce to the policy when it is asked for one, which is why this is
+not automatic: once a nonce is in `script-src`, browsers ignore `'unsafe-inline'`,
+and an application relying on it would have its inline scripts blocked on every
+page that renders component JS. The bundle asks only for the nonces of the tags it
+injects — no script nonce on a page without component scripts.
+
+Pass the same nonce to the import map, which needs one too:
+`{{ importmap('app', {nonce: csp_nonce('script')}) }}`.
+
+For any other source of nonces, implement
+`Tito10047\UX\Sdc\Csp\NonceProviderInterface` (`getScriptNonce(): ?string`,
+`getStyleNonce(): ?string`) and give its service ID. It is called while the
+response is sent, once per kind of tag; return the nonce the response's
+`Content-Security-Policy` header allows, or `null` for none. A provider that keeps
+the nonce in a property has to forget it between requests (`kernel.reset`), or a
+long-running worker would reuse it.
 
 ### Stimulus controllers
 
@@ -378,8 +454,11 @@ nothing to declare them with.
 Live Components get their assets like any other component on the first render.
 When a re-render brings a component that is not on the page yet, the response
 cannot carry new `<link>` tags; the bundle sends the asset URLs in the
-`X-SDC-Assets-CSS` and `X-SDC-Assets-JS` headers instead, and a Stimulus
-controller shipped with the bundle adds the missing ones to `<head>`.
+`X-SDC-Assets-CSS`, `X-SDC-Assets-JS` (modules) and `X-SDC-Assets-JS-Classic`
+headers instead, and a Stimulus controller shipped with the bundle adds the
+missing ones to `<head>` — with the CSP nonce it finds on the page's own `<script>`
+and `<link>`/`<style>` elements, since the policy that applies is the one the page
+was loaded with.
 
 Attach the controller once, to `<body>`:
 
@@ -591,6 +670,11 @@ ux_sdc:
 
     # What render_component_assets() prints and the response listener replaces.
     placeholder: '<!-- __UX_TWIG_COMPONENT_ASSETS__ -->'
+
+    # Service ID of a Tito10047\UX\Sdc\Csp\NonceProviderInterface, whose CSP
+    # nonces are put on the injected tags. Tito10047\UX\Sdc\Csp\NelmioNonceProvider
+    # uses NelmioSecurityBundle's. null: no nonce.
+    csp_nonce_provider: null
 ```
 
 `metadata_cache` follows the debug flag, not the environment name: a `staging`
@@ -622,9 +706,10 @@ component until the worker restarts.
    and process).
 3. **Response.** A `kernel.response` listener (priority 64, ahead of WebLink's
    `Link` header listener) replaces the first placeholder in an HTML main response
-   with the tags, sorted by priority, and adds a `Link: rel="preload"` header for
-   each. For a Live Component re-render it sets the `X-SDC-Assets-*` headers
-   instead. The registry is reset between requests, so long-running workers do not
+   with the tags, sorted by priority — scripts as ES modules, with the CSP nonce
+   when a provider is configured — and adds a `Link: rel="preload"` header for each
+   stylesheet and classic script. For a Live Component re-render it sets the
+   `X-SDC-Assets-*` headers instead. The registry is reset between requests, so long-running workers do not
    carry assets over.
 
 Components rendered in a sub-request (`render(controller(...))`) end up in the
@@ -679,6 +764,7 @@ The bundle also logs what goes wrong while rendering, through the application's
 |-------|------|--------|
 | warning | A co-located template is outside every Twig path, or a co-located CSS/JS file outside every AssetMapper path, so it is left out (see [Where components can live](#where-components-can-live)). | in debug only; at build time (`metadata_cache: true`) into the container compiler log, shown in the profiler's *Logs* panel under *Container* |
 | warning | An HTML page with a `<head>` renders components with assets but does not call `render_component_assets()`. Fragments without a `<head>` (Turbo Frames, partials) are not reported. | in debug only |
+| warning | The page has its import map after `render_component_assets()`, so component modules come before it. | in debug only |
 | warning | A component asset path is not in the asset map (a typo in `#[Asset]`, a file AssetMapper does not serve), so it is linked as it is. URLs (`https://…`, `//…`, `/…`) are linked as they are on purpose and not reported. | in debug only |
 | error | `metadata_cache` is on but `%kernel.cache_dir%/sdc_metadata.php` does not exist — the cache was not warmed where the application runs, or the runtime cache directory differs from the build one. Pages still render, without component CSS and JS. | always |
 
@@ -690,9 +776,9 @@ Every message says what to change.
   response and ignores its `<head>`, and only Live Component requests get the
   `X-SDC-Assets-*` headers. The CSS and JS of a component that first appears in a
   frame or stream are therefore not loaded unless the page already has them.
-- **Assets added by a Live re-render** are inserted as plain `<link>` and
-  `<script>` tags: the `attributes` of `#[Asset]` (`type="module"`, `nonce`, …) do
-  not travel with the headers.
+- **Assets added by a Live re-render** keep whether a script is a module and get
+  the CSP nonce of the page, but no other `attributes` of `#[Asset]` (`defer`,
+  `integrity`, …): those do not travel with the headers.
 - **Streamed responses.** Components rendered while a `StreamedResponse` is being
   sent are registered after `kernel.response` and get no assets.
 - **ESI.** Each ESI fragment is its own main request; assets of its components do

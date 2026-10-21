@@ -95,7 +95,7 @@ final class TemplateResolutionIntegrationTest extends FunctionalTestCase
         $assetMapper = self::getContainer()->get(AssetMapperInterface::class);
         $js = $assetMapper->getAsset('lib/Badge/Badge.js')?->publicPath;
         $this->assertNotNull($js);
-        $this->assertSame(1, substr_count($html, \sprintf('<script src="%s"></script>', $js)));
+        $this->assertSame(1, substr_count($html, \sprintf('<script src="%s" type="module"></script>', $js)));
     }
 
     private function assertStylesheetLinked(string $html, string $logicalPath): void

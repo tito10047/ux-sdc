@@ -11,6 +11,7 @@
 
 namespace Tito10047\UX\Sdc\DependencyInjection;
 
+use Nelmio\SecurityBundle\NelmioSecurityBundle;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Resource\FileExistenceResource;
@@ -25,6 +26,7 @@ use Symfony\Component\Config\FileLocator;
 use Tito10047\UX\Sdc\CompilerPass\AssetComponentCompilerPass;
 use Tito10047\UX\Sdc\CompilerPass\ComponentRoutesCompilerPass;
 use Tito10047\UX\Sdc\CompilerPass\StimulusControllerPathsCompilerPass;
+use Tito10047\UX\Sdc\Csp\NelmioNonceProvider;
 use Tito10047\UX\Sdc\Debug\ComponentInspector;
 use Tito10047\UX\Sdc\EventListener\ComponentRenderListener;
 use Tito10047\UX\Sdc\EventListener\DevComponentRenderListener;
@@ -75,9 +77,15 @@ class SdcExtension extends Extension implements PrependExtensionInterface
             $container->getDefinition(ComponentInspector::class)->setArgument('$metadataCache', $metadataCache);
         }
 
+        $this->registerNelmioNonceProvider($container);
+
         if ($container->hasDefinition('Tito10047\UX\Sdc\EventListener\AssetResponseListener')) {
-            $container->getDefinition('Tito10047\UX\Sdc\EventListener\AssetResponseListener')
+            $listener = $container->getDefinition('Tito10047\UX\Sdc\EventListener\AssetResponseListener')
                 ->setArgument('$placeholder', $config['placeholder']);
+
+            if (null !== $config['csp_nonce_provider']) {
+                $listener->setArgument('$nonceProvider', new Reference($config['csp_nonce_provider']));
+            }
         }
 
         if ($container->hasDefinition('Tito10047\UX\Sdc\Twig\AssetExtension')) {
@@ -182,6 +190,30 @@ class SdcExtension extends Extension implements PrependExtensionInterface
                 ],
             ]);
         }
+    }
+
+    /**
+     * The adapter for NelmioSecurityBundle, available to `csp_nonce_provider` when
+     * the bundle is enabled. It refers to Nelmio's CSP listener, which exists only
+     * with Nelmio's `csp` feature on; unless `csp_nonce_provider` selects it, the
+     * adapter is private and unused, and the container removes it without
+     * resolving that reference.
+     */
+    private function registerNelmioNonceProvider(ContainerBuilder $container): void
+    {
+        if (!$container->hasParameter('kernel.bundles')) {
+            return;
+        }
+
+        /** @var array<string, class-string> $bundles */
+        $bundles = $container->getParameter('kernel.bundles');
+
+        if (!\in_array(NelmioSecurityBundle::class, $bundles, true)) {
+            return;
+        }
+
+        $container->register(NelmioNonceProvider::class, NelmioNonceProvider::class)
+            ->setArguments([new Reference('nelmio_security.csp_listener')]);
     }
 
     /**

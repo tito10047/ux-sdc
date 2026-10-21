@@ -22,6 +22,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\WebLink\GenericLinkProvider;
+use Tito10047\UX\Sdc\Csp\NonceProviderInterface;
 use Tito10047\UX\Sdc\EventListener\AssetResponseListener;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
 use Tito10047\UX\Sdc\Tests\TestLogger;
@@ -50,13 +51,11 @@ final class AssetResponseListenerTest extends TestCase
         $response = $this->dispatch(new Response(self::PAGE), $request);
 
         $this->assertSame(
-            '<html><head><link rel="stylesheet" href="style.css">' . "\n" . '<script src="app.js"></script>' . "\n" . '</head><body></body></html>',
+            '<html><head><link rel="stylesheet" href="style.css">' . "\n" . '<script src="app.js" type="module"></script>' . "\n" . '</head><body></body></html>',
             $response->getContent(),
         );
 
-        $links = $request->attributes->get('_links');
-        $this->assertInstanceOf(GenericLinkProvider::class, $links);
-        $this->assertCount(2, $links->getLinks());
+        $this->assertSame(['style.css' => 'style'], $this->preloads($request), 'A module script gets no preload.');
     }
 
     public function testInjectsOnceWhenThePlaceholderAppearsSeveralTimes(): void
@@ -67,7 +66,7 @@ final class AssetResponseListenerTest extends TestCase
         $response = $this->dispatch(new Response('<head>[[ASSETS]]</head><body>[[ASSETS]]<p>[[ASSETS]]</p></body>'));
 
         $this->assertSame(
-            '<head><link rel="stylesheet" href="style.css">' . "\n" . '<script src="app.js"></script>' . "\n" . '</head><body><p></p></body>',
+            '<head><link rel="stylesheet" href="style.css">' . "\n" . '<script src="app.js" type="module"></script>' . "\n" . '</head><body><p></p></body>',
             $response->getContent(),
         );
     }
@@ -197,7 +196,195 @@ final class AssetResponseListenerTest extends TestCase
 
         $response = $this->dispatch(new Response(self::PAGE));
 
-        $this->assertStringContainsString('<script src="app.js" defer data-id="a&quot;b"></script>', (string) $response->getContent());
+        $this->assertStringContainsString('<script src="app.js" type="module" defer data-id="a&quot;b"></script>', (string) $response->getContent());
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>, string}>
+     */
+    public static function provideClassicScripts(): iterable
+    {
+        yield 'type left out' => [['type' => false], '<script src="legacy.js"></script>'];
+        yield 'type null' => [['type' => null], '<script src="legacy.js"></script>'];
+        yield 'another type' => [['type' => 'text/javascript'], '<script src="legacy.js" type="text/javascript"></script>'];
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     */
+    #[DataProvider('provideClassicScripts')]
+    public function testAnAssetCanOptOutOfModules(array $attributes, string $tag): void
+    {
+        $this->registry->addAsset('legacy.js', 'js', attributes: $attributes);
+
+        $request = new Request();
+        $response = $this->dispatch(new Response(self::PAGE), $request);
+
+        $this->assertStringContainsString($tag . "\n", (string) $response->getContent());
+        $this->assertSame(['legacy.js' => 'script'], $this->preloads($request));
+    }
+
+    public function testAnExplicitModuleTypeIsAModule(): void
+    {
+        $this->registry->addAsset('app.js', 'js', attributes: ['type' => 'MODULE']);
+
+        $request = new Request();
+        $response = $this->dispatch(new Response(self::PAGE), $request);
+
+        $this->assertStringContainsString('<script src="app.js" type="MODULE"></script>', (string) $response->getContent());
+        $this->assertFalse($request->attributes->has('_links'));
+    }
+
+    public function testPutsTheNoncesOfTheProviderOnTheTags(): void
+    {
+        $provider = $this->createNonceProvider('script-n0nce', 'style"n0nce');
+        $this->listener = $this->createListener(true, $provider);
+        $this->registry->addAsset('style.css', 'css');
+        $this->registry->addAsset('app.js', 'js');
+        $this->registry->addAsset('legacy.js', 'js', attributes: ['type' => false]);
+
+        $response = $this->dispatch(new Response(self::PAGE));
+
+        $this->assertSame(
+            '<html><head><link rel="stylesheet" href="style.css" nonce="style&quot;n0nce">' . "\n"
+            . '<script src="app.js" type="module" nonce="script-n0nce"></script>' . "\n"
+            . '<script src="legacy.js" nonce="script-n0nce"></script>' . "\n"
+            . '</head><body></body></html>',
+            $response->getContent(),
+        );
+        $this->assertSame(['script' => 1, 'style' => 1], $provider->calls, 'Each nonce is asked for once per response.');
+    }
+
+    public function testTheNonceAttributeOfAnAssetWins(): void
+    {
+        $this->listener = $this->createListener(true, $this->createNonceProvider('n0nce', 'n0nce'));
+        $this->registry->addAsset('app.js', 'js', attributes: ['nonce' => false]);
+        $this->registry->addAsset('style.css', 'css', attributes: ['nonce' => 'own']);
+
+        $content = (string) $this->dispatch(new Response(self::PAGE))->getContent();
+
+        $this->assertStringContainsString('<script src="app.js" type="module"></script>', $content);
+        $this->assertStringContainsString('<link rel="stylesheet" href="style.css" nonce="own">', $content);
+    }
+
+    public function testInjectsWithoutANonceWhenTheProviderHasNone(): void
+    {
+        $this->listener = $this->createListener(true, $this->createNonceProvider(null, null));
+        $this->registry->addAsset('style.css', 'css');
+        $this->registry->addAsset('app.js', 'js');
+
+        $content = (string) $this->dispatch(new Response(self::PAGE))->getContent();
+
+        $this->assertStringContainsString('<link rel="stylesheet" href="style.css">', $content);
+        $this->assertStringContainsString('<script src="app.js" type="module"></script>', $content);
+    }
+
+    /**
+     * NelmioSecurityBundle adds a nonce to the policy when it is asked for one;
+     * a page without component scripts must not get a script nonce it does not use.
+     */
+    public function testAsksOnlyForTheNoncesOfTheTagsInjected(): void
+    {
+        $provider = $this->createNonceProvider('script-n0nce', 'style-n0nce');
+        $this->listener = $this->createListener(true, $provider);
+        $this->registry->addAsset('style.css', 'css');
+
+        $this->dispatch(new Response(self::PAGE));
+
+        $this->assertSame(['script' => 0, 'style' => 1], $provider->calls);
+    }
+
+    /**
+     * @return iterable<string, array{Request, Response}>
+     */
+    public static function provideResponsesWithoutTags(): iterable
+    {
+        $live = new Request();
+        $live->headers->set('Accept', 'application/vnd.live-component+html');
+
+        yield 'Live Component request' => [$live, new Response('<div></div>')];
+        yield 'no placeholder' => [new Request(), new Response('<html><head></head><body></body></html>')];
+        yield 'not HTML' => [new Request(), new Response(self::PAGE, 200, ['Content-Type' => 'application/json'])];
+    }
+
+    #[DataProvider('provideResponsesWithoutTags')]
+    public function testDoesNotAskForNoncesWhenNoTagIsInjected(Request $request, Response $response): void
+    {
+        $provider = $this->createNonceProvider('script-n0nce', 'style-n0nce');
+        $this->listener = $this->createListener(true, $provider);
+        $this->registry->addAsset('style.css', 'css');
+        $this->registry->addAsset('app.js', 'js');
+
+        $this->dispatch($response, $request);
+
+        $this->assertSame(['script' => 0, 'style' => 0], $provider->calls);
+    }
+
+    public function testSendsClassicScriptsInTheirOwnHeaderToLiveComponentRequests(): void
+    {
+        $this->registry->addAsset('app.js', 'js');
+        $this->registry->addAsset('legacy.js', 'js', attributes: ['type' => false]);
+        $this->registry->addAsset('old.js', 'js', attributes: ['type' => 'text/javascript']);
+
+        $request = new Request();
+        $request->headers->set('Accept', 'application/vnd.live-component+html');
+        $response = $this->dispatch(new Response('<div></div>'), $request);
+
+        $this->assertSame('app.js', $response->headers->get('X-SDC-Assets-JS'));
+        $this->assertSame('legacy.js,old.js', $response->headers->get('X-SDC-Assets-JS-Classic'));
+        $this->assertFalse($response->headers->has('X-SDC-Assets-CSS'));
+    }
+
+    public function testWarnsInDebugWhenTheImportMapComesAfterModuleScripts(): void
+    {
+        $this->registry->addAsset('Alert/Alert.js', 'js');
+
+        $page = '<html><head>[[ASSETS]]<script type="importmap">{"imports": {}}</script></head><body></body></html>';
+        $this->dispatch(new Response($page), Request::create('/shop'));
+
+        $warnings = $this->logger->recordsOf(LogLevel::WARNING);
+        $this->assertCount(1, $warnings);
+        $this->assertSame(['uri' => '/shop'], $warnings[0]['context']);
+        $this->assertStringContainsString('before its import map', $warnings[0]['message']);
+        $this->assertStringContainsString('after {{ importmap() }}', $warnings[0]['message']);
+    }
+
+    /**
+     * @return iterable<string, array{bool, string, array<string, mixed>}>
+     */
+    public static function providePagesWithoutImportMapProblem(): iterable
+    {
+        $after = '<html><head>[[ASSETS]]<SCRIPT type=importmap>{}</SCRIPT></head><body></body></html>';
+
+        // [debug, content, script attributes]
+        yield 'import map first' => [true, '<html><head><script type="importmap">{}</script>' . "\n" . '[[ASSETS]]</head><body>[[ASSETS]]</body></html>', []];
+        yield 'no import map' => [true, self::PAGE, []];
+        yield 'classic scripts only' => [true, $after, ['type' => false]];
+        yield 'not in debug' => [false, $after, []];
+        yield 'another attribute ending in type' => [true, '<html><head>[[ASSETS]]<script data-type="importmap" src="x.js"></script></head></html>', []];
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     */
+    #[DataProvider('providePagesWithoutImportMapProblem')]
+    public function testDoesNotWarnAboutTheImportMap(bool $debug, string $content, array $attributes): void
+    {
+        $this->listener = $this->createListener($debug);
+        $this->registry->addAsset('Alert/Alert.js', 'js', attributes: $attributes);
+
+        $this->dispatch(new Response($content));
+
+        $this->assertSame([], $this->logger->records);
+    }
+
+    public function testWarnsAboutAnImportMapWrittenInAnyCase(): void
+    {
+        $this->registry->addAsset('Alert/Alert.js', 'js');
+
+        $this->dispatch(new Response('<html><head>[[ASSETS]]<SCRIPT nonce="x" TYPE=\'importmap\'>{}</SCRIPT></head></html>'));
+
+        $this->assertCount(1, $this->logger->recordsOf(LogLevel::WARNING));
     }
 
     public function testEscapesTheAssetUrl(): void
@@ -342,7 +529,7 @@ final class AssetResponseListenerTest extends TestCase
     /**
      * The asset map knows Alert/Alert.css and Alert/Alert.js.
      */
-    private function createListener(bool $debug): AssetResponseListener
+    private function createListener(bool $debug, ?NonceProviderInterface $nonceProvider = null): AssetResponseListener
     {
         $assetMapper = $this->createMock(AssetMapperInterface::class);
         $assetMapper->method('getAsset')->willReturnCallback(static fn (string $logicalPath): ?MappedAsset => match ($logicalPath) {
@@ -351,7 +538,57 @@ final class AssetResponseListenerTest extends TestCase
             default => null,
         });
 
-        return new AssetResponseListener($this->registry, $assetMapper, '[[ASSETS]]', $this->logger, $debug);
+        return new AssetResponseListener($this->registry, $assetMapper, '[[ASSETS]]', $this->logger, $debug, $nonceProvider);
+    }
+
+    /**
+     * Counts how often each nonce is asked for.
+     */
+    private function createNonceProvider(?string $scriptNonce, ?string $styleNonce): NonceProviderInterface
+    {
+        return new class ($scriptNonce, $styleNonce) implements NonceProviderInterface {
+            /** @var array{script: int, style: int} */
+            public array $calls = ['script' => 0, 'style' => 0];
+
+            public function __construct(
+                private ?string $scriptNonce,
+                private ?string $styleNonce,
+            ) {
+            }
+
+            public function getScriptNonce(): ?string
+            {
+                ++$this->calls['script'];
+
+                return $this->scriptNonce;
+            }
+
+            public function getStyleNonce(): ?string
+            {
+                ++$this->calls['style'];
+
+                return $this->styleNonce;
+            }
+        };
+    }
+
+    /**
+     * The preload links stored for WebLink, `href => as`.
+     *
+     * @return array<string, string>
+     */
+    private function preloads(Request $request): array
+    {
+        $links = $request->attributes->get('_links');
+        $this->assertInstanceOf(GenericLinkProvider::class, $links);
+
+        $preloads = [];
+        foreach ($links->getLinks() as $link) {
+            $this->assertSame(['preload'], $link->getRels());
+            $preloads[$link->getHref()] = $link->getAttributes()['as'];
+        }
+
+        return $preloads;
     }
 
     private function dispatch(Response $response, ?Request $request = null, int $requestType = HttpKernelInterface::MAIN_REQUEST): Response

@@ -103,6 +103,6 @@ class AutoDiscoveryIntegrationTest extends IntegrationTestCase
 
         // Verify assets are injected (based on auto-discovery filenames)
         $this->assertStringContainsString('<link rel="stylesheet" href="/assets/AutoDiscovery/AutoDiscoveryComponent.css">', $finalHtml);
-        $this->assertStringContainsString('<script src="/assets/AutoDiscovery/AutoDiscoveryComponent.js"></script>', $finalHtml);
+        $this->assertStringContainsString('<script src="/assets/AutoDiscovery/AutoDiscoveryComponent.js" type="module"></script>', $finalHtml);
     }
 }

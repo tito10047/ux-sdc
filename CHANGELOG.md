@@ -87,6 +87,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `false` makes the `ux_sdc` import load nothing and keeps the component classes
   out of `resource: routing.controllers` (Symfony 7.4+). An import of the
   directory written by the application itself is not affected.
+- `ux_sdc.csp_nonce_provider` (default `null`): the service ID of a
+  `Tito10047\UX\Sdc\Csp\NonceProviderInterface`, whose Content Security Policy
+  nonces are put on the injected `<script>` (script nonce) and `<link>` (style
+  nonce) tags. It is asked only for the kinds of tags a response gets.
+  `Tito10047\UX\Sdc\Csp\NelmioNonceProvider`, registered when
+  NelmioSecurityBundle is enabled, uses the nonces of Nelmio's `csp` feature;
+  it is opt-in, because a nonce in the policy makes browsers ignore
+  `'unsafe-inline'`. An asset's own `nonce` attribute wins (`false` leaves it out).
+  The loader controller gives the assets of a Live re-render the nonce of the page.
+- Warning, in debug only: a page has its import map after
+  `render_component_assets()`, so component module scripts come before it.
 
 ### Changed
 
@@ -181,6 +192,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stops before writing anything. The generated template called
   `stimulus_controller()`, a Twig function of StimulusBundle, so the component
   failed to render.
+- **Behaviour change:** component scripts are loaded as ES modules,
+  `<script src="…" type="module">` — discovered ones, `#[AsSdcComponent(js: …)]`
+  and `#[Asset]` alike. AssetMapper serves JavaScript as modules: a component
+  script with an `import` statement failed as a classic script, and bare imports
+  resolve only through the import map. A module runs after the page is parsed, in
+  strict mode and in a scope of its own, so a script relying on running
+  immediately in `<head>` or on its top-level variables being global has to opt
+  out with `attributes: ['type' => false]` (classic script; any other `type`
+  value is kept as it is). `render_component_assets()` has to come after
+  `{{ importmap() }}`: a browser that does not merge import maps ignores one that
+  comes after a module script, and every bare import of the page then fails.
+- Module scripts get no `Link: rel="preload"` header any more (`as="script"`
+  fetches a module in the wrong mode, so it was downloaded twice; a
+  `rel="modulepreload"` header would start loading modules before the import map
+  is parsed). Stylesheets and classic scripts keep theirs.
+- Live re-render headers: `X-SDC-Assets-JS` lists module scripts, the new
+  `X-SDC-Assets-JS-Classic` the scripts that opted out; the loader controller
+  inserts them accordingly. Until now every script was inserted as a classic one.
 
 ### Fixed
 

@@ -3,9 +3,15 @@
 //
 // On a full page load the server injects component assets into the HTML. A
 // Live Component AJAX re-render cannot do that, so the server lists the asset
-// URLs in the `X-SDC-Assets-CSS` / `X-SDC-Assets-JS` response headers
-// (comma-separated, in priority order) and this controller adds the ones the
-// document does not have yet.
+// URLs in response headers (comma-separated, in priority order) and this
+// controller adds the ones the document does not have yet:
+//
+//   X-SDC-Assets-CSS         stylesheets
+//   X-SDC-Assets-JS          scripts loaded as ES modules (the default)
+//   X-SDC-Assets-JS-Classic  scripts an asset opted out of modules for
+//
+// Under a Content Security Policy with nonces, the new elements get the nonce of
+// the page they are added to, taken from an element that already carries one.
 //
 // The controller is registered automatically through the bundle's
 // `assets/package.json`; attach it once per page, ideally on <body>:
@@ -21,6 +27,7 @@ import { Controller } from '@hotwired/stimulus';
 
 const CSS_HEADER = 'X-SDC-Assets-CSS';
 const JS_HEADER = 'X-SDC-Assets-JS';
+const CLASSIC_JS_HEADER = 'X-SDC-Assets-JS-Classic';
 
 export default class extends Controller {
   initialize() {
@@ -77,26 +84,63 @@ export default class extends Controller {
       return;
     }
 
+    const styleNonce = documentNonce('link[nonce], style[nonce]');
     for (const url of parseAssetHeader(headers.get(CSS_HEADER))) {
       if (!hasStylesheet(url)) {
         const link = document.createElement('link');
         link.rel = 'stylesheet';
         link.href = url;
+        if (styleNonce) {
+          link.nonce = styleNonce;
+        }
         document.head.appendChild(link);
       }
     }
 
+    const scriptNonce = documentNonce('script[nonce]');
     for (const url of parseAssetHeader(headers.get(JS_HEADER))) {
-      if (!hasScript(url)) {
-        const script = document.createElement('script');
-        script.src = url;
-        // Dynamically inserted scripts are async by default; keep them executing
-        // in insertion order, which is the priority order the server sent.
-        script.async = false;
-        document.head.appendChild(script);
-      }
+      addScript(url, true, scriptNonce);
+    }
+    for (const url of parseAssetHeader(headers.get(CLASSIC_JS_HEADER))) {
+      addScript(url, false, scriptNonce);
     }
   }
+}
+
+function addScript(url, isModule, nonce) {
+  if (hasScript(url)) {
+    return;
+  }
+
+  const script = document.createElement('script');
+  if (isModule) {
+    script.type = 'module';
+  }
+  script.src = url;
+  if (nonce) {
+    script.nonce = nonce;
+  }
+  // Dynamically inserted scripts are async by default; keep them executing
+  // in insertion order, which is the priority order the server sent.
+  script.async = false;
+  document.head.appendChild(script);
+}
+
+/**
+ * The CSP nonce of the page, read from the first element matching the selector.
+ * The `nonce` property, not the attribute: browsers blank the attribute once
+ * the element is parsed, so that the nonce cannot be read by CSS selectors.
+ * A nonce sent with the re-render response would be of no use: the policy that
+ * applies is the one the page was loaded with.
+ */
+function documentNonce(selector) {
+  for (const element of document.querySelectorAll(selector)) {
+    if (element.nonce) {
+      return element.nonce;
+    }
+  }
+
+  return '';
 }
 
 /**

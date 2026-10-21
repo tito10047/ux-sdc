@@ -16,6 +16,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
+use Tito10047\UX\Sdc\Csp\NonceProviderInterface;
 use Tito10047\UX\Sdc\Service\AssetPath;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
 use Symfony\Component\WebLink\GenericLinkProvider;
@@ -26,6 +27,12 @@ use Symfony\Component\WebLink\Link;
  *
  * Registered on `kernel.response` in `config/services.php`, where its priority
  * is explained.
+ *
+ * Scripts are ES modules (`type="module"`) unless the asset says otherwise:
+ * AssetMapper serves JavaScript as modules, and a file with an `import` statement
+ * is a syntax error when loaded as a classic script. An asset that sets the
+ * `type` attribute itself keeps it, and `'type' => false` leaves the attribute
+ * out, which loads a classic script.
  */
 final class AssetResponseListener
 {
@@ -43,6 +50,7 @@ final class AssetResponseListener
         private string $placeholder = '<!-- __UX_TWIG_COMPONENT_ASSETS__ -->',
         private ?LoggerInterface $logger = null,
         private bool $debug = false,
+        private ?NonceProviderInterface $nonceProvider = null,
     ) {
     }
 
@@ -63,24 +71,29 @@ final class AssetResponseListener
         $this->injectAssets($event->getRequest(), $event->getResponse());
     }
 
+    /**
+     * The loader controller creates module scripts from `X-SDC-Assets-JS` and
+     * classic ones from `X-SDC-Assets-JS-Classic`, the way the tags of a full page
+     * would be. No other attribute travels; the nonce is the one of the page the
+     * assets are added to, which the controller takes from the document.
+     */
     private function addAssetHeaders(Response $response): void
     {
-        $css = [];
-        $js = [];
+        $paths = ['X-SDC-Assets-CSS' => [], 'X-SDC-Assets-JS' => [], 'X-SDC-Assets-JS-Classic' => []];
 
         foreach ($this->resolveAssets() as $asset) {
-            if ('css' === $asset['type']) {
-                $css[] = $asset['path'];
-            } else {
-                $js[] = $asset['path'];
-            }
+            $header = match (true) {
+                'css' === $asset['type'] => 'X-SDC-Assets-CSS',
+                $this->isModule($this->scriptAttributes($asset['attributes'], null)) => 'X-SDC-Assets-JS',
+                default => 'X-SDC-Assets-JS-Classic',
+            };
+            $paths[$header][] = $asset['path'];
         }
 
-        if ($css) {
-            $response->headers->set('X-SDC-Assets-CSS', implode(',', array_unique($css)));
-        }
-        if ($js) {
-            $response->headers->set('X-SDC-Assets-JS', implode(',', array_unique($js)));
+        foreach ($paths as $header => $list) {
+            if ([] !== $list) {
+                $response->headers->set($header, implode(',', array_unique($list)));
+            }
         }
     }
 
@@ -99,20 +112,48 @@ final class AssetResponseListener
             return;
         }
 
+        $assets = $this->resolveAssets();
+        $types = array_column($assets, 'type');
+
+        // Asked for only when a tag of that kind is injected: a provider such as
+        // NelmioSecurityBundle adds a nonce to the policy as soon as it hands it out.
+        $styleNonce = \in_array('css', $types, true) ? $this->nonceProvider?->getStyleNonce() : null;
+        $scriptNonce = \in_array('js', $types, true) ? $this->nonceProvider?->getScriptNonce() : null;
+
         $html = '';
         $links = [];
+        $modules = false;
 
-        foreach ($this->resolveAssets() as $asset) {
+        foreach ($assets as $asset) {
             $path = htmlspecialchars($asset['path'], ENT_QUOTES);
-            $attributes = $this->renderAttributes($asset['attributes']);
 
             if ('css' === $asset['type']) {
-                $html .= sprintf('<link rel="stylesheet" href="%s"%s>' . "\n", $path, $attributes);
+                $attributes = array_merge(['nonce' => $styleNonce], $asset['attributes']);
+                $html .= sprintf('<link rel="stylesheet" href="%s"%s>' . "\n", $path, $this->renderAttributes($attributes));
                 $links[] = (new Link('preload', $asset['path']))->withAttribute('as', 'style');
+
+                continue;
+            }
+
+            $attributes = $this->scriptAttributes($asset['attributes'], $scriptNonce);
+            $html .= sprintf('<script src="%s"%s></script>' . "\n", $path, $this->renderAttributes($attributes));
+
+            // A module script gets no preload header; it is fetched as soon as its
+            // tag is parsed. `rel="preload"; as="script"` would fetch it in the
+            // wrong mode for a module, so the browser downloads it twice.
+            // `rel="modulepreload"` in a header starts loading modules before the
+            // page's import map is parsed, after which a browser that does not merge
+            // import maps ignores it (whatwg/html#9274, Firefox bug 1774414);
+            // `importmap()` does not send one either.
+            if ($this->isModule($attributes)) {
+                $modules = true;
             } else {
-                $html .= sprintf('<script src="%s"%s></script>' . "\n", $path, $attributes);
                 $links[] = (new Link('preload', $asset['path']))->withAttribute('as', 'script');
             }
+        }
+
+        if ($modules) {
+            $this->reportImportMapAfterModules($request, $content);
         }
 
         // The tags go where the first placeholder is. Any further placeholder (a
@@ -214,6 +255,59 @@ final class AssetResponseListener
         }
 
         return $path;
+    }
+
+    /**
+     * The attributes of a script tag: `type="module"` and the nonce first, then
+     * those of the asset, which override either. `'type' => false` therefore
+     * renders a classic script, and `'nonce' => false` a tag without the nonce.
+     *
+     * @param array<string, mixed> $attributes
+     *
+     * @return array<string, mixed>
+     */
+    private function scriptAttributes(array $attributes, ?string $nonce): array
+    {
+        return array_merge(['type' => 'module', 'nonce' => $nonce], $attributes);
+    }
+
+    /**
+     * @param array<string, mixed> $attributes as returned by scriptAttributes()
+     */
+    private function isModule(array $attributes): bool
+    {
+        return \is_string($attributes['type']) && 'module' === strtolower(trim($attributes['type']));
+    }
+
+    /**
+     * An import map has to come before every module script of the document: a
+     * browser that does not merge import maps ignores one parsed after it has
+     * started loading modules, and every bare import of the page
+     * (`import '@hotwired/stimulus'`) — those of the application's own entrypoint
+     * included — then fails to resolve.
+     *
+     * The tags go where the first placeholder is, so an import map found further
+     * down the page is reported. A page without an import map is not: its modules
+     * may only use relative imports.
+     */
+    private function reportImportMapAfterModules(Request $request, string $content): void
+    {
+        if (!$this->debug || null === $this->logger) {
+            return;
+        }
+
+        if (1 !== preg_match('/<script\b[^>]*\stype\s*=\s*["\']?importmap\b/i', $content, $match, \PREG_OFFSET_CAPTURE)) {
+            return;
+        }
+
+        if ($match[0][1] < strpos($content, $this->placeholder)) {
+            return;
+        }
+
+        $this->logger->warning(
+            'The page "{uri}" injects component scripts, which are ES modules, before its import map: an import map that comes after a module script is ignored by browsers that do not merge import maps, and the bare imports of the page then fail to resolve. Call {{ render_component_assets() }} after {{ importmap() }}.',
+            ['uri' => $request->getRequestUri()]
+        );
     }
 
     /**

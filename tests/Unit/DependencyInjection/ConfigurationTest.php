@@ -33,6 +33,7 @@ class ConfigurationTest extends TestCase
         $this->assertTrue($config['auto_discovery']);
         $this->assertSame('auto', $config['metadata_cache']);
         $this->assertEquals('<!-- __UX_TWIG_COMPONENT_ASSETS__ -->', $config['placeholder']);
+        $this->assertNull($config['csp_nonce_provider']);
     }
 
     public function testCustomConfig(): void

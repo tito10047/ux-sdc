@@ -55,6 +55,10 @@ class Configuration implements ConfigurationInterface
                     ->cannotBeEmpty()
                     ->info('The marker that render_component_assets() prints and that is replaced, in an HTML response, with the <link> and <script> tags of the components rendered on the page. Choose a string that cannot occur in the page otherwise.')
                 ->end()
+                ->scalarNode('csp_nonce_provider')
+                    ->defaultNull()
+                    ->info('Service ID of a Tito10047\\UX\\Sdc\\Csp\\NonceProviderInterface supplying the Content Security Policy nonces of the current request, put on the injected <script> and <link> tags. "Tito10047\\UX\\Sdc\\Csp\\NelmioNonceProvider" uses those of NelmioSecurityBundle (its "csp" feature has to be on). Null injects the tags without a nonce.')
+                ->end()
             ->end();
 
         return $treeBuilder;

@@ -139,7 +139,7 @@ final class AnonymousComponentIntegrationTest extends FunctionalTestCase
      */
     private function linkedScripts(string $html): array
     {
-        preg_match_all('~<script src="([^"]+)"></script>~', $html, $matches);
+        preg_match_all('~<script src="([^"]+)" type="module"></script>~', $html, $matches);
 
         return $matches[1];
     }
