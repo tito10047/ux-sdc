@@ -7,7 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `ux_sdc.exclude_templates_from_asset_map` (default `true`): keeps the Twig
+  templates of `ux_components_dir` out of the AssetMapper. Set it to `false`
+  only if you really want them mapped.
+
 ### Fixed
+
+- Component Twig templates are no longer published to `public/assets/`.
+  `ux_components_dir` is registered as an AssetMapper path so that component
+  CSS and JS can be served, which also mapped every `.html.twig` next to them:
+  `asset-map:compile` copied the template sources into `public/assets/` and
+  `manifest.json`, where anyone could download them. The bundle now adds the
+  directory's `*.twig` files (nested directories included) to
+  `framework.asset_mapper.excluded_patterns`; patterns the application defines
+  itself are kept. The manual `excluded_patterns` workaround is no longer
+  needed and can be removed.
 
 - Component assets no longer leak from one request into the next in
   long-running runtimes (FrankenPHP worker mode, RoadRunner, Swoole). There the

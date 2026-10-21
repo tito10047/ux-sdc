@@ -29,10 +29,14 @@ class TestKernel extends Kernel
 
     private array $configs = [];
 
+    /**
+     * @param array $frameworkConfig loaded as a separate framework config, the way an application's own config/packages/framework.yaml would be
+     */
     public function __construct(
         string|array $configs = [],
         ?string $environment = 'test',
-        bool $debug = true
+        bool $debug = true,
+        private readonly array $frameworkConfig = [],
     ) {
         if (is_string($configs)) {
             $environment = $configs;
@@ -84,6 +88,10 @@ class TestKernel extends Kernel
             'session'              => ['storage_factory_id' => 'session.storage.factory.mock_file'],
             'test'                 => true,
         ]);
+
+        if ([] !== $this->frameworkConfig) {
+            $container->loadFromExtension('framework', $this->frameworkConfig);
+        }
 
         $container->loadFromExtension('twig', [
             'default_path' => '%kernel.project_dir%/tests/Integration/Fixtures/templates',

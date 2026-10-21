@@ -44,7 +44,6 @@ It covers the recommended project structure and the `make:sdc-component --action
 
 - The bundle prepends `stimulus.controller_paths`, which suppresses StimulusBundle's default value. Unless your application declares `%kernel.project_dir%/assets/controllers` in `config/packages/stimulus.yaml`, your own Stimulus controllers silently stop being registered.
 - Routes on co-located `--action` controllers reach the router through autoconfiguration, which requires `controllers: { resource: routing.controllers }` in `config/routes.yaml`. That loader arrived in Symfony 7.4; on earlier versions add an explicit routing resource for the component directory, or every generated page returns 404.
-- `ux_components_dir` is registered as an AssetMapper path so component CSS can be served, which also maps the component `.html.twig` files — `asset-map:compile` writes them into `public/assets/`. Add `*/src_component/*.html.twig` to `framework.asset_mapper.excluded_patterns`. (`.php` files are skipped by AssetMapper itself.)
 - Use exactly one component attribute per class. `#[AsSdcComponent]` does not need `#[AsTwigComponent]`, and `#[AsLiveComponent]` does not need `#[AsSdcComponent]`; stacking two fails the container with *"another component already has this name"*.
 
 ## The Concept
@@ -170,6 +169,10 @@ ux_sdc:
     component_namespace: 'App\Component'
     stimulus:
         enabled: true
+    # ux_components_dir is an AssetMapper path, so component CSS and JS can be served.
+    # Its Twig templates are kept out of the asset map (and out of public/assets/);
+    # set this to false only if you want them mapped.
+    exclude_templates_from_asset_map: true
 ```
 
 4. **Add the placeholder to your base template:**

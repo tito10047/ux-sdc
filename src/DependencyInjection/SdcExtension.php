@@ -130,10 +130,12 @@ class SdcExtension extends Extension implements PrependExtensionInterface
         if ($this->isAssetMapperAvailable($container)) {
             $paths[__DIR__.'/../../assets/controllers'] = '@tito10047/ux-sdc';
         }
+        $assetMapper = ['paths' => $paths];
+        if ($this->excludesTemplatesFromAssetMap($container, $config)) {
+            $assetMapper['excluded_patterns'] = [self::templateExclusionPattern($uxComponentsDir)];
+        }
         $container->prependExtensionConfig('framework', [
-            'asset_mapper' => [
-                'paths' => $paths,
-            ],
+            'asset_mapper' => $assetMapper,
         ]);
 
         if (isset($config['component_namespace'])) {
@@ -154,6 +156,62 @@ class SdcExtension extends Extension implements PrependExtensionInterface
                 ],
             ]);
         }
+    }
+
+    /**
+     * The bundle's own configuration is not processed yet when prepend() runs,
+     * so the raw value is read here the way Symfony merges a scalar: last wins.
+     *
+     * @param array<string, mixed> $config
+     */
+    private function excludesTemplatesFromAssetMap(ContainerBuilder $container, array $config): bool
+    {
+        $exclude = $container->resolveEnvPlaceholders($config['exclude_templates_from_asset_map'] ?? true, true);
+
+        // Anything that is not a boolean is rejected by Configuration once
+        // load() processes the same value, so it is not interpreted here.
+        return false !== $exclude;
+    }
+
+    /**
+     * Builds the glob that keeps every Twig template of the component
+     * directory out of the asset map.
+     *
+     * FrameworkBundle compiles `excluded_patterns` with
+     * Glob::toRegex($glob, true, false), anchored at both ends, and
+     * AssetMapperRepository matches it against the absolute path of each file,
+     * built from the realpath() of the mapped directory and normalised to
+     * forward slashes. That is the same in Symfony 6.4, 7.x and 8.x. Hence:
+     *
+     *  - the directory goes in as its realpath(), with forward slashes, or a
+     *    symlinked or "../"-containing path would never match;
+     *  - `*` crosses `/` (strict wildcard slash is off), so one pattern covers
+     *    templates in nested component directories too;
+     *  - glob metacharacters in the directory name are escaped. `[` and `]`
+     *    have no escape in Symfony's Glob (they reach the regex untouched),
+     *    so each becomes `?`, which matches any single character;
+     *  - `%` is doubled, because the pattern is resolved as a container
+     *    parameter once more before FrameworkBundle reads it.
+     */
+    private static function templateExclusionPattern(string $uxComponentsDir): string
+    {
+        $directory = realpath($uxComponentsDir);
+        if (false === $directory) {
+            $directory = $uxComponentsDir;
+        }
+
+        $directory = rtrim(str_replace('\\', '/', $directory), '/');
+        $directory = strtr($directory, [
+            '*' => '\\*',
+            '?' => '\\?',
+            '{' => '\\{',
+            '}' => '\\}',
+            '[' => '?',
+            ']' => '?',
+            '%' => '%%',
+        ]);
+
+        return $directory.'/*.twig';
     }
 
     /**
