@@ -13,12 +13,8 @@ namespace Tito10047\UX\Sdc\CompilerPass;
 
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\DependencyInjection\Definition;
-use Tito10047\UX\Sdc\Attribute\Asset;
-use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
-use ReflectionClass;
 
 /**
  * @phpstan-import-type SdcMetadata from ComponentMetadataResolver
@@ -83,10 +79,8 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
             foreach ($twigConfigs as $config) {
                 if (isset($config['paths'])) {
                     foreach ($config['paths'] as $path => $namespace) {
-                        $actualPath = is_array($path) ? key($path) : $path;
-                        if (is_numeric($actualPath)) {
-                            $actualPath = $namespace;
-                        }
+                        // "paths" is either a path => namespace map or a plain list of paths.
+                        $actualPath = is_numeric($path) ? $namespace : $path;
                         $twigRoots[] = $container->getParameterBag()->resolveValue($actualPath);
                     }
                 }

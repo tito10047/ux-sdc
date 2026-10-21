@@ -15,7 +15,6 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\UX\TwigComponent\ComponentFactory;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\SdcComponent;
-use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\SdcComponentWithAsset;
 
 class AsSdcComponentIntegrationTest extends KernelTestCase

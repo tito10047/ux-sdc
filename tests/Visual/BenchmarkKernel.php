@@ -19,7 +19,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\UX\TwigComponent\TwigComponentBundle;
-use Tito10047\UX\Sdc\UxSdcBundle;
+use Tito10047\UX\Sdc\SdcBundle;
 
 class BenchmarkKernel extends Kernel
 {
@@ -39,7 +39,7 @@ class BenchmarkKernel extends Kernel
             new FrameworkBundle(),
             new TwigBundle(),
             new TwigComponentBundle(),
-            new UxSdcBundle(),
+            new SdcBundle(),
         ];
     }
 

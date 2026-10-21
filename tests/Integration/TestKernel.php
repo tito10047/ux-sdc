@@ -17,13 +17,11 @@ use Symfony\Bundle\TwigBundle\TwigBundle;
 use Symfony\Component\Config\Loader\LoaderInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpKernel\Kernel;
-use Symfony\Component\Routing\RouteCollection;
 use Symfony\UX\TwigComponent\TwigComponentBundle;
 use Symfony\UX\LiveComponent\LiveComponentBundle;
 use Symfony\UX\StimulusBundle\StimulusBundle;
 use Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator;
 use Tito10047\UX\Sdc\SdcBundle;
-use Tito10047\UX\Sdc\UxSdcBundle;
 
 class TestKernel extends Kernel
 {

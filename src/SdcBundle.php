@@ -11,20 +11,19 @@
 
 namespace Tito10047\UX\Sdc;
 
-use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
-use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
-use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
-use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
+use Symfony\Component\HttpKernel\Bundle\Bundle;
 use Tito10047\UX\Sdc\CompilerPass\AssetComponentCompilerPass;
-use Tito10047\UX\Sdc\DependencyInjection\Configuration;
 use Tito10047\UX\Sdc\DependencyInjection\SdcExtension;
 
 /**
+ * The configuration tree lives in {@see DependencyInjection\Configuration},
+ * loaded by {@see SdcExtension} under the "ux_sdc" alias.
+ *
  * @link https://symfony.com/doc/current/bundles/best_practices.html
  */
-class SdcBundle extends AbstractBundle
+class SdcBundle extends Bundle
 {
     public const STIMULUS_CONTROLLER = 'tito10047--ux-sdc--sdc-loader';
 
@@ -33,9 +32,13 @@ class SdcBundle extends AbstractBundle
         return new SdcExtension();
     }
 
-    public function configure(DefinitionConfigurator $definition): void
+    /**
+     * The bundle root, not src/: the bundle uses the modern directory structure
+     * (templates/, assets/ and config/ next to src/).
+     */
+    public function getPath(): string
     {
-        $definition->import('../config/definition.php');
+        return \dirname(__DIR__);
     }
 
     public function build(ContainerBuilder $container): void

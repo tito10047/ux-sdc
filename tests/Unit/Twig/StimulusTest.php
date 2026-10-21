@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace Tito10047\UX\Sdc\Tests\Twig;
+namespace Tito10047\UX\Sdc\Tests\Unit\Twig;
 
 use PHPUnit\Framework\TestCase;
 use Tito10047\UX\Sdc\Twig\Stimulus;
@@ -23,10 +23,10 @@ class StimulusTest extends TestCase
             use Stimulus;
         };
 
-        $component->setComponentNamespace('Tito10047\\UX\\Sdc\\Tests\\Twig\\');
+        $component->setComponentNamespace('Tito10047\\UX\\Sdc\\Tests\\Unit\\Twig\\');
 
         // The class name of the anonymous class will be something like
-        // Tito10047\UX\Sdc\Tests\Twig\StimulusTest@anonymous...
+        // Tito10047\UX\Sdc\Tests\Unit\Twig\StimulusTest@anonymous...
         // We want to verify it replaces the namespace and backslashes
 
         $controller = $component->getController();
@@ -49,7 +49,7 @@ class StimulusTest extends TestCase
     public function testGetControllerWithSpecificClass(): void
     {
         $component = new TestComponent();
-        $component->setComponentNamespace('Tito10047\\UX\\Sdc\\Tests\\Twig\\');
+        $component->setComponentNamespace('Tito10047\\UX\\Sdc\\Tests\\Unit\\Twig\\');
 
         $this->assertEquals('TestComponent', $component->getController());
     }
@@ -57,7 +57,7 @@ class StimulusTest extends TestCase
     public function testGetControllerWithSubNamespace(): void
     {
         $component = new Sub\SubComponent();
-        $component->setComponentNamespace('Tito10047\\UX\\Sdc\\Tests\\Twig\\');
+        $component->setComponentNamespace('Tito10047\\UX\\Sdc\\Tests\\Unit\\Twig\\');
 
         $this->assertEquals('Sub--SubComponent', $component->getController());
     }
@@ -68,7 +68,7 @@ class TestComponent implements ComponentNamespaceInterface
     use Stimulus;
 }
 
-namespace Tito10047\UX\Sdc\Tests\Twig\Sub;
+namespace Tito10047\UX\Sdc\Tests\Unit\Twig\Sub;
 
 use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
 use Tito10047\UX\Sdc\Twig\Stimulus;

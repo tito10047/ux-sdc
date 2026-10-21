@@ -13,7 +13,6 @@ namespace Tito10047\UX\Sdc\Tests\Integration;
 
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\UX\TwigComponent\ComponentRendererInterface;
-use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\StimulusComponent;
 
 class StimulusIntegrationTest extends KernelTestCase
 {

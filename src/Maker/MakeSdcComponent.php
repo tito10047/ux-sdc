@@ -21,8 +21,6 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
-use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
-use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
 use Tito10047\UX\Sdc\Twig\Stimulus;
 
 final class MakeSdcComponent extends AbstractMaker

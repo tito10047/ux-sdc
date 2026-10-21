@@ -12,13 +12,11 @@
 namespace Tito10047\UX\Sdc\EventListener;
 
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
-use Symfony\UX\TwigComponent\ComponentAttributes;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\UX\TwigComponent\Event\PostMountEvent;
 use Symfony\UX\TwigComponent\Event\PreRenderEvent;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
-use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
 
 final class ComponentRenderListener
 {
@@ -36,7 +34,7 @@ final class ComponentRenderListener
     {
         $component = $event->getComponent();
 
-        $this->setNamespace($component);
+        $this->setComponentNamespace($component);
 
         $assets = $this->metadataRegistry->getMetadata($component::class);
 
@@ -58,14 +56,7 @@ final class ComponentRenderListener
 
         // Static callables ("Class::method", [Class::class, 'method']) have no instance to configure.
         if (\is_object($controller)) {
-            $this->setNamespace($controller);
-        }
-    }
-
-    private function setNamespace(object $component): void
-    {
-        if ($component instanceof ComponentNamespaceInterface && null !== $this->componentNamespace) {
-            $component->setComponentNamespace($this->componentNamespace);
+            $this->setComponentNamespace($controller);
         }
     }
 

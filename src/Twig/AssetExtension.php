@@ -12,7 +12,6 @@
 namespace Tito10047\UX\Sdc\Twig;
 
 use Tito10047\UX\Sdc\SdcBundle;
-use Tito10047\UX\Sdc\UxSdcBundle;
 use Twig\Extension\AbstractExtension;
 use Twig\Extension\GlobalsInterface;
 use Twig\TwigFunction;

@@ -13,12 +13,42 @@ namespace Tito10047\UX\Sdc\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Tito10047\UX\Sdc\UxSdcBundle;
-use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
+use Tito10047\UX\Sdc\CompilerPass\AssetComponentCompilerPass;
 use Tito10047\UX\Sdc\DependencyInjection\SdcExtension;
+use Tito10047\UX\Sdc\SdcBundle;
 
-class UxSdcBundleTest extends TestCase
+class SdcBundleTest extends TestCase
 {
+    public function testContainerExtensionKeepsTheUxSdcAlias(): void
+    {
+        $extension = (new SdcBundle())->getContainerExtension();
+
+        $this->assertInstanceOf(SdcExtension::class, $extension);
+        $this->assertSame('ux_sdc', $extension->getAlias());
+    }
+
+    public function testPathIsTheBundleRoot(): void
+    {
+        $path = (new SdcBundle())->getPath();
+
+        $this->assertSame(\dirname(__DIR__, 2), $path);
+        $this->assertDirectoryExists($path . '/templates');
+        $this->assertDirectoryExists($path . '/config');
+    }
+
+    public function testBuildRegistersTheAssetCompilerPass(): void
+    {
+        $container = new ContainerBuilder();
+
+        (new SdcBundle())->build($container);
+
+        $passes = array_filter(
+            $container->getCompilerPassConfig()->getPasses(),
+            static fn (object $pass): bool => $pass instanceof AssetComponentCompilerPass,
+        );
+        $this->assertCount(1, $passes);
+    }
+
     public function testLoadExtensionSetsParameters(): void
     {
         $container = new ContainerBuilder();

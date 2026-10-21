@@ -11,8 +11,6 @@
 
 namespace Tito10047\UX\Sdc\EventListener;
 
-use Symfony\UX\TwigComponent\ComponentAttributes;
-use Symfony\UX\TwigComponent\Event\PreRenderEvent;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
 use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
 
