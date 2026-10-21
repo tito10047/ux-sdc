@@ -19,6 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   files are picked up without `cache:clear`; `auto` means `false` when
   `kernel.debug` is on and `true` otherwise. The value selects services at build
   time and therefore cannot come from an environment variable.
+- `debug:sdc [name] [--format=txt|json] [--strict]`: lists every component as
+  the bundle renders it — template and where it comes from (next to the class,
+  named by the registration, or the Twig Components default), CSS and JS with
+  their public paths and where each was declared (discovered, `#[Asset]`,
+  `#[AsSdcComponent]`), the Stimulus controller name `{{ controller }}` gets
+  and whether StimulusBundle has it, and the routes of the controllers next to
+  the class — and flags what keeps a part from loading: a file left out because
+  it is outside every Twig or AssetMapper path, an asset path the asset map does
+  not know, an asset of a type other than `css`/`js`, a missing template, a
+  template using `{{ controller }}` without a controller of that name. It reads
+  the metadata the pages use (the build-time cache with `metadata_cache: true`).
+  A name, a class or a part of either narrows the list; a single match is shown
+  in detail. Like other `debug:*` commands it exits with 0; `--strict` fails it
+  when a problem is found, for CI.
 - Diagnostics for component assets that silently went missing, logged through the
   application's `logger` service (channel `ux_sdc` with MonologBundle; the bundle
   now requires `psr/log`). Each message says what to change:
@@ -30,6 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - warning, in debug only: an HTML page with a `<head>` renders components with
     assets but has no `render_component_assets()` placeholder. Fragments without a
     `<head>` (Turbo Frames, partials) are not reported;
+  - warning, in debug only: a component asset path the asset map does not know
+    (a typo in `#[Asset]`/`#[AsSdcComponent]`, a file AssetMapper does not serve)
+    is linked as it is. URLs (`https://…`, `//…`, `/…`, `data:…`) are linked as
+    they are on purpose and not reported;
   - error, in every environment: `metadata_cache` is on but
     `%kernel.cache_dir%/sdc_metadata.php` does not exist (cache not warmed where
     the application runs, or a different runtime cache directory). The page is
@@ -86,11 +104,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a list, empty when there are none) and `getTemplate(string $class): ?string`.
   Its constructor takes `bool $cacheEnabled` and an optional logger after
   `$cachePath`. The `sdc_metadata.php` format changed to
-  `[class => ['assets' => [...], 'template' => ?string]]`; it is regenerated with
+  `[class => ['assets' => [...], 'template' => ?string, 'problems' => [...]]]`,
+  each asset with a `source` (`discovered`, `#[Asset]` or `#[AsSdcComponent]`);
+  it is regenerated with
   the container, so no action is needed for the file itself.
 - **BC break:** `ComponentMetadataResolver::resolveMetadata($class, $componentName, &$allMetadata)`
   is replaced by `resolve(string $class): ComponentMetadata`, an immutable value
-  object with `assets` and `template`. The constructor now reads
+  object with `assets` (each with its `source`), `template` and `problems` (the
+  files next to the class it had to leave out, as PSR-3 message and context;
+  they are reported whether or not the resolver logs them). The constructor now reads
   `(array $twigRoots, array $assetRoots, bool $autoDiscoveryEnabled, ?LoggerInterface $logger = null, bool $debug = false, array $classesWithExplicitTemplate = [])`:
   Twig paths and AssetMapper paths are separate, each a list of directories or
   a map of directory => namespace, as in `twig.paths` and

@@ -51,6 +51,25 @@ class SdcMetadataRegistryTest extends TestCase
         $this->assertSame('Icon/Icon.html.twig', $registry->getTemplate('App\Icon'));
     }
 
+    public function testGivesTheWholeMetadataOfAClass(): void
+    {
+        $asset = ['path' => 'Alert/Alert.css', 'type' => 'css', 'priority' => 0, 'attributes' => [], 'source' => 'discovered'];
+        $problem = ['message' => '"{file}" is outside', 'context' => ['file' => '/app/Alert.js']];
+        $this->writeCache([
+            'App\Alert' => ['assets' => [$asset], 'template' => 'Alert/Alert.html.twig', 'problems' => [$problem]],
+        ]);
+
+        $registry = new SdcMetadataRegistry($this->cachePath);
+
+        $metadata = $registry->getComponentMetadata('App\Alert');
+        $this->assertSame([$asset], $metadata->assets);
+        $this->assertSame('Alert/Alert.html.twig', $metadata->template);
+        $this->assertSame([$problem], $metadata->problems);
+        $this->assertSame(['"/app/Alert.js" is outside'], $metadata->getProblemMessages());
+
+        $this->assertTrue($registry->getComponentMetadata('App\Unknown')->isEmpty());
+    }
+
     public function testUnknownClassHasNoAssetsAndNoTemplate(): void
     {
         $this->writeCache([]);

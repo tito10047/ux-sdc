@@ -32,13 +32,17 @@ use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
  * other way round, and a Twig namespace plays no part in a logical path.
  * `ux_components_dir` is registered as both, with no namespace, so its files
  * get the same relative name in each. A file without such a name is left out
- * — and, in debug, reported to the logger.
+ * — and reported.
  *
  * A component whose registration names its template (the `template` argument
  * of #[AsTwigComponent], #[AsSdcComponent] or #[AsLiveComponent], or of the
  * `twig.component` tag) keeps it: the file next to the class is not looked up.
  *
- * @phpstan-import-type SdcAsset from AssetRegistry
+ * A file left out is a problem of the returned metadata, which `debug:sdc`
+ * shows; in debug, it is also logged when the class is resolved.
+ *
+ * @phpstan-import-type SdcComponentAsset from ComponentMetadata
+ * @phpstan-import-type SdcProblem from ComponentMetadata
  */
 class ComponentMetadataResolver
 {
@@ -85,7 +89,7 @@ class ComponentMetadataResolver
      *
      * @param array<int|string, string|null> $twigRoots                   Twig paths (`twig.paths`); a null or empty namespace is the main one
      * @param array<int|string, string|null> $assetRoots                  AssetMapper paths (`framework.asset_mapper.paths`); a null or empty namespace is none
-     * @param bool                           $debug                       a file left out is reported only in debug: it is a
+     * @param bool                           $debug                       a file left out is logged only in debug: it is a
      *                                                                    mistake in the application's code, the same in every
      *                                                                    environment, and a production log would get it from
      *                                                                    every process for as long as the code stays as it is
@@ -117,6 +121,7 @@ class ComponentMetadataResolver
         $reflectionClass = new ReflectionClass($class);
         $assets = $this->collectExplicitAssets($reflectionClass);
         $template = null;
+        $problems = [];
         $fileName = $reflectionClass->getFileName();
 
         // Internal classes have no file, hence no siblings to discover.
@@ -124,29 +129,36 @@ class ComponentMetadataResolver
             $basePath = dirname($fileName) . DIRECTORY_SEPARATOR . $reflectionClass->getShortName();
 
             foreach (['css', 'js'] as $ext) {
-                $path = $this->findCoLocatedAsset($class, $basePath . '.' . $ext);
+                $path = $this->findCoLocatedAsset($basePath . '.' . $ext, $problems);
                 if (null !== $path) {
                     $assets[] = [
                         'path' => $path,
                         'type' => $ext,
                         'priority' => 0,
                         'attributes' => [],
+                        'source' => ComponentMetadata::SOURCE_DISCOVERED,
                     ];
                 }
             }
 
             if (!isset($this->classesWithExplicitTemplate[$class])) {
-                $template = $this->findCoLocatedTemplate($class, $basePath . '.html.twig');
+                $template = $this->findCoLocatedTemplate($basePath . '.html.twig', $problems);
             }
         }
 
-        return $this->classCache[$class] = new ComponentMetadata($assets, $template);
+        if ($this->debug) {
+            foreach ($problems as $problem) {
+                $this->logger?->warning('Component "{component}": ' . $problem['message'], ['component' => $class] + $problem['context']);
+            }
+        }
+
+        return $this->classCache[$class] = new ComponentMetadata($assets, $template, $problems);
     }
 
     /**
      * @param ReflectionClass<object> $reflectionClass
      *
-     * @return list<SdcAsset>
+     * @return list<SdcComponentAsset>
      */
     private function collectExplicitAssets(ReflectionClass $reflectionClass): array
     {
@@ -160,6 +172,7 @@ class ComponentMetadataResolver
                     'type' => $asset->type ?? '',
                     'priority' => $asset->priority,
                     'attributes' => $asset->attributes,
+                    'source' => ComponentMetadata::SOURCE_ASSET_ATTRIBUTE,
                 ];
             }
         }
@@ -173,6 +186,7 @@ class ComponentMetadataResolver
                     'type' => 'css',
                     'priority' => 0,
                     'attributes' => [],
+                    'source' => ComponentMetadata::SOURCE_SDC_COMPONENT_ATTRIBUTE,
                 ];
             }
 
@@ -182,6 +196,7 @@ class ComponentMetadataResolver
                     'type' => 'js',
                     'priority' => 0,
                     'attributes' => [],
+                    'source' => ComponentMetadata::SOURCE_SDC_COMPONENT_ATTRIBUTE,
                 ];
             }
         }
@@ -190,10 +205,12 @@ class ComponentMetadataResolver
     }
 
     /**
+     * @param list<SdcProblem> $problems receives the reason a file that exists is left out
+     *
      * @return string|null the AssetMapper logical path of the file; null when
      *                     there is no such file or it is outside every AssetMapper path
      */
-    private function findCoLocatedAsset(string $class, string $file): ?string
+    private function findCoLocatedAsset(string $file, array &$problems): ?string
     {
         if (!file_exists($file)) {
             return null;
@@ -209,23 +226,22 @@ class ComponentMetadataResolver
             }
         }
 
-        if ($this->debug) {
-            $this->report(
-                'Component "{component}": "{file}" next to the class is outside every AssetMapper path ({roots}), so it is not loaded with the component. Move the component into the directory configured as "ux_sdc.ux_components_dir", add its directory to "framework.asset_mapper.paths", or reference the file by its AssetMapper logical path with #[Asset].',
-                $class,
-                $realFile,
-                $this->assetRoots,
-            );
-        }
+        $problems[] = self::problem(
+            '"{file}" next to the class is outside every AssetMapper path ({roots}), so it is not loaded with the component. Move the component into the directory configured as "ux_sdc.ux_components_dir", add its directory to "framework.asset_mapper.paths", or reference the file by its AssetMapper logical path with #[Asset].',
+            $realFile,
+            $this->assetRoots,
+        );
 
         return null;
     }
 
     /**
+     * @param list<SdcProblem> $problems receives the reason a file that exists is left out
+     *
      * @return string|null the Twig name of the file; null when there is no such
      *                     file or it is outside every Twig path
      */
-    private function findCoLocatedTemplate(string $class, string $file): ?string
+    private function findCoLocatedTemplate(string $file, array &$problems): ?string
     {
         if (!file_exists($file)) {
             return null;
@@ -255,30 +271,31 @@ class ComponentMetadataResolver
             }
         }
 
-        if ($this->debug) {
-            $this->report(
-                'Component "{component}": the template "{file}" next to the class is outside every Twig path ({roots}), so it is not used. Move the component into the directory configured as "ux_sdc.ux_components_dir", or name its template explicitly with the "template" argument of #[AsTwigComponent] or #[AsSdcComponent].',
-                $class,
-                $realFile,
-                $this->twigRoots,
-            );
-        }
+        $problems[] = self::problem(
+            'the template "{file}" next to the class is outside every Twig path ({roots}), so it is not used. Move the component into the directory configured as "ux_sdc.ux_components_dir", or name its template explicitly with the "template" argument of #[AsTwigComponent] or #[AsSdcComponent].',
+            $realFile,
+            $this->twigRoots,
+        );
 
         return null;
     }
 
     /**
      * @param list<array{string, string}> $roots
+     *
+     * @return SdcProblem
      */
-    private function report(string $message, string $class, string $file, array $roots): void
+    private static function problem(string $message, string $file, array $roots): array
     {
         $paths = array_map(static fn (array $root): string => rtrim($root[0], DIRECTORY_SEPARATOR), $roots);
 
-        $this->logger?->warning($message, [
-            'component' => $class,
-            'file' => $file,
-            'roots' => [] === $paths ? 'none configured' : implode(', ', array_unique($paths)),
-        ]);
+        return [
+            'message' => $message,
+            'context' => [
+                'file' => $file,
+                'roots' => [] === $paths ? 'none configured' : implode(', ', array_unique($paths)),
+            ],
+        ];
     }
 
     /**

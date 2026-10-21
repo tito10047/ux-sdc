@@ -593,14 +593,53 @@ main response.
 
 ## Diagnostics
 
-Components degrade gracefully: a missing asset never breaks a page. The bundle logs
-why instead, through the application's `logger` (on the `ux_sdc` channel with
-MonologBundle):
+Components degrade gracefully: a missing asset never breaks a page. To see what
+each component gets, and what keeps any of it from loading, ask the bundle:
+
+```bash
+php bin/console debug:sdc
+```
+
+```
+ ---------------- --------------------------------------- -------------------------- ------------------- ---------------------
+  Component        Template                                CSS                        JS                  Stimulus controller
+ ---------------- --------------------------------------- -------------------------- ------------------- ---------------------
+  UI:Alert:Alert   UI/Alert/Alert.html.twig (co-located)   UI/Alert/Alert.css         UI/Alert/Alert.js   UI--Alert--Alert
+  ⚠ Legacy:Old     ⚠ /Legacy/Old.html.twig (default)       ⚠ css/old.css (#[Asset])   -                   -
+ ---------------- --------------------------------------- -------------------------- ------------------- ---------------------
+
+Legacy:Old (App\Component\Legacy\Old)
+-------------------------------------
+
+ * The component has no template: none next to the class can be used, and "/Legacy/Old.html.twig", which Twig Components looks up by default, does not exist. […]
+ * The asset "css/old.css" (#[Asset]) is not in the asset map, so the page links to it as it is and it will most likely not load. […]
+```
+
+It flags (⚠) a file next to a class that is outside every Twig or AssetMapper
+path, an asset path the asset map does not know, an asset of a type other than
+`css`/`js`, a missing template, and a template that uses `{{ controller }}`
+when StimulusBundle has no controller of that name. It reads the metadata from
+where the pages do — the build-time cache with `metadata_cache: true` — so it
+also shows a cache that predates a file you just added.
+
+- `debug:sdc Alert` — only the components whose name or class contains `Alert`
+  (any case); a single match is shown in detail: public paths, where each asset
+  was declared, the routes of the controllers next to the class.
+- `--format=json` — the same, for scripts and tools.
+- `--strict` — exits with 1 when there is a problem, for a CI step. Without it,
+  like every `debug:*` command, it exits with 0.
+
+`debug:twig-component` complements it with the props and hooks of a component,
+and anonymous components.
+
+The bundle also logs what goes wrong while rendering, through the application's
+`logger` (on the `ux_sdc` channel with MonologBundle):
 
 | Level | When | Logged |
 |-------|------|--------|
 | warning | A co-located template is outside every Twig path, or a co-located CSS/JS file outside every AssetMapper path, so it is left out (see [Where components can live](#where-components-can-live)). | in debug only; at build time (`metadata_cache: true`) into the container compiler log, shown in the profiler's *Logs* panel under *Container* |
 | warning | An HTML page with a `<head>` renders components with assets but does not call `render_component_assets()`. Fragments without a `<head>` (Turbo Frames, partials) are not reported. | in debug only |
+| warning | A component asset path is not in the asset map (a typo in `#[Asset]`, a file AssetMapper does not serve), so it is linked as it is. URLs (`https://…`, `//…`, `/…`) are linked as they are on purpose and not reported. | in debug only |
 | error | `metadata_cache` is on but `%kernel.cache_dir%/sdc_metadata.php` does not exist — the cache was not warmed where the application runs, or the runtime cache directory differs from the build one. Pages still render, without component CSS and JS. | always |
 
 Every message says what to change.

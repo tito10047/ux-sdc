@@ -16,6 +16,7 @@ use Psr\Log\LogLevel;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 use Tito10047\UX\Sdc\Tests\TestLogger;
 use Tito10047\UX\Sdc\Tests\Unit\Service\Fixtures\Alert\Alert;
+use Tito10047\UX\Sdc\Tests\Unit\Service\Fixtures\SdcAlert\SdcAlert;
 
 final class ComponentMetadataResolverTest extends TestCase
 {
@@ -26,7 +27,7 @@ final class ComponentMetadataResolverTest extends TestCase
      */
     private const UNRELATED_ROOT = __DIR__ . '/../../Integration/Fixtures/templates';
 
-    private const EXPLICIT_ASSET = ['path' => 'vendor/explicit.css', 'type' => '', 'priority' => 3, 'attributes' => []];
+    private const EXPLICIT_ASSET = ['path' => 'vendor/explicit.css', 'type' => '', 'priority' => 3, 'attributes' => [], 'source' => '#[Asset]'];
 
     public function testResolvesFilesNextToTheClassRelativeToTheirRoots(): void
     {
@@ -35,10 +36,11 @@ final class ComponentMetadataResolverTest extends TestCase
 
         $this->assertSame([
             self::EXPLICIT_ASSET,
-            ['path' => 'Alert/Alert.css', 'type' => 'css', 'priority' => 0, 'attributes' => []],
-            ['path' => 'Alert/Alert.js', 'type' => 'js', 'priority' => 0, 'attributes' => []],
+            ['path' => 'Alert/Alert.css', 'type' => 'css', 'priority' => 0, 'attributes' => [], 'source' => 'discovered'],
+            ['path' => 'Alert/Alert.js', 'type' => 'js', 'priority' => 0, 'attributes' => [], 'source' => 'discovered'],
         ], $metadata->assets);
         $this->assertSame('Alert/Alert.html.twig', $metadata->template);
+        $this->assertSame([], $metadata->problems);
         $this->assertSame([], $logger->records);
     }
 
@@ -76,6 +78,28 @@ final class ComponentMetadataResolverTest extends TestCase
         $this->assertStringContainsString('#[Asset]', $warnings[0]['message']);
         $this->assertStringContainsString('outside every Twig path', $warnings[2]['message']);
         $this->assertStringContainsString('"template" argument', $warnings[2]['message']);
+
+        // The log and debug:sdc read the same problems.
+        $this->assertCount(3, $metadata->problems);
+        foreach ($metadata->problems as $i => $problem) {
+            $this->assertSame('Component "{component}": ' . $problem['message'], $warnings[$i]['message']);
+            $this->assertSame(['component' => Alert::class] + $problem['context'], $warnings[$i]['context']);
+        }
+        $this->assertSame(
+            '"' . realpath(self::FIXTURES . '/Alert/Alert.css') . '" next to the class is outside every AssetMapper path (' . realpath(self::UNRELATED_ROOT) . '), so it is not loaded with the component. Move the component into the directory configured as "ux_sdc.ux_components_dir", add its directory to "framework.asset_mapper.paths", or reference the file by its AssetMapper logical path with #[Asset].',
+            $metadata->getProblemMessages()[0],
+        );
+    }
+
+    public function testNamesWhereEachAssetComesFrom(): void
+    {
+        $metadata = (new ComponentMetadataResolver([], [self::FIXTURES], true))->resolve(SdcAlert::class);
+
+        $this->assertSame([
+            ['css/sdc.css', '#[AsSdcComponent]'],
+            ['js/sdc.js', '#[AsSdcComponent]'],
+            ['SdcAlert/SdcAlert.css', 'discovered'],
+        ], array_map(static fn (array $asset): array => [$asset['path'], $asset['source']], $metadata->assets));
     }
 
     /**
@@ -168,6 +192,9 @@ final class ComponentMetadataResolverTest extends TestCase
         $this->assertCount(3, $logger->records);
     }
 
+    /**
+     * Not logged, but still reported in the metadata, for debug:sdc.
+     */
     public function testDoesNotWarnOutsideDebug(): void
     {
         $logger = new TestLogger();
@@ -175,6 +202,7 @@ final class ComponentMetadataResolverTest extends TestCase
 
         $this->assertSame([self::EXPLICIT_ASSET], $metadata->assets);
         $this->assertNull($metadata->template);
+        $this->assertCount(3, $metadata->problems);
         $this->assertSame([], $logger->records);
     }
 

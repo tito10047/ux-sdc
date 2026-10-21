@@ -15,13 +15,15 @@ use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Exception\LogicException;
 use Symfony\Component\Filesystem\Filesystem;
+use Tito10047\UX\Sdc\Debug\ComponentInspector;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 
 /**
  * Collects what the resolver needs to know about the application — its Twig
  * paths, its AssetMapper paths and the components registered with an explicit
- * template — for the runtime resolver and for the build-time one, and, with
+ * template — for the runtime resolver and for the build-time one, hands the
+ * components to `debug:sdc`, and, with
  * `ux_sdc.metadata_cache` on, dumps the metadata of every component into
  * `sdc_metadata.php`.
  *
@@ -51,6 +53,7 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
     {
         $twigRoots = $this->collectTwigRoots($container);
         $assetRoots = $this->collectAssetMapperRoots($container);
+        $componentClasses = $this->collectComponentClasses($container);
         $classesWithExplicitTemplate = $this->collectClassesWithExplicitTemplate($container);
 
         // Both pipelines resolve against the same roots and registrations. Only
@@ -60,6 +63,12 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
             $container->getDefinition(ComponentMetadataResolver::class)
                 ->setArgument('$twigRoots', $twigRoots)
                 ->setArgument('$assetRoots', $assetRoots)
+                ->setArgument('$classesWithExplicitTemplate', $classesWithExplicitTemplate);
+        }
+
+        if ($container->hasDefinition(ComponentInspector::class)) {
+            $container->getDefinition(ComponentInspector::class)
+                ->setArgument('$componentClasses', $componentClasses)
                 ->setArgument('$classesWithExplicitTemplate', $classesWithExplicitTemplate);
         }
 
@@ -98,7 +107,7 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
             $classesWithExplicitTemplate,
         );
 
-        $this->dumpCache($cachePath, $this->resolveTaggedComponents($container, $resolver));
+        $this->dumpCache($cachePath, $this->resolveComponents($componentClasses, $resolver));
     }
 
     /**
@@ -228,27 +237,42 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
     }
 
     /**
+     * The classes of the `twig.component` services that exist.
+     *
+     * @return list<string>
+     */
+    private function collectComponentClasses(ContainerBuilder $container): array
+    {
+        $classes = [];
+
+        foreach (array_keys($container->findTaggedServiceIds('twig.component')) as $id) {
+            $class = $container->getParameterBag()->resolveValue($container->getDefinition($id)->getClass());
+
+            if (\is_string($class) && class_exists($class)) {
+                $classes[] = $class;
+            }
+        }
+
+        return array_values(array_unique($classes));
+    }
+
+    /**
+     * @param list<string> $componentClasses
+     *
      * @return SdcMetadataCache
      */
-    private function resolveTaggedComponents(ContainerBuilder $container, ComponentMetadataResolver $resolver): array
+    private function resolveComponents(array $componentClasses, ComponentMetadataResolver $resolver): array
     {
         $metadata = [];
-        $taggedServices = $container->findTaggedServiceIds('twig.component');
 
-        foreach ($taggedServices as $id => $tags) {
-            $definition = $container->getDefinition($id);
-            $class = $definition->getClass();
-
-            if (!$class || !class_exists($class)) {
-                continue;
-            }
-
+        foreach ($componentClasses as $class) {
             $componentMetadata = $resolver->resolve($class);
 
             if (!$componentMetadata->isEmpty()) {
                 $metadata[$class] = [
                     'assets' => $componentMetadata->assets,
                     'template' => $componentMetadata->template,
+                    'problems' => $componentMetadata->problems,
                 ];
             }
         }

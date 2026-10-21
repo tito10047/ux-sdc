@@ -13,24 +13,59 @@ namespace Tito10047\UX\Sdc\Service;
 
 /**
  * What ComponentMetadataResolver found for one component class: the assets to
- * load with it and the template sitting next to it, if any.
+ * load with it, the template sitting next to it, if any, and the files next to
+ * it that could not be used.
  *
- * @phpstan-import-type SdcAsset from AssetRegistry
+ * `SdcComponentAsset` is an asset as AssetRegistry takes it, plus where it was
+ * found: next to the class, in #[Asset] or in #[AsSdcComponent].
+ *
+ * `SdcProblem` is a file left out, as a PSR-3 message and its context: the
+ * resolver logs it as is, and `debug:sdc` shows it.
+ *
+ * @phpstan-type SdcComponentAsset array{path: string, type: string, priority: int, attributes: array<string, mixed>, source: self::SOURCE_*}
+ * @phpstan-type SdcProblem array{message: string, context: array<string, string>}
  */
 final class ComponentMetadata
 {
+    public const SOURCE_DISCOVERED = 'discovered';
+    public const SOURCE_ASSET_ATTRIBUTE = '#[Asset]';
+    public const SOURCE_SDC_COMPONENT_ATTRIBUTE = '#[AsSdcComponent]';
+
     /**
-     * @param list<SdcAsset> $assets
-     * @param string|null    $template the Twig name of the co-located template; null lets Twig Components pick the template
+     * @param list<SdcComponentAsset> $assets
+     * @param string|null             $template the Twig name of the co-located template; null lets Twig Components pick the template
+     * @param list<SdcProblem>        $problems
      */
     public function __construct(
         public readonly array $assets = [],
         public readonly ?string $template = null,
+        public readonly array $problems = [],
     ) {
     }
 
+    /**
+     * Whether there is nothing to load with the component, and nothing to report about it.
+     */
     public function isEmpty(): bool
     {
-        return [] === $this->assets && null === $this->template;
+        return [] === $this->assets && null === $this->template && [] === $this->problems;
+    }
+
+    /**
+     * @return list<string> the problems, with their placeholders replaced
+     */
+    public function getProblemMessages(): array
+    {
+        return array_map(
+            static function (array $problem): string {
+                $replacements = [];
+                foreach ($problem['context'] as $key => $value) {
+                    $replacements['{' . $key . '}'] = $value;
+                }
+
+                return strtr($problem['message'], $replacements);
+            },
+            $this->problems,
+        );
     }
 }

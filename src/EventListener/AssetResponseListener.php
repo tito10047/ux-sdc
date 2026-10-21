@@ -16,6 +16,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
+use Tito10047\UX\Sdc\Service\AssetPath;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
 use Symfony\Component\WebLink\GenericLinkProvider;
 use Symfony\Component\WebLink\Link;
@@ -30,10 +31,11 @@ final class AssetResponseListener
 {
     /**
      * @param non-empty-string $placeholder
-     * @param bool             $debug       a page missing the placeholder is reported only in
-     *                                      debug: it is a mistake in a template, and in
-     *                                      production it would be logged on every request
-     *                                      that renders the page
+     * @param bool             $debug       a page missing the placeholder, and an asset path
+     *                                      the asset map does not know, are reported only in
+     *                                      debug: they are mistakes in a template or an
+     *                                      attribute, and in production they would be logged
+     *                                      on every request that renders the page
      */
     public function __construct(
         private AssetRegistry $assetRegistry,
@@ -181,7 +183,7 @@ final class AssetResponseListener
         $resolved = [];
 
         foreach ($this->assetRegistry->getSortedAssets() as $asset) {
-            $path = $this->assetMapper->getAsset($asset['path'])->publicPath ?? $asset['path'];
+            $path = $this->assetMapper->getAsset($asset['path'])->publicPath ?? $this->passThrough($asset['path']);
 
             $type = match (true) {
                 'css' === $asset['type'], '' === $asset['type'] && str_ends_with($path, '.css') => 'css',
@@ -195,6 +197,23 @@ final class AssetResponseListener
         }
 
         return $resolved;
+    }
+
+    /**
+     * A path the asset map does not know is linked as it is. That is what a
+     * URL is for; anything else was meant as a logical path — a typo in
+     * #[Asset], or a file AssetMapper does not serve — and will not load.
+     */
+    private function passThrough(string $path): string
+    {
+        if ($this->debug && !AssetPath::isUrl($path)) {
+            $this->logger?->warning(
+                'The component asset "{path}" is not in the asset map, so it is linked as it is and will most likely not load. Reference it by its AssetMapper logical path (see "bin/console debug:asset-map" and "bin/console debug:sdc"), or by a URL.',
+                ['path' => $path]
+            );
+        }
+
+        return $path;
     }
 
     /**

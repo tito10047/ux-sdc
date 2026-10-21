@@ -25,6 +25,7 @@ use Symfony\Component\Config\FileLocator;
 use Tito10047\UX\Sdc\CompilerPass\AssetComponentCompilerPass;
 use Tito10047\UX\Sdc\CompilerPass\ComponentRoutesCompilerPass;
 use Tito10047\UX\Sdc\CompilerPass\StimulusControllerPathsCompilerPass;
+use Tito10047\UX\Sdc\Debug\ComponentInspector;
 use Tito10047\UX\Sdc\EventListener\ComponentRenderListener;
 use Tito10047\UX\Sdc\EventListener\DevComponentRenderListener;
 use Tito10047\UX\Sdc\Routing\ComponentRouteLoader;
@@ -63,6 +64,9 @@ class SdcExtension extends Extension implements PrependExtensionInterface
         $metadataCache = $this->isMetadataCacheEnabled($container, $config['metadata_cache']);
         $container->setParameter(AssetComponentCompilerPass::METADATA_CACHE_PARAMETER, $metadataCache);
         $container->removeDefinition($metadataCache ? DevComponentRenderListener::class : ComponentRenderListener::class);
+        if ($container->hasDefinition(ComponentInspector::class)) {
+            $container->getDefinition(ComponentInspector::class)->setArgument('$metadataCache', $metadataCache);
+        }
 
         if ($container->hasDefinition('Tito10047\UX\Sdc\EventListener\AssetResponseListener')) {
             $container->getDefinition('Tito10047\UX\Sdc\EventListener\AssetResponseListener')

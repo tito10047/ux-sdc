@@ -11,6 +11,8 @@
 
 namespace Tito10047\UX\Sdc\Service;
 
+use Symfony\UX\TwigComponent\Attribute\ExposeInTemplate;
+
 /**
  * Names the Stimulus controller of a component after its class.
  *
@@ -24,12 +26,25 @@ namespace Tito10047\UX\Sdc\Service;
  * `UI--Date-Picker--Date-Picker` — which is what this resolver derives from
  * the class name relative to `component_namespace`.
  *
+ * The bundle hands that name to the template as `controller`, unless the
+ * component exposes a `controller` variable of its own.
+ *
  * @internal
  */
 final class StimulusControllerNameResolver
 {
     /** The namespace with a trailing backslash, or null when none is configured. */
     private readonly ?string $componentNamespace;
+
+    /**
+     * Per component class: whether it exposes a `controller` variable with
+     * #[ExposeInTemplate], and whether it declares a public `controller`
+     * property. Derived from the class alone, so kept for the lifetime of the
+     * process.
+     *
+     * @var array<string, array{bool, bool}>
+     */
+    private array $ownControllerVariables = [];
 
     public function __construct(?string $componentNamespace)
     {
@@ -50,5 +65,70 @@ final class StimulusControllerNameResolver
         }
 
         return strtr(substr($class, \strlen($this->componentNamespace)), ['\\' => '--', '_' => '-']);
+    }
+
+    /**
+     * Whether the component exposes a `controller` template variable of its
+     * own — the Stimulus trait, #[ExposeInTemplate], or a public property when
+     * public properties are exposed — which then wins over the derived name.
+     *
+     * @param class-string $class
+     */
+    public function isExposedByComponent(string $class, bool $publicPropsExposed): bool
+    {
+        [$exposedByAttribute, $hasPublicProperty] = $this->ownControllerVariables[$class]
+            ??= self::findOwnControllerVariable($class);
+
+        return $exposedByAttribute || ($hasPublicProperty && $publicPropsExposed);
+    }
+
+    /**
+     * Mirrors how TwigComponent names the variables of a component class: a
+     * property is exposed under the name given to #[ExposeInTemplate] or its
+     * own (private ones of parent classes included), a public method under
+     * that name or its own without a "get" prefix, and public properties under
+     * their own when `exposePublicProps` is on. Destructured values are not
+     * looked into: their keys are only known once the component has run.
+     *
+     * @param class-string $class
+     *
+     * @return array{bool, bool}
+     */
+    private static function findOwnControllerVariable(string $class): array
+    {
+        $reflection = new \ReflectionClass($class);
+
+        $hasPublicProperty = $reflection->hasProperty('controller')
+            && $reflection->getProperty('controller')->isPublic()
+            && !$reflection->getProperty('controller')->isStatic();
+
+        for ($declaringClass = $reflection; false !== $declaringClass; $declaringClass = $declaringClass->getParentClass()) {
+            foreach ($declaringClass->getProperties() as $property) {
+                if ('controller' === self::exposedName($property, $property->name)) {
+                    return [true, $hasPublicProperty];
+                }
+            }
+        }
+
+        foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
+            $defaultName = str_starts_with($method->name, 'get') ? lcfirst(substr($method->name, 3)) : $method->name;
+
+            if ('controller' === self::exposedName($method, $defaultName)) {
+                return [true, $hasPublicProperty];
+            }
+        }
+
+        return [false, $hasPublicProperty];
+    }
+
+    private static function exposedName(\ReflectionProperty|\ReflectionMethod $member, string $defaultName): ?string
+    {
+        $attribute = ($member->getAttributes(ExposeInTemplate::class)[0] ?? null)?->newInstance();
+
+        if (null === $attribute || $attribute->destruct) {
+            return null;
+        }
+
+        return $attribute->name ?? $defaultName;
     }
 }

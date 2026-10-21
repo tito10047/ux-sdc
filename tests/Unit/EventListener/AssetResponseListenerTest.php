@@ -15,6 +15,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LogLevel;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
+use Symfony\Component\AssetMapper\MappedAsset;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -274,10 +275,81 @@ final class AssetResponseListenerTest extends TestCase
         $this->assertSame([], $this->logger->records);
     }
 
+    public function testWarnsInDebugAboutAnAssetTheAssetMapDoesNotKnow(): void
+    {
+        $this->registry->addAsset('Alert/Alert.css', 'css');
+        $this->registry->addAsset('css/typo.css', 'css');
+
+        $response = $this->dispatch(new Response(self::PAGE));
+
+        $this->assertStringContainsString('<link rel="stylesheet" href="/assets/Alert/Alert-1a2b3c.css">', (string) $response->getContent());
+        $this->assertStringContainsString('<link rel="stylesheet" href="css/typo.css">', (string) $response->getContent(), 'Still linked as it is.');
+
+        $warnings = $this->logger->recordsOf(LogLevel::WARNING);
+        $this->assertCount(1, $warnings);
+        $this->assertSame(['path' => 'css/typo.css'], $warnings[0]['context']);
+        $this->assertStringContainsString('"{path}" is not in the asset map', $warnings[0]['message']);
+        $this->assertStringContainsString('debug:sdc', $warnings[0]['message']);
+    }
+
+    public function testWarnsAboutAnUnknownAssetOfALiveComponentRequestToo(): void
+    {
+        $this->registry->addAsset('css/typo.css', 'css');
+
+        $request = new Request();
+        $request->headers->set('Accept', 'application/vnd.live-component+html');
+        $response = $this->dispatch(new Response('<div></div>'), $request);
+
+        $this->assertSame('css/typo.css', $response->headers->get('X-SDC-Assets-CSS'));
+        $this->assertCount(1, $this->logger->recordsOf(LogLevel::WARNING));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function provideUrls(): iterable
+    {
+        yield 'absolute' => ['https://cdn.example.com/lib.css'];
+        yield 'protocol-relative' => ['//cdn.example.com/lib.css'];
+        yield 'root-relative' => ['/build/app.css'];
+        yield 'data URI' => ['data:text/css,body{}'];
+    }
+
+    /**
+     * A URL is linked as it is on purpose.
+     */
+    #[DataProvider('provideUrls')]
+    public function testDoesNotWarnAboutAUrl(string $url): void
+    {
+        $this->registry->addAsset($url, 'css');
+
+        $response = $this->dispatch(new Response(self::PAGE));
+
+        $this->assertStringContainsString(htmlspecialchars($url, \ENT_QUOTES), (string) $response->getContent());
+        $this->assertSame([], $this->logger->records);
+    }
+
+    public function testDoesNotWarnAboutAnUnknownAssetOutsideDebug(): void
+    {
+        $this->listener = $this->createListener(false);
+        $this->registry->addAsset('css/typo.css', 'css');
+
+        $this->dispatch(new Response(self::PAGE));
+
+        $this->assertSame([], $this->logger->records);
+    }
+
+    /**
+     * The asset map knows Alert/Alert.css and Alert/Alert.js.
+     */
     private function createListener(bool $debug): AssetResponseListener
     {
         $assetMapper = $this->createMock(AssetMapperInterface::class);
-        $assetMapper->method('getAsset')->willReturn(null);
+        $assetMapper->method('getAsset')->willReturnCallback(static fn (string $logicalPath): ?MappedAsset => match ($logicalPath) {
+            'Alert/Alert.css' => new MappedAsset($logicalPath, publicPath: '/assets/Alert/Alert-1a2b3c.css'),
+            'Alert/Alert.js' => new MappedAsset($logicalPath, publicPath: '/assets/Alert/Alert-4d5e6f.js'),
+            default => null,
+        });
 
         return new AssetResponseListener($this->registry, $assetMapper, '[[ASSETS]]', $this->logger, $debug);
     }

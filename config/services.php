@@ -1,6 +1,7 @@
 <?php
 
 use Symfony\Bundle\MakerBundle\MakerBundle;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
@@ -13,6 +14,8 @@ use Tito10047\UX\Sdc\Twig\AssetExtension;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Tito10047\UX\Sdc\Maker\MakeSdcComponent;
 use Tito10047\UX\Sdc\Routing\ComponentRouteLoader;
+use Tito10047\UX\Sdc\Command\DebugSdcCommand;
+use Tito10047\UX\Sdc\Debug\ComponentInspector;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\abstract_arg;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
@@ -120,6 +123,30 @@ return static function (ContainerConfigurator $container): void {
             abstract_arg('component_namespace, or null'),
         ])
         ->tag('routing.loader');
+
+    if (class_exists(Command::class)) {
+        // Instantiated only when debug:sdc runs: the command is lazy, its name
+        // being known from #[AsCommand].
+        $services->set(ComponentInspector::class)
+            ->args([
+                service('ux.twig_component.component_factory'),
+                service(SdcMetadataRegistry::class),
+                service(ComponentMetadataResolver::class),
+                abstract_arg('whether ux_sdc.metadata_cache resolved to true, set by SdcExtension'),
+                service('twig'),
+                service(AssetMapperInterface::class),
+                service(StimulusControllerNameResolver::class),
+                // Absent without StimulusBundle, or when it does not use AssetMapper.
+                service('stimulus.asset_mapper.controllers_map_generator')->nullOnInvalid(),
+                service('router')->nullOnInvalid(),
+                abstract_arg('the classes of the twig.component services, set by AssetComponentCompilerPass'),
+                abstract_arg('the component classes registered with an explicit template, set by AssetComponentCompilerPass'),
+            ]);
+
+        $services->set(DebugSdcCommand::class)
+            ->args([service(ComponentInspector::class)])
+            ->tag('console.command');
+    }
 
     if (class_exists(MakerBundle::class)) {
         $services->set(MakeSdcComponent::class)

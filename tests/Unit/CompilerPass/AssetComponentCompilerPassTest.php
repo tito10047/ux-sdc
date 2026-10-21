@@ -18,6 +18,7 @@ use Symfony\Component\DependencyInjection\Exception\LogicException;
 use Symfony\Component\DependencyInjection\Reference;
 use Tito10047\UX\Sdc\Attribute\Asset;
 use Tito10047\UX\Sdc\CompilerPass\AssetComponentCompilerPass;
+use Tito10047\UX\Sdc\Debug\ComponentInspector;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 use Tito10047\UX\Sdc\Tests\Unit\Service\Fixtures\Alert\Alert;
@@ -133,6 +134,12 @@ final class AssetComponentCompilerPassTest extends TestCase
         $this->assertSame(['vendor/explicit.css'], array_column($map[Alert::class]['assets'], 'path'));
         $this->assertNull($map[Alert::class]['template']);
 
+        // Kept for debug:sdc, which reads them from the registry.
+        $this->assertSame(
+            [realpath(self::FIXTURES . '/Alert/Alert.css'), realpath(self::FIXTURES . '/Alert/Alert.js'), realpath(self::FIXTURES . '/Alert/Alert.html.twig')],
+            array_map(static fn (array $problem): string => $problem['context']['file'], $map[Alert::class]['problems']),
+        );
+
         $log = $container->getCompiler()->getLog();
         $this->assertCount(3, $log);
         $this->assertStringStartsWith(AssetComponentCompilerPass::class . ': [warning] Component "' . Alert::class . '": "' . realpath(self::FIXTURES . '/Alert/Alert.css') . '" next to the class is outside every AssetMapper path (none configured)', $log[0]);
@@ -193,6 +200,26 @@ final class AssetComponentCompilerPassTest extends TestCase
         $this->assertSame([], $definition->getArgument('$twigRoots'));
         $this->assertSame([], $definition->getArgument('$assetRoots'));
         $this->assertSame([], $definition->getArgument('$classesWithExplicitTemplate'));
+    }
+
+    /**
+     * debug:sdc lists the classes of the `twig.component` services that exist,
+     * once each, and knows which have an explicit template.
+     */
+    public function testGivesTheInspectorTheComponents(): void
+    {
+        $container = $this->createContainer(metadataCache: false, component: Alert::class, tag: ['template' => 'alert.html.twig']);
+        $container->register(ComponentInspector::class);
+        $container->register('other_component', MockComponent::class)
+            ->addTag('twig.component', ['key' => 'other'])
+            ->addTag('twig.component', ['key' => 'other_alias']);
+        $container->register('missing_component', 'App\\DoesNotExist')->addTag('twig.component', ['key' => 'missing']);
+
+        (new AssetComponentCompilerPass())->process($container);
+
+        $definition = $container->getDefinition(ComponentInspector::class);
+        $this->assertSame([Alert::class, MockComponent::class], $definition->getArgument('$componentClasses'));
+        $this->assertSame([Alert::class], $definition->getArgument('$classesWithExplicitTemplate'));
     }
 
     public function testFailsOnAnAssetMapperRepositoryItDoesNotKnow(): void

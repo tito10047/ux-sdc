@@ -14,6 +14,10 @@ namespace Tito10047\UX\Sdc\Tests\Unit\Service;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tito10047\UX\Sdc\Service\StimulusControllerNameResolver;
+use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\Stimulus\Own\OwnMethod;
+use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\Stimulus\Own\OwnPrivateProperty;
+use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\Stimulus\Own\OwnProperty;
+use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\Stimulus\Plain\Plain;
 
 final class StimulusControllerNameResolverTest extends TestCase
 {
@@ -86,5 +90,21 @@ final class StimulusControllerNameResolverTest extends TestCase
     public function testWithoutNamespaceNoClassHasAName(?string $namespace): void
     {
         $this->assertNull((new StimulusControllerNameResolver($namespace))->resolve('App\Component\Alert'));
+    }
+
+    /**
+     * A `controller` of the component's own wins over the derived name: the
+     * Stimulus trait, #[ExposeInTemplate], or a public property when public
+     * properties are exposed.
+     */
+    public function testKnowsAComponentThatExposesItsOwnController(): void
+    {
+        $resolver = new StimulusControllerNameResolver('App\\Component');
+
+        $this->assertTrue($resolver->isExposedByComponent(OwnMethod::class, false));
+        $this->assertTrue($resolver->isExposedByComponent(OwnPrivateProperty::class, false));
+        $this->assertTrue($resolver->isExposedByComponent(OwnProperty::class, true));
+        $this->assertFalse($resolver->isExposedByComponent(OwnProperty::class, false), 'Public properties are not exposed.');
+        $this->assertFalse($resolver->isExposedByComponent(Plain::class, true));
     }
 }

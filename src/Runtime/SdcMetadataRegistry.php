@@ -12,17 +12,19 @@
 namespace Tito10047\UX\Sdc\Runtime;
 
 use Psr\Log\LoggerInterface;
-use Tito10047\UX\Sdc\Service\AssetRegistry;
+use Tito10047\UX\Sdc\Service\ComponentMetadata;
 
 /**
  * Reads the component metadata AssetComponentCompilerPass resolved when the
  * container was built.
  *
  * `SdcMetadataCache` is the shape of `sdc_metadata.php`: component class to its
- * assets and its co-located template. Classes with neither are left out.
+ * assets, its co-located template and the files next to it that could not be
+ * used. Classes with none of these are left out.
  *
- * @phpstan-import-type SdcAsset from AssetRegistry
- * @phpstan-type SdcMetadataCache array<string, array{assets: list<SdcAsset>, template: string|null}>
+ * @phpstan-import-type SdcComponentAsset from ComponentMetadata
+ * @phpstan-import-type SdcProblem from ComponentMetadata
+ * @phpstan-type SdcMetadataCache array<string, array{assets: list<SdcComponentAsset>, template: string|null, problems: list<SdcProblem>}>
  */
 class SdcMetadataRegistry
 {
@@ -44,7 +46,7 @@ class SdcMetadataRegistry
     }
 
     /**
-     * @return list<SdcAsset>
+     * @return list<SdcComponentAsset>
      */
     public function getAssets(string $class): array
     {
@@ -57,6 +59,21 @@ class SdcMetadataRegistry
     public function getTemplate(string $class): ?string
     {
         return $this->load()[$class]['template'] ?? null;
+    }
+
+    /**
+     * Everything the build resolved for the component class, the files it had
+     * to leave out included.
+     */
+    public function getComponentMetadata(string $class): ComponentMetadata
+    {
+        $metadata = $this->load()[$class] ?? null;
+
+        if (null === $metadata) {
+            return new ComponentMetadata();
+        }
+
+        return new ComponentMetadata($metadata['assets'], $metadata['template'], $metadata['problems']);
     }
 
     /**
