@@ -425,6 +425,57 @@ and `_` as `-`, case kept: `Alert/Alert.php` → `Alert--Alert`,
 `stimulus.enabled: false` stops the bundle from adding `ux_components_dir` to the
 Stimulus controller paths.
 
+#### Capital letters in controller names
+
+StimulusBundle keeps the case of the file path, so a component controller is
+registered as `UI--Calendar--Month`, while Stimulus expects lowercase
+identifiers: the browser lowercases attribute names, and Stimulus compares some
+of them with names it builds from the identifier as it is. With Stimulus 3.2:
+
+- Targets, actions, action parameters, classes, reading and writing values
+  (`this.countValue`) and outlets work.
+- **`…ValueChanged()` callbacks are not called** when the value is in the
+  markup — neither when the controller connects nor when the attribute changes
+  later (`this.countValue = 2`, a Live Component re-render). Without the
+  attribute, the callback runs once, for the default value. Read the value where
+  you need it, and call the reaction yourself after changing it.
+- **Changing an outlet's selector attribute** after the host connected is not
+  noticed. Outlets present in the markup connect normally.
+- **Outlet properties need brackets.** Stimulus turns `--` into `-` and only
+  capitalizes a lowercase letter after a dash, so the properties of the outlet
+  `UI--Calendar--Month` are `UI-Calendar-MonthOutlet`, `…Outlets`,
+  `…OutletElement`, `…OutletElements` and `hasUI-Calendar-MonthOutlet`:
+
+```twig
+<div {{ stimulus_controller(controller, {}, {}, {'UI--Calendar--Month': '.calendar-month'}) }}>
+```
+
+```js
+export default class extends Controller {
+    static outlets = ['UI--Calendar--Month'];
+
+    next() {
+        if (this['hasUI-Calendar-MonthOutlet']) {
+            this['UI-Calendar-MonthOutlet'].refresh();
+        }
+    }
+
+    ['UI-Calendar-MonthOutletConnected'](outlet, element) {
+        // also a computed name, like …OutletDisconnected
+    }
+}
+```
+
+A controller that needs `…ValueChanged()` or outlets that change selector needs a
+lowercase name, which StimulusBundle only gives to a lowercase path: put it in
+`assets/controllers/` (`assets/controllers/ui/calendar/month_controller.js` is
+registered as `ui--calendar--month`, its outlet properties are
+`uiCalendarMonthOutlet` and `hasUiCalendarMonthOutlet`) and name it in the
+template, `stimulus_controller('ui/calendar/month')`, instead of using
+`{{ controller }}`. The bundle has no option to lowercase `{{ controller }}`:
+the name StimulusBundle registers is derived from the file path, and changing
+only one side would name a controller that does not exist.
+
 ### Where components can live
 
 Co-located files are loaded by the name they have where they are served from:
@@ -938,6 +989,10 @@ profiler enabled; anywhere else nothing is recorded.
 
 ## Known limitations
 
+- **Component controller names keep their capitals.** Stimulus does not call
+  `…ValueChanged()` callbacks of such a controller and needs bracket access for
+  its outlets; see
+  [Capital letters in controller names](#capital-letters-in-controller-names).
 - **Fragments render before their stylesheets load.** The loader adds the
   stylesheets of a Live re-render or a Turbo Frame/Stream as the response arrives,
   but neither Live Components nor Turbo wait for them, so a component that is new
