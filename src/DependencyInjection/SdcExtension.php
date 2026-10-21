@@ -13,12 +13,14 @@ namespace Tito10047\UX\Sdc\DependencyInjection;
 
 use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
+use Symfony\Component\Config\Resource\FileExistenceResource;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Config\FileLocator;
 use Tito10047\UX\Sdc\CompilerPass\AssetComponentCompilerPass;
 use Tito10047\UX\Sdc\CompilerPass\StimulusControllerPathsCompilerPass;
@@ -79,6 +81,8 @@ class SdcExtension extends Extension implements PrependExtensionInterface
         if (null !== $namespace) {
             $uxComponentsDir = $container->resolveEnvPlaceholders($config['ux_components_dir'], true);
 
+            // Not created yet: prepend() makes the container track the
+            // directory, so that it is rebuilt once the directory exists.
             if (file_exists($uxComponentsDir)) {
                 $this->registerClasses($container, $namespace, $uxComponentsDir);
             }
@@ -116,21 +120,37 @@ class SdcExtension extends Extension implements PrependExtensionInterface
         $uxComponentsDir = $config['ux_components_dir'] ?? '%kernel.project_dir%/src_component';
         $uxComponentsDir = $container->resolveEnvPlaceholders($uxComponentsDir, true);
 
-        $container->prependExtensionConfig('twig', [
-            'paths' => [
-                rtrim($uxComponentsDir, DIRECTORY_SEPARATOR) => null,
-                $uxComponentsDir.DIRECTORY_SEPARATOR => 'component',
-            ],
-        ]);
+        // Right after `composer require`, before the first component is made,
+        // the directory does not exist yet, and both Twig's FilesystemLoader and
+        // AssetMapper (in debug) throw on a path that does not exist: Twig as
+        // soon as the "twig" service is created, which took down every page of
+        // the application. The directory is therefore registered only once it
+        // exists, the way TwigBundle treats its own default path, and the
+        // container tracks its existence so that a debug container is rebuilt
+        // when it appears. A container that is never rebuilt — production,
+        // warmed up before the directory was created — keeps going without it.
+        $uxComponentsDirPath = $this->filesystemPath($container, $uxComponentsDir);
+        $container->addResource(new FileExistenceResource($uxComponentsDirPath));
+        $uxComponentsDirExists = is_dir($uxComponentsDirPath);
 
-        $paths = [
-            $uxComponentsDir,
-        ];
+        if ($uxComponentsDirExists) {
+            $container->prependExtensionConfig('twig', [
+                'paths' => [
+                    rtrim($uxComponentsDir, DIRECTORY_SEPARATOR) => null,
+                    $uxComponentsDir.DIRECTORY_SEPARATOR => 'component',
+                ],
+            ]);
+        }
+
+        $paths = [];
+        if ($uxComponentsDirExists) {
+            $paths[] = $uxComponentsDir;
+        }
         if ($this->isAssetMapperAvailable($container)) {
             $paths[__DIR__.'/../../assets/controllers'] = '@tito10047/ux-sdc';
         }
         $assetMapper = ['paths' => $paths];
-        if ($this->excludesTemplatesFromAssetMap($container, $config)) {
+        if ($uxComponentsDirExists && $this->excludesTemplatesFromAssetMap($container, $config)) {
             $assetMapper['excluded_patterns'] = [self::templateExclusionPattern($uxComponentsDir)];
         }
         $container->prependExtensionConfig('framework', [
@@ -147,6 +167,27 @@ class SdcExtension extends Extension implements PrependExtensionInterface
                 ],
             ]);
         }
+    }
+
+    /**
+     * The directory a configured path names on the filesystem: parameters and
+     * environment variables resolved, unescaped, and relative to the project
+     * directory unless absolute — as Twig and AssetMapper read it.
+     */
+    private function filesystemPath(ContainerBuilder $container, string $path): string
+    {
+        $unescaped = $container->getParameterBag()->unescapeValue($path);
+        if (\is_string($unescaped)) {
+            $path = $unescaped;
+        }
+
+        if ((new Filesystem())->isAbsolutePath($path) || !$container->hasParameter('kernel.project_dir')) {
+            return $path;
+        }
+
+        $projectDir = $container->getParameter('kernel.project_dir');
+
+        return \is_string($projectDir) ? $projectDir.'/'.$path : $path;
     }
 
     /**

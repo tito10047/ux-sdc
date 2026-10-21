@@ -60,12 +60,8 @@ return [
 ];
 ```
 
-**2. Create the component directory and map a namespace to it** in
-`composer.json`, then run `composer dump-autoload`:
-
-```bash
-mkdir src_component
-```
+**2. Map a namespace to the component directory** in `composer.json`, then
+run `composer dump-autoload`:
 
 ```json
 {
@@ -90,6 +86,10 @@ The two must describe the same mapping: `App\Component\Alert\Alert` lives in
 `src_component/Alert/Alert.php`. With `component_namespace` set, every class in
 `ux_components_dir` is registered as an autowired and autoconfigured service,
 so components need no entry in `services.yaml`.
+
+The directory does not have to exist yet: `make:sdc-component` creates it with
+the first component. Until then the bundle leaves it out of Twig and
+AssetMapper, and a debug container picks it up as soon as it is created.
 
 **4. Print the assets in the `<head>` of your base layout**, usually
 `templates/base.html.twig`:

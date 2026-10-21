@@ -345,7 +345,7 @@ EOF
         try {
             return ($this->twig)();
         } catch (TwigError $e) {
-            // The Twig paths of the application, ux_components_dir among them, have to exist.
+            // The Twig paths the application configures itself have to exist.
             throw new RuntimeCommandException(\sprintf('Twig is needed to find the layout of the action template, and cannot be set up: %s', $e->getMessage()), 0, $e);
         }
     }

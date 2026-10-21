@@ -132,6 +132,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Installing the bundle before `ux_components_dir` exists no longer breaks every
+  page of the application. The directory was registered as a Twig path and an
+  AssetMapper path regardless, and Twig refuses a path that does not exist, so
+  the `twig` service could not be created (`The "…/src_component" directory
+  does not exist`); `debug:asset-map` failed the same way. A missing directory
+  is now left out, like TwigBundle leaves out a missing `templates/`, and a
+  debug container is rebuilt as soon as the directory is created. A container
+  built without it and never rebuilt — production, warmed up before the
+  directory existed — needs `cache:clear`.
 - A controller implementing `ComponentNamespaceInterface` (a page controller
   using the `Stimulus` trait) receives the component namespace on
   `kernel.controller` whether or not LiveComponent is installed. Without

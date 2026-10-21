@@ -11,14 +11,20 @@
 
 namespace Tito10047\UX\Sdc\Tests\Unit;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Config\Resource\FileExistenceResource;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\Filesystem\Filesystem;
 use Tito10047\UX\Sdc\CompilerPass\AssetComponentCompilerPass;
 use Tito10047\UX\Sdc\DependencyInjection\SdcExtension;
 use Tito10047\UX\Sdc\SdcBundle;
 
 class SdcBundleTest extends TestCase
 {
+    /** @var list<string> */
+    private array $temporaryPaths = [];
+
     public function testContainerExtensionKeepsTheUxSdcAlias(): void
     {
         $extension = (new SdcBundle())->getContainerExtension();
@@ -72,34 +78,105 @@ class SdcBundleTest extends TestCase
 
     public function testPrependAddsConfiguration(): void
     {
-        $container = new ContainerBuilder();
-        $container->setParameter('kernel.project_dir', '/var/www');
-        $extension = new SdcExtension();
+        $componentsDir = $this->temporaryProjectDir().'/src_component';
+        (new Filesystem())->mkdir($componentsDir);
 
-        $container->prependExtensionConfig('ux_sdc', [
-            'ux_components_dir' => '/var/www/src_component',
-            'component_namespace' => 'App\\Component\\'
-        ]);
+        $container = $this->prependedContainer(\dirname($componentsDir), $componentsDir);
 
-        $extension->prepend($container);
+        $this->assertSame([$componentsDir => null, $componentsDir.'/' => 'component'], $this->twigPaths($container));
 
-        $twigConfigs = $container->getExtensionConfig('twig');
-        $this->assertNotEmpty($twigConfigs);
-        $found = false;
-        foreach ($twigConfigs as $tConfig) {
-            if (isset($tConfig['paths']) && array_key_exists('/var/www/src_component', $tConfig['paths'])) {
-                $found = true;
-                break;
-            }
-        }
-        $this->assertTrue($found, 'Twig path /var/www/src_component not found');
-
-        $assetMapperConfigs = $container->getExtensionConfig('framework');
-        $this->assertNotEmpty($assetMapperConfigs);
-        $this->assertContains('/var/www/src_component', $assetMapperConfigs[0]['asset_mapper']['paths']);
+        $assetMapper = $container->getExtensionConfig('framework')[0]['asset_mapper'];
+        $this->assertContains($componentsDir, $assetMapper['paths']);
+        $this->assertSame([realpath($componentsDir).'/*.twig'], $assetMapper['excluded_patterns']);
 
         $twigComponentConfigs = $container->getExtensionConfig('twig_component');
         $this->assertNotEmpty($twigComponentConfigs);
         $this->assertEquals('', $twigComponentConfigs[0]['defaults']['App\\Component\\']['template_directory']);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function missingComponentsDirProvider(): iterable
+    {
+        yield 'absolute' => ['%kernel.project_dir%/src_component'];
+        yield 'relative to the project directory' => ['src_component'];
+    }
+
+    /**
+     * Twig's FilesystemLoader, and AssetMapper in debug, throw on a directory
+     * that does not exist — as the component directory does not, right after
+     * the bundle is installed.
+     */
+    #[DataProvider('missingComponentsDirProvider')]
+    public function testPrependLeavesOutAComponentsDirThatDoesNotExist(string $componentsDir): void
+    {
+        $projectDir = $this->temporaryProjectDir();
+
+        $container = $this->prependedContainer($projectDir, $componentsDir);
+
+        $this->assertSame([], $this->twigPaths($container));
+
+        $assetMapper = $container->getExtensionConfig('framework')[0]['asset_mapper'];
+        $this->assertNotContains($componentsDir, $assetMapper['paths']);
+        $this->assertArrayNotHasKey('excluded_patterns', $assetMapper);
+
+        $this->assertContainsEquals(new FileExistenceResource($projectDir.'/src_component'), $container->getResources());
+
+        $twigComponentConfigs = $container->getExtensionConfig('twig_component');
+        $this->assertEquals('', $twigComponentConfigs[0]['defaults']['App\\Component\\']['template_directory']);
+    }
+
+    public function testPrependRegistersAComponentsDirRelativeToTheProjectDirectory(): void
+    {
+        $projectDir = $this->temporaryProjectDir();
+        (new Filesystem())->mkdir($projectDir.'/src_component');
+
+        $container = $this->prependedContainer($projectDir, 'src_component');
+
+        $this->assertSame(['src_component' => null, 'src_component/' => 'component'], $this->twigPaths($container));
+        $this->assertContains('src_component', $container->getExtensionConfig('framework')[0]['asset_mapper']['paths']);
+    }
+
+    protected function tearDown(): void
+    {
+        (new Filesystem())->remove($this->temporaryPaths);
+    }
+
+    private function prependedContainer(string $projectDir, string $componentsDir): ContainerBuilder
+    {
+        $container = new ContainerBuilder();
+        $container->setParameter('kernel.project_dir', $projectDir);
+
+        $container->prependExtensionConfig('ux_sdc', [
+            'ux_components_dir' => $componentsDir,
+            'component_namespace' => 'App\\Component\\',
+        ]);
+
+        (new SdcExtension())->prepend($container);
+
+        return $container;
+    }
+
+    /**
+     * @return array<string, string|null>
+     */
+    private function twigPaths(ContainerBuilder $container): array
+    {
+        $paths = [];
+        foreach ($container->getExtensionConfig('twig') as $config) {
+            $paths += $config['paths'] ?? [];
+        }
+
+        return $paths;
+    }
+
+    private function temporaryProjectDir(): string
+    {
+        $path = sys_get_temp_dir().'/'.uniqid('ux-sdc-', true);
+        (new Filesystem())->mkdir($path);
+        $this->temporaryPaths[] = $path;
+
+        return $path;
     }
 }

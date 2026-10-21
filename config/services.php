@@ -114,8 +114,9 @@ return static function (ContainerConfigurator $container): void {
             ->args([
                 '%ux_sdc.ux_components_dir%',
                 '%ux_sdc.component_namespace%',
-                // Only --action needs Twig. Built eagerly, it would take the maker down
-                // with it in an application whose ux_components_dir does not exist yet.
+                // Only --action needs Twig. Built eagerly, a Twig setup that cannot be
+                // created (a configured path that does not exist) would take the whole
+                // maker down with it.
                 service_closure('twig'),
             ])
             ->tag('maker.command');
