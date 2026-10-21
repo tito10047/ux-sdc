@@ -42,6 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Without `component_namespace`, and for classes outside it, nothing is set.
   The trait and the interface keep working, for the name in PHP
   (`getController()`). `make:sdc-component` no longer generates them.
+- `make:sdc-component --route-path=PATH --layout=TEMPLATE`: the path of the
+  `--action` route and the template the page extends, instead of the derived and
+  detected ones. Either option implies `--action`.
 
 ### Changed
 
@@ -106,6 +109,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   needs (`src/`, `config/`, `assets/`, `templates/` and the documentation). The
   tests, the end-to-end setup, tool configuration and an internal specification
   (`zadanie.md`, `.junie/`) are no longer shipped.
+- **Behaviour change:** `make:sdc-component --action` generates a page that opens
+  on a Flex application without being edited, once its route is loaded:
+  - the page template extends `layout.html.twig` if Twig finds one, else
+    `base.html.twig`, and fills the `content` block if that template has one
+    (also when inherited), else `body`. It used to extend `layout.html.twig` with
+    `content` unconditionally, which a Flex application does not have. Without
+    a template to extend, or with neither block in it, the maker stops and asks
+    for `--layout`;
+  - the route path is derived from the component name, kebab-cased, without a
+    leading `Page` namespace (`Page:Blog:BlogPost` → `/blog/blog-post`), instead
+    of `/en` for every page, and the route name follows `make:controller`
+    (`app_blog_blog_post` instead of `app.blogpost`);
+  - the controller is a `final` invokable `AbstractController` with a
+    `Response` return type imported, and the maker prints what the application
+    needs for its route to be loaded.
+- **Behaviour change:** `make:sdc-component` stops, before writing anything, when
+  `component_namespace` is not set (it used to assume `App\Component`), when
+  Composer does not autoload it, or when Composer maps it to another directory
+  than `ux_components_dir`. It used to write the class in one directory and its
+  template and assets in another, where nothing found them.
 
 ### Fixed
 

@@ -14,6 +14,7 @@ use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Tito10047\UX\Sdc\Maker\MakeSdcComponent;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
+use function Symfony\Component\DependencyInjection\Loader\Configurator\service_closure;
 
 /**
  * @link https://symfony.com/doc/current/bundles/best_practices.html#services
@@ -113,6 +114,9 @@ return static function (ContainerConfigurator $container): void {
             ->args([
                 '%ux_sdc.ux_components_dir%',
                 '%ux_sdc.component_namespace%',
+                // Only --action needs Twig. Built eagerly, it would take the maker down
+                // with it in an application whose ux_components_dir does not exist yet.
+                service_closure('twig'),
             ])
             ->tag('maker.command');
     }

@@ -15,13 +15,14 @@
 namespace <?= $namespace ?>;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
-class <?= $class_name ?> extends AbstractController
+final class <?= $class_name ?> extends AbstractController
 {
-    #[Route('/en', name: 'app.<?= strtolower($component_name) ?>')]
-    public function index(): \Symfony\Component\HttpFoundation\Response
+    #[Route(<?= var_export($route_path, true) ?>, name: <?= var_export($route_name, true) ?>)]
+    public function __invoke(): Response
     {
-        return $this->render('<?= ($sub_path ? $sub_path.'/' : '').$component_name ?>/<?= $component_name ?>Action.html.twig');
+        return $this->render(<?= var_export($template_name, true) ?>);
     }
 }

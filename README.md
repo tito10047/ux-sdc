@@ -412,10 +412,14 @@ src_component/UI/Alert/
 | `name` | Component name; `:` or `/` separate directories (`UI:Alert`, `UI/Alert`). Asked for when omitted. |
 | `--stimulus` | Also generate `<Name>_controller.js`. Without the option, asked interactively (default yes); never generated with `--no-interaction`. |
 | `--action` | Also generate a page controller and its template (see below). Without the option, asked interactively (default no). |
+| `--route-path=PATH` | Path of the page's route, instead of the one derived from the name. Implies `--action`. |
+| `--layout=TEMPLATE` | Template the page extends, instead of the one detected. Implies `--action`. |
 
-The PHP class is written where Composer's PSR-4 mapping puts its namespace, and
-the other files into `ux_components_dir` — one more reason to keep the two in
-step. Without `component_namespace` the maker assumes `App\Component`.
+The maker needs `component_namespace`, and writes the PHP class where Composer's
+PSR-4 mapping puts it and the other files into `ux_components_dir`. When the two
+do not point to the same directory — or `component_namespace` is not set, or
+Composer does not autoload it — it stops before writing anything and says which
+setting to fix, rather than leave the class apart from its template and assets.
 
 ### Page components with `--action`
 
@@ -430,12 +434,13 @@ additionally creates a controller and a page template next to the component:
 namespace App\Component\Page\Homepage;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
-class HomepageAction extends AbstractController
+final class HomepageAction extends AbstractController
 {
-    #[Route('/en', name: 'app.homepage')]
-    public function index(): \Symfony\Component\HttpFoundation\Response
+    #[Route('/homepage', name: 'app_homepage')]
+    public function __invoke(): Response
     {
         return $this->render('Page/Homepage/HomepageAction.html.twig');
     }
@@ -444,34 +449,31 @@ class HomepageAction extends AbstractController
 
 ```twig
 {# src_component/Page/Homepage/HomepageAction.html.twig #}
-{% extends 'layout.html.twig' %}
+{% extends 'base.html.twig' %}
 
-{% block content %}
+{% block body %}
     <twig:Page:Homepage:Homepage />
 {% endblock %}
 ```
 
-The generated code needs three adjustments today:
-
-- **The route path is always `/en`.** Change it; a second generated page would
-  collide with the first.
-- **The template extends `layout.html.twig` with a `content` block**, which a Flex
-  application does not have (it has `base.html.twig` with `body`). Edit the two
-  lines, or create the layout once:
-
-  ```twig
-  {# templates/layout.html.twig #}
-  {% extends 'base.html.twig' %}
-
-  {% block body %}
-      {% block content %}{% endblock %}
-  {% endblock %}
-  ```
-
-- **The route has to be loaded.** On Symfony 7.4 and later, a `config/routes.yaml`
-  with the `routing.controllers` resource — the default of new 7.4+ applications —
-  loads it with no further configuration, because the bundle registers the
-  controller as an autoconfigured service:
+- **Route.** The path is the component name, each part kebab-cased, without a
+  leading `Page` — the namespace of page components, see
+  [Organizing components](#organizing-components): `Page:Homepage` → `/homepage`,
+  `Page:Blog:BlogPost` → `/blog/blog-post`, `Admin:Dashboard` → `/admin/dashboard`.
+  The route name is the one `make:controller` would give the same name:
+  `app_homepage`, `app_blog_blog_post`, `app_admin_dashboard`. Choose another path
+  with `--route-path`; the name is yours to edit.
+- **Layout.** The page extends `layout.html.twig` if Twig finds one, else
+  `base.html.twig`, and fills the `content` block if that template has one —
+  defined in it or in a template it extends — else `body`. On a Flex application
+  that is `base.html.twig` and `body`. Choose another template with `--layout`.
+  When there is no template to extend, or it has neither block, the maker stops
+  and says so.
+- **The route has to be loaded.** The bundle does not load routes itself; the
+  maker prints what your application needs. On Symfony 7.4 and later, a
+  `config/routes.yaml` with the `routing.controllers` resource — the default of
+  new 7.4+ applications — loads it with no further configuration, because the
+  bundle registers the controller as an autoconfigured service:
 
   ```yaml
   controllers:
@@ -490,7 +492,7 @@ The generated code needs three adjustments today:
       type: attribute
   ```
 
-  Check with `php bin/console debug:router`.
+  Check with `php bin/console debug:router app_homepage`.
 
 ### Organizing components
 

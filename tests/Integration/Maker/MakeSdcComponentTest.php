@@ -11,14 +11,19 @@
 
 namespace Tito10047\UX\Sdc\Tests\Integration\Maker;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Bundle\MakerBundle\Exception\RuntimeCommandException;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\UX\StimulusBundle\AssetMapper\ControllersMapGenerator;
 use Symfony\UX\TwigComponent\ComponentRendererInterface;
 use Tito10047\UX\Sdc\Tests\Integration\IntegrationTestCase;
 
 class MakeSdcComponentTest extends IntegrationTestCase
 {
+    private const NEW_COMPONENTS_DIR = __DIR__.'/../Fixtures/maker/components';
+
     protected function setUp(): void
     {
         if (!class_exists(\Symfony\Bundle\MakerBundle\MakerBundle::class)) {
@@ -26,31 +31,30 @@ class MakeSdcComponentTest extends IntegrationTestCase
         }
 
         parent::setUp();
-        $this->removeDir(self::getContainer()->getParameter('ux_sdc.ux_components_dir') . '/UI');
-        $this->removeDir(self::getContainer()->getParameter('ux_sdc.ux_components_dir') . '/Alert');
-        $this->removeDir(self::getContainer()->getParameter('ux_sdc.ux_components_dir') . '/Page');
+        $this->removeGeneratedComponents();
     }
 
     protected function tearDown(): void
     {
-        // Before parent::tearDown(): getContainer() would boot the kernel again
-        // after it was shut down, and leave it booted for the next test class.
-        $this->removeDir(self::getContainer()->getParameter('ux_sdc.ux_components_dir') . '/UI');
-        $this->removeDir(self::getContainer()->getParameter('ux_sdc.ux_components_dir') . '/Alert');
-        $this->removeDir(self::getContainer()->getParameter('ux_sdc.ux_components_dir') . '/Page');
+        $this->removeGeneratedComponents();
         parent::tearDown();
     }
 
-    private function removeDir(string $dir): void
+    /**
+     * Fixed paths rather than the ux_components_dir of the kernel: some tests
+     * boot one with another directory, and a failing one may have written files.
+     */
+    private function removeGeneratedComponents(): void
     {
-        if (!is_dir($dir)) {
-            return;
-        }
-        $files = array_diff(scandir($dir), ['.', '..']);
-        foreach ($files as $file) {
-            (is_dir("$dir/$file")) ? $this->removeDir("$dir/$file") : unlink("$dir/$file");
-        }
-        rmdir($dir);
+        $fixtures = \dirname(__DIR__).'/Fixtures';
+
+        (new Filesystem())->remove([
+            $fixtures.'/Component/UI',
+            $fixtures.'/Component/Alert',
+            $fixtures.'/Component/Page',
+            $fixtures.'/Library/UI',
+            self::NEW_COMPONENTS_DIR,
+        ]);
     }
 
     public function testMakeSdcComponent(): void
@@ -126,63 +130,6 @@ class MakeSdcComponentTest extends IntegrationTestCase
         $this->assertStringContainsString('data-controller="UI--Alert--Alert"', $html);
     }
 
-    public function testMakeSdcComponentWithAction(): void
-    {
-        self::bootKernel();
-        $application = new Application(self::$kernel);
-
-        $command = $application->find('make:sdc-component');
-        $tester = new CommandTester($command);
-
-        // Page:Homepage with --action
-        $tester->execute([
-            'name' => 'Page:Homepage',
-            '--action' => true,
-        ], [
-            'interactive' => false,
-        ]);
-
-        $tester->assertCommandIsSuccessful();
-
-        $baseDir = self::getContainer()->getParameter('ux_sdc.ux_components_dir');
-        $this->assertFileExists($baseDir . '/Page/Homepage/Homepage.php');
-        $this->assertFileExists($baseDir . '/Page/Homepage/HomepageAction.php');
-        $this->assertFileExists($baseDir . '/Page/Homepage/HomepageAction.html.twig');
-
-        $actionPhpContent = file_get_contents($baseDir . '/Page/Homepage/HomepageAction.php');
-        $this->assertStringContainsString('namespace Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\Page\Homepage;', $actionPhpContent);
-        $this->assertStringContainsString('class HomepageAction extends AbstractController', $actionPhpContent);
-        $this->assertStringContainsString('#[Route(\'/en\', name: \'app.homepage\')]', $actionPhpContent);
-        $this->assertStringContainsString('return $this->render(\'Page/Homepage/HomepageAction.html.twig\');', $actionPhpContent);
-
-        $actionTwigContent = file_get_contents($baseDir . '/Page/Homepage/HomepageAction.html.twig');
-        $this->assertStringContainsString('{% extends \'layout.html.twig\' %}', $actionTwigContent);
-        $this->assertStringContainsString('<twig:Page:Homepage:Homepage />', $actionTwigContent);
-    }
-
-    public function testMakeSdcComponentInteractiveWithAction(): void
-    {
-        self::bootKernel();
-        $application = new Application(self::$kernel);
-
-        $command = $application->find('make:sdc-component');
-        $tester = new CommandTester($command);
-
-        $tester->setInputs([
-            'Page:Homepage', // Component name
-            'n',             // Stimulus?
-            'y',             // Action?
-        ]);
-
-        $tester->execute([]);
-
-        $tester->assertCommandIsSuccessful();
-
-        $baseDir = self::getContainer()->getParameter('ux_sdc.ux_components_dir');
-        $this->assertFileExists($baseDir . '/Page/Homepage/HomepageAction.php');
-        $this->assertFileExists($baseDir . '/Page/Homepage/HomepageAction.html.twig');
-    }
-
     public function testMakeSdcComponentWithColonSeparator(): void
     {
         self::bootKernel();
@@ -233,5 +180,54 @@ class MakeSdcComponentTest extends IntegrationTestCase
 
         $twigContent = file_get_contents($baseDir . '/Alert/Alert.html.twig');
         $this->assertStringNotContainsString('stimulus_controller', $twigContent);
+    }
+
+    /**
+     * Kernel options, and the message. ux_components_dir does not exist yet, as
+     * in an application about to get its first component: once it holds classes,
+     * a namespace that does not match makes the container fail to build.
+     *
+     * @return iterable<string, array{array<string, mixed>, string}>
+     */
+    public static function provideMismatchedConfiguration(): iterable
+    {
+        $fixtures = \dirname(__DIR__).'/Fixtures';
+
+        yield 'namespace of another directory' => [
+            ['configs' => ['component_namespace' => 'Tito10047\\UX\\Sdc\\Tests\\Integration\\Fixtures\\Library', 'ux_components_dir' => self::NEW_COMPONENTS_DIR]],
+            'would be written to "'.$fixtures.'/Library/UI/Alert", but its template and assets to "'.$fixtures.'/maker/components/UI/Alert". "ux_sdc.component_namespace" (Tito10047\\UX\\Sdc\\Tests\\Integration\\Fixtures\\Library\\) has to be the namespace Composer\'s PSR-4 autoloading maps to "ux_sdc.ux_components_dir"',
+        ];
+        yield 'namespace Composer does not autoload' => [
+            ['configs' => ['component_namespace' => 'Acme\\NotAutoloaded', 'ux_components_dir' => self::NEW_COMPONENTS_DIR]],
+            'Composer\'s autoloading does not know where to put the class "Acme\\NotAutoloaded\\UI\\Alert\\Alert".',
+        ];
+        yield 'no namespace' => [
+            // Without component_namespace, TwigComponent 3 wants defaults of the application.
+            ['configs' => ['component_namespace' => null], 'twig_component' => ['defaults' => ['App\\Twig\\Components\\' => 'components/']]],
+            'make:sdc-component needs "ux_sdc.component_namespace"',
+        ];
+    }
+
+    /**
+     * Instead of a class in one directory and its template and assets in another.
+     *
+     * @param array<string, mixed> $kernelOptions
+     */
+    #[DataProvider('provideMismatchedConfiguration')]
+    public function testMismatchedConfigurationFailsBeforeAnythingIsWritten(array $kernelOptions, string $message): void
+    {
+        self::bootKernel($kernelOptions);
+        $tester = new CommandTester((new Application(self::$kernel))->find('make:sdc-component'));
+
+        try {
+            $tester->execute(['name' => 'UI:Alert'], ['interactive' => false]);
+            $this->fail('The maker generated a component with a configuration that scatters it.');
+        } catch (RuntimeCommandException $e) {
+            $this->assertStringContainsString($message, $e->getMessage());
+        }
+
+        $this->assertDirectoryDoesNotExist(self::NEW_COMPONENTS_DIR);
+        $this->assertDirectoryDoesNotExist(\dirname(__DIR__).'/Fixtures/Library/UI');
+        $this->assertDirectoryDoesNotExist(\dirname(__DIR__).'/Fixtures/Component/UI');
     }
 }

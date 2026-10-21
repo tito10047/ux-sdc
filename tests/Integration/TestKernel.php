@@ -52,6 +52,7 @@ class TestKernel extends Kernel
      * @param array      $twigConfig      loaded as a separate twig config, the way an application's own config/packages/twig.yaml would be
      * @param list<class-string> $services registered autowired and autoconfigured, the way an application's services.yaml registers its classes
      * @param array      $twigComponentConfig loaded as a separate twig_component config, the way an application's own config/packages/twig_component.yaml would be
+     * @param array<string, string> $attributeRoutes PSR-4 directories whose #[Route] attributes are loaded, namespace => directory, the way a `resource: {path, namespace}, type: attribute` entry of config/routes.yaml loads them
      */
     public function __construct(
         string|array $configs = [],
@@ -63,6 +64,7 @@ class TestKernel extends Kernel
         private readonly array $twigConfig = [],
         private readonly array $services = [],
         private readonly array $twigComponentConfig = [],
+        private readonly array $attributeRoutes = [],
     ) {
         if (is_string($configs)) {
             $environment = $configs;
@@ -105,9 +107,15 @@ class TestKernel extends Kernel
             ->controller(TemplateController::class)
             ->requirements(['template' => '.+\\.twig']);
 
+        // Before the LiveComponent route: imported without a prefix, it matches any /{a}/{b}.
+        foreach ($this->attributeRoutes as $namespace => $directory) {
+            $routes->import(['path' => $directory, 'namespace' => $namespace], 'attribute');
+        }
+
         if (class_exists(LiveComponentBundle::class)) {
             $routes->import('@LiveComponentBundle/config/routes.php');
         }
+
     }
 
     protected function configureContainer(ContainerBuilder $container, LoaderInterface $loader): void

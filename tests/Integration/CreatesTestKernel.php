@@ -21,6 +21,7 @@ use Symfony\Component\HttpKernel\KernelInterface;
  *  - `compiler_passes`: extra compiler passes, see TestKernel
  *  - `framework`, `twig`, `twig_component`: application configuration of those bundles
  *  - `services`: application classes registered as services, see TestKernel
+ *  - `attribute_routes`: directories whose #[Route] attributes are loaded, see TestKernel
  */
 trait CreatesTestKernel
 {
@@ -46,6 +47,7 @@ trait CreatesTestKernel
             twigConfig: $options['twig'] ?? [],
             services: $options['services'] ?? [],
             twigComponentConfig: $options['twig_component'] ?? [],
+            attributeRoutes: $options['attribute_routes'] ?? [],
         );
     }
 }
