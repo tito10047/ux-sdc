@@ -125,7 +125,7 @@ documentation moved from the README to [`docs/`](docs/installation.md).
 - Describe every option in English in `config:dump-reference ux_sdc`.
 - Rewrite the documentation against the code and split it into `docs/`; add
   `UPGRADE.md`. The package archive ships `src/`, `config/`, `assets/`,
-  `templates/` and the documentation, without tests and tooling.
+  `templates/`, `skeleton/` and the documentation, without tests and tooling.
 
 ### Deprecated
 
@@ -183,6 +183,11 @@ documentation moved from the README to [`docs/`](docs/installation.md).
 - Fix `make:sdc-component` writing the licence header of the bundle into the
   generated `.css` and `_controller.js`, and make it say that
   `config/routes/ux_sdc.yaml` loads the route when the file exists.
+- Fix `cache:clear` / `cache:warmup` compiling the PHP skeletons of
+  `make:sdc-component` as Twig templates in every application without
+  `twig.file_name_pattern` (dozens of Twig deprecations, and two templates that do
+  not compile): TwigBundle registers the bundle's `templates/` as `@Sdc`, so the
+  skeletons moved to `skeleton/`.
 
 ## [0.4.0] - 2026-10-02
 

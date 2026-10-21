@@ -36,6 +36,13 @@ use Twig\Error\Error as TwigError;
 final class MakeSdcComponent extends AbstractMaker
 {
     /**
+     * The PHP skeletons of the generated files. Not under templates/: TwigBundle
+     * registers that directory as the @Sdc namespace, and its cache warmer would
+     * compile them as Twig templates in every application.
+     */
+    private const SKELETON_DIR = __DIR__.'/../../skeleton';
+
+    /**
      * Base templates a generated page extends when --layout is not given, the
      * first one Twig finds: a layout of the application's own, then the one
      * every Flex application has.
@@ -202,7 +209,7 @@ EOF
 
         $generator->generateFile(
             $directory . '/' . $componentName . '.html.twig',
-            __DIR__.'/../../templates/sdc/template.tpl.php',
+            self::SKELETON_DIR.'/template.tpl.php',
             [
                 'component_name' => $componentName,
                 'with_stimulus' => $withStimulus,
@@ -211,7 +218,7 @@ EOF
 
         $generator->generateFile(
             $directory . '/' . $componentName . '.css',
-            __DIR__.'/../../templates/sdc/style.tpl.php',
+            self::SKELETON_DIR.'/style.tpl.php',
             [
                 'component_name' => $componentName,
             ]
@@ -220,7 +227,7 @@ EOF
         if ($withStimulus) {
             $generator->generateFile(
                 $directory . '/' . $componentName . '_controller.js',
-                __DIR__.'/../../templates/sdc/controller.tpl.php',
+                self::SKELETON_DIR.'/controller.tpl.php',
                 [
                     'component_name' => $componentName,
                 ]
@@ -230,7 +237,7 @@ EOF
         if (null !== $action) {
             $generator->generateClass(
                 $fullNamespace . '\\' . $componentName . 'Action',
-                __DIR__.'/../../templates/sdc/Action.tpl.php',
+                self::SKELETON_DIR.'/Action.tpl.php',
                 [
                     'route_path' => $action['route_path'],
                     'route_name' => $action['route_name'],
@@ -240,7 +247,7 @@ EOF
 
             $generator->generateFile(
                 $directory . '/' . $componentName . 'Action.html.twig',
-                __DIR__.'/../../templates/sdc/ActionTemplate.tpl.php',
+                self::SKELETON_DIR.'/ActionTemplate.tpl.php',
                 [
                     'layout' => $action['layout'],
                     'block' => $action['block'],
@@ -278,7 +285,7 @@ EOF
         $settingsHint = \sprintf('"ux_sdc.component_namespace" (%s) has to be the namespace Composer\'s PSR-4 autoloading maps to "ux_sdc.ux_components_dir" (%s): fix whichever of the two is wrong, or the "autoload" section of composer.json, and run "composer dump-autoload".', $this->componentNamespace, $this->uxComponentsDir);
 
         try {
-            $classPath = $generator->generateClass($className, __DIR__.'/../../templates/sdc/Component.tpl.php');
+            $classPath = $generator->generateClass($className, self::SKELETON_DIR.'/Component.tpl.php');
         } catch (\LogicException $e) {
             // MakerBundle's way of saying that no PSR-4 prefix covers the class.
             throw new RuntimeCommandException(\sprintf('Composer\'s autoloading does not know where to put the class "%s". %s', $className, $settingsHint), 0, $e);
