@@ -17,7 +17,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Reference;
 use Tito10047\UX\Sdc\Csp\NelmioNonceProvider;
 use Tito10047\UX\Sdc\DependencyInjection\SdcExtension;
-use Tito10047\UX\Sdc\EventListener\AssetResponseListener;
+use Tito10047\UX\Sdc\Response\PageAssetInjector;
 
 final class SdcExtensionCspNonceTest extends TestCase
 {
@@ -25,14 +25,14 @@ final class SdcExtensionCspNonceTest extends TestCase
     {
         $container = $this->load([]);
 
-        $this->assertArrayNotHasKey('$nonceProvider', $container->getDefinition(AssetResponseListener::class)->getArguments());
+        $this->assertArrayNotHasKey('$nonceProvider', $container->getDefinition(PageAssetInjector::class)->getArguments());
     }
 
-    public function testTheListenerGetsTheSelectedProvider(): void
+    public function testTheInjectorGetsTheSelectedProvider(): void
     {
         $container = $this->load(['csp_nonce_provider' => 'app.csp_nonces']);
 
-        $argument = $container->getDefinition(AssetResponseListener::class)->getArgument('$nonceProvider');
+        $argument = $container->getDefinition(PageAssetInjector::class)->getArgument('$nonceProvider');
         $this->assertInstanceOf(Reference::class, $argument);
         $this->assertSame('app.csp_nonces', (string) $argument);
     }

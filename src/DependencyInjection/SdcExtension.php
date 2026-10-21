@@ -28,11 +28,14 @@ use Tito10047\UX\Sdc\CompilerPass\ComponentRoutesCompilerPass;
 use Tito10047\UX\Sdc\CompilerPass\StimulusControllerPathsCompilerPass;
 use Tito10047\UX\Sdc\Csp\NelmioNonceProvider;
 use Tito10047\UX\Sdc\Debug\ComponentInspector;
+use Tito10047\UX\Sdc\EventListener\AssetResponseListener;
 use Tito10047\UX\Sdc\EventListener\ComponentRenderListener;
 use Tito10047\UX\Sdc\EventListener\DevComponentRenderListener;
+use Tito10047\UX\Sdc\Response\PageAssetInjector;
 use Tito10047\UX\Sdc\Routing\ComponentRouteLoader;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
+use Tito10047\UX\Sdc\Twig\AssetExtension;
 
 class SdcExtension extends Extension implements PrependExtensionInterface
 {
@@ -79,24 +82,18 @@ class SdcExtension extends Extension implements PrependExtensionInterface
 
         $this->registerNelmioNonceProvider($container);
 
-        if ($container->hasDefinition('Tito10047\UX\Sdc\EventListener\AssetResponseListener')) {
-            $listener = $container->getDefinition('Tito10047\UX\Sdc\EventListener\AssetResponseListener')
-                ->setArgument('$placeholder', $config['placeholder']);
-
-            if (null !== $config['csp_nonce_provider']) {
-                $listener->setArgument('$nonceProvider', new Reference($config['csp_nonce_provider']));
-            }
+        // Printed by render_component_assets(), looked for by the listener,
+        // replaced by the injector.
+        foreach ([AssetExtension::class, AssetResponseListener::class, PageAssetInjector::class] as $id) {
+            $container->getDefinition($id)->setArgument('$placeholder', $config['placeholder']);
         }
 
-        if ($container->hasDefinition('Tito10047\UX\Sdc\Twig\AssetExtension')) {
-            $container->getDefinition('Tito10047\UX\Sdc\Twig\AssetExtension')
-                ->setArgument('$placeholder', $config['placeholder']);
+        if (null !== $config['csp_nonce_provider']) {
+            $container->getDefinition(PageAssetInjector::class)
+                ->setArgument('$nonceProvider', new Reference($config['csp_nonce_provider']));
         }
 
-        $namespace = null;
-        if (isset($config['component_namespace'])) {
-            $namespace = rtrim((string) $config['component_namespace'], '\\') . '\\';
-        }
+        $namespace = isset($config['component_namespace']) ? self::normalizeNamespace((string) $config['component_namespace']) : null;
         $container->setParameter('ux_sdc.component_namespace', $namespace);
 
         $uxComponentsDir = $container->resolveEnvPlaceholders($config['ux_components_dir'], true);
@@ -181,7 +178,7 @@ class SdcExtension extends Extension implements PrependExtensionInterface
         ]);
 
         if (isset($config['component_namespace'])) {
-            $namespace = rtrim((string) $config['component_namespace'], '\\') . '\\';
+            $namespace = self::normalizeNamespace((string) $config['component_namespace']);
             $container->prependExtensionConfig('twig_component', [
                 'defaults' => [
                     $namespace => [
@@ -366,6 +363,15 @@ class SdcExtension extends Extension implements PrependExtensionInterface
                 '$classesWithExplicitTemplate' => [],
             ])
             ->addTag('monolog.logger', ['channel' => 'ux_sdc']);
+    }
+
+    /**
+     * `component_namespace` with exactly one trailing backslash, the form the
+     * class registration and the `defaults` of Twig Components expect.
+     */
+    private static function normalizeNamespace(string $namespace): string
+    {
+        return rtrim($namespace, '\\') . '\\';
     }
 
     private function registerClasses(ContainerBuilder $container, string $namespace, string $resource): void

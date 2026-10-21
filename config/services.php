@@ -9,6 +9,11 @@ use Tito10047\UX\Sdc\Service\AssetRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 use Tito10047\UX\Sdc\Service\StimulusControllerNameResolver;
 use Tito10047\UX\Sdc\EventListener\AssetResponseListener;
+use Tito10047\UX\Sdc\Response\AssetResolver;
+use Tito10047\UX\Sdc\Response\AssetTagRenderer;
+use Tito10047\UX\Sdc\Response\FragmentAssetHeader;
+use Tito10047\UX\Sdc\Response\PageAssetInjector;
+use Tito10047\UX\Sdc\Response\ResponseClassifier;
 use Tito10047\UX\Sdc\EventListener\ComponentRenderListener;
 use Tito10047\UX\Sdc\EventListener\DevComponentRenderListener;
 use Tito10047\UX\Sdc\Twig\AssetExtension;
@@ -34,6 +39,31 @@ return static function (ContainerConfigurator $container): void {
     $services->set(AssetRegistry::class)
         ->tag('kernel.reset', ['method' => 'reset']);
 
+    // The collaborators of AssetResponseListener. The logger is optional, on the
+    // `ux_sdc` channel when MonologBundle is installed (the tag is ignored
+    // otherwise); what each reports, and why only in debug, is on its `$debug`.
+    $services->set(AssetResolver::class)
+        ->args([service(AssetMapperInterface::class)])
+        ->arg('$logger', service('logger')->nullOnInvalid())
+        ->arg('$debug', '%kernel.debug%')
+        ->tag('monolog.logger', ['channel' => 'ux_sdc']);
+
+    $services->set(ResponseClassifier::class);
+
+    $services->set(AssetTagRenderer::class);
+
+    // The placeholder and the CSP nonce provider are set by SdcExtension.
+    $services->set(PageAssetInjector::class)
+        ->args([service(AssetTagRenderer::class)])
+        ->arg('$logger', service('logger')->nullOnInvalid())
+        ->arg('$debug', '%kernel.debug%')
+        ->tag('monolog.logger', ['channel' => 'ux_sdc']);
+
+    $services->set(FragmentAssetHeader::class)
+        ->arg('$logger', service('logger')->nullOnInvalid())
+        ->arg('$debug', '%kernel.debug%')
+        ->tag('monolog.logger', ['channel' => 'ux_sdc']);
+
     // Priority 64: the listener stores the preload links in the `_links` request
     // attribute, which WebLink's AddLinkHeaderListener (priority 0) turns into the
     // `Link` header — so it has to run first. At equal priority the order would
@@ -49,12 +79,14 @@ return static function (ContainerConfigurator $container): void {
     // headers of controller attributes such as #[Cache]. 64 keeps clear of the
     // default priority without claiming the top of the stack.
     //
-    // The logger is optional, on the `ux_sdc` channel when MonologBundle is
-    // installed (the tag is ignored otherwise).
+    // The placeholder is set by SdcExtension.
     $services->set(AssetResponseListener::class)
         ->args([
             service(AssetRegistry::class),
-            service(AssetMapperInterface::class),
+            service(AssetResolver::class),
+            service(ResponseClassifier::class),
+            service(PageAssetInjector::class),
+            service(FragmentAssetHeader::class),
         ])
         ->arg('$logger', service('logger')->nullOnInvalid())
         ->arg('$debug', '%kernel.debug%')

@@ -24,6 +24,11 @@ use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\WebLink\GenericLinkProvider;
 use Tito10047\UX\Sdc\Csp\NonceProviderInterface;
 use Tito10047\UX\Sdc\EventListener\AssetResponseListener;
+use Tito10047\UX\Sdc\Response\AssetResolver;
+use Tito10047\UX\Sdc\Response\AssetTagRenderer;
+use Tito10047\UX\Sdc\Response\FragmentAssetHeader;
+use Tito10047\UX\Sdc\Response\PageAssetInjector;
+use Tito10047\UX\Sdc\Response\ResponseClassifier;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
 use Tito10047\UX\Sdc\Tests\TestLogger;
 
@@ -743,7 +748,9 @@ final class AssetResponseListenerTest extends TestCase
     }
 
     /**
-     * The asset map knows Alert/Alert.css and Alert/Alert.js.
+     * The listener with its collaborators, all of them real: this test covers
+     * the output of the whole response path. The asset map knows
+     * Alert/Alert.css and Alert/Alert.js.
      */
     private function createListener(bool $debug, ?NonceProviderInterface $nonceProvider = null): AssetResponseListener
     {
@@ -754,7 +761,16 @@ final class AssetResponseListenerTest extends TestCase
             default => null,
         });
 
-        return new AssetResponseListener($this->registry, $assetMapper, '[[ASSETS]]', $this->logger, $debug, $nonceProvider);
+        return new AssetResponseListener(
+            $this->registry,
+            new AssetResolver($assetMapper, $this->logger, $debug),
+            new ResponseClassifier(),
+            new PageAssetInjector(new AssetTagRenderer(), '[[ASSETS]]', $nonceProvider, $this->logger, $debug),
+            new FragmentAssetHeader($this->logger, $debug),
+            '[[ASSETS]]',
+            $this->logger,
+            $debug,
+        );
     }
 
     /**

@@ -13,6 +13,7 @@ namespace Tito10047\UX\Sdc\EventListener;
 
 use Symfony\UX\TwigComponent\Event\PreRenderEvent;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
+use Tito10047\UX\Sdc\Service\AssetType;
 use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
 
 /**
@@ -35,7 +36,7 @@ trait ComponentRenderTrait
         foreach ($assets as $asset) {
             $this->assetRegistry->addAsset(
                 $asset['path'],
-                $asset['type'] ?: (str_ends_with($asset['path'], '.css') ? 'css' : 'js'),
+                AssetType::resolve($asset['type'], $asset['path']),
                 $asset['priority'],
                 $asset['attributes']
             );

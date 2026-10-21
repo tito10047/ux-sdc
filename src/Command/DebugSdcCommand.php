@@ -24,6 +24,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Tito10047\UX\Sdc\Debug\ComponentInspector;
 use Tito10047\UX\Sdc\Debug\ComponentReport;
+use Tito10047\UX\Sdc\Service\AssetType;
 use Tito10047\UX\Sdc\Service\ComponentMetadata;
 
 /**
@@ -177,8 +178,8 @@ final class DebugSdcCommand extends Command
             $rows[] = [
                 ([] === $report->problems ? '' : self::PROBLEM) . OutputFormatter::escape($report->name),
                 $this->formatTemplate($report),
-                $this->formatAssets($report, 'css', false),
-                $this->formatAssets($report, 'js', false),
+                $this->formatAssets($report, AssetType::CSS, false),
+                $this->formatAssets($report, AssetType::JS, false),
                 $this->formatStimulusController($report, false),
             ];
         }
@@ -199,8 +200,8 @@ final class DebugSdcCommand extends Command
             ['Name', OutputFormatter::escape($report->name)],
             ['Class', null === $report->class ? '<comment>none (anonymous component)</comment>' : OutputFormatter::escape($report->class)],
             ['Template', $this->formatTemplate($report)],
-            ['CSS', $this->formatAssets($report, 'css', true)],
-            ['JS', $this->formatAssets($report, 'js', true)],
+            ['CSS', $this->formatAssets($report, AssetType::CSS, true)],
+            ['JS', $this->formatAssets($report, AssetType::JS, true)],
             ['Stimulus controller', $this->formatStimulusController($report, true)],
             ['Routes', [] === $routes ? '-' : implode("\n", $routes)],
         ]);
@@ -261,14 +262,14 @@ final class DebugSdcCommand extends Command
     }
 
     /**
-     * @param 'css'|'js' $type
+     * @param AssetType::CSS|AssetType::JS $type
      */
     private function formatAssets(ComponentReport $report, string $type, bool $detailed): string
     {
         $lines = [];
         foreach ($report->assets as $asset) {
             // An asset of any other type is not loaded: listed with the JS, flagged.
-            if ($type !== ('css' === $asset['type'] ? 'css' : 'js')) {
+            if ($type !== (AssetType::CSS === $asset['type'] ? AssetType::CSS : AssetType::JS)) {
                 continue;
             }
 
@@ -294,7 +295,7 @@ final class DebugSdcCommand extends Command
      */
     private function hasProblem(array $asset): bool
     {
-        return false === $asset['mapped'] || ('css' !== $asset['type'] && 'js' !== $asset['type']);
+        return false === $asset['mapped'] || !AssetType::isLoaded($asset['type']);
     }
 
     /**
