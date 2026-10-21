@@ -17,6 +17,7 @@
         "symfony/asset": "^6.4|^7.0|^8.0",
         "symfony/asset-mapper": "^6.4|^7.0|^8.0",
         "symfony/framework-bundle": "^6.4|^7.0|^8.0",
+        "symfony/service-contracts": "^2.5|^3.0",
         "symfony/ux-twig-component": "^2.13|^3.0",
         "symfony/web-link": "^6.4|^7.0|^8.0"
     },

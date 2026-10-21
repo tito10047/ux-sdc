@@ -20,7 +20,10 @@ use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 return static function (ContainerConfigurator $container): void {
     $services = $container->services();
 
-    $services->set(AssetRegistry::class);
+    // Tagged explicitly: these definitions are not autoconfigured, so implementing
+    // ResetInterface alone would not register the service with `services_resetter`.
+    $services->set(AssetRegistry::class)
+        ->tag('kernel.reset', ['method' => 'reset']);
 
     $services->set(AssetResponseListener::class)
         ->args([

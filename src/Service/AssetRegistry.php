@@ -11,6 +11,8 @@
 
 namespace Tito10047\UX\Sdc\Service;
 
+use Symfony\Contracts\Service\ResetInterface;
+
 /**
  * Shape of a single asset, shared by the metadata resolver, the compiled metadata
  * cache and this registry. In resolved metadata `type` may be an empty string,
@@ -18,7 +20,7 @@ namespace Tito10047\UX\Sdc\Service;
  *
  * @phpstan-type SdcAsset array{path: string, type: string, priority: int, attributes: array<string, mixed>}
  */
-final class AssetRegistry
+final class AssetRegistry implements ResetInterface
 {
     /**
      * @var array<string, SdcAsset>
@@ -67,5 +69,18 @@ final class AssetRegistry
     public function clear(): void
     {
         $this->assets = [];
+    }
+
+    /**
+     * Called by the `services_resetter` between requests.
+     *
+     * The registry collects the assets of one response. In a long-running worker
+     * (FrankenPHP worker mode, RoadRunner, Swoole) the container outlives the request,
+     * so without this every page would also receive the assets of every component
+     * rendered on the pages served before it.
+     */
+    public function reset(): void
+    {
+        $this->clear();
     }
 }

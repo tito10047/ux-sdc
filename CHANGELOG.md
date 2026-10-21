@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Component assets no longer leak from one request into the next in
+  long-running runtimes (FrankenPHP worker mode, RoadRunner, Swoole). There the
+  container survives between requests, and `AssetRegistry` — which collects the
+  CSS/JS of the components rendered for one response — was never emptied, so
+  every page also received the assets of every page served before it by the
+  same worker. The registry now implements `ResetInterface` and is tagged
+  `kernel.reset`, so Symfony's `services_resetter` clears it between requests.
+  Classic PHP-FPM setups were not affected. `AssetRegistry::clear()` still
+  exists and behaves as before.
+
 ## [0.4.0] - 2026-10-02
 
 ### Added

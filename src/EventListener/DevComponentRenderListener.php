@@ -26,6 +26,16 @@ final class DevComponentRenderListener
     use ComponentRenderTrait;
 
     /**
+     * Per-component resolution cache, deliberately kept for the lifetime of the
+     * process and not reset between requests (this listener is not tagged
+     * `kernel.reset`).
+     *
+     * Every entry is derived from the component class alone — its attributes and
+     * the files sitting next to it — never from the request, so a worker serving
+     * many requests can safely reuse it. The per-request state lives in
+     * AssetRegistry, which is reset. Clearing this cache as well would only make
+     * every request re-run reflection and filesystem lookups.
+     *
      * @var SdcMetadata
      */
     private array $runtimeMetadata = [];
