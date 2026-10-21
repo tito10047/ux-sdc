@@ -19,6 +19,7 @@ use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
+use Tito10047\UX\Sdc\CompilerPass\StimulusControllerPathsCompilerPass;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 
@@ -39,6 +40,13 @@ class SdcExtension extends Extension implements PrependExtensionInterface
 
         $container->setParameter('ux_sdc.auto_discovery', $config['auto_discovery']);
         $container->setParameter('ux_sdc.ux_components_dir', $config['ux_components_dir']);
+
+        // Read by StimulusControllerPathsCompilerPass, which adds the component
+        // directory to the controller paths StimulusBundle resolved.
+        $container->setParameter(
+            StimulusControllerPathsCompilerPass::ENABLED_PARAMETER,
+            $this->isConfigEnabled($container, $config['stimulus']),
+        );
 
         $this->registerMetadataResolver($container, $config);
 
@@ -145,14 +153,6 @@ class SdcExtension extends Extension implements PrependExtensionInterface
                     $namespace => [
                         'template_directory' => '',
                     ],
-                ],
-            ]);
-        }
-
-        if (($config['stimulus']['enabled'] ?? true) && $container->hasExtension('stimulus')) {
-            $container->prependExtensionConfig('stimulus', [
-                'controller_paths' => [
-                    $uxComponentsDir,
                 ],
             ]);
         }

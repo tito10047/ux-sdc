@@ -42,7 +42,6 @@ For agents other than Claude Code, the skill is a plain directory of Markdown fo
 
 It covers the recommended project structure and the `make:sdc-component --action` page workflow, asset discovery and injection, Stimulus controller naming, Live Component asset headers, and the differences between the `dev` and `prod` pipelines — plus a set of failure modes with their root causes, including several that are not documented here:
 
-- The bundle prepends `stimulus.controller_paths`, which suppresses StimulusBundle's default value. Unless your application declares `%kernel.project_dir%/assets/controllers` in `config/packages/stimulus.yaml`, your own Stimulus controllers silently stop being registered.
 - Routes on co-located `--action` controllers reach the router through autoconfiguration, which requires `controllers: { resource: routing.controllers }` in `config/routes.yaml`. That loader arrived in Symfony 7.4; on earlier versions add an explicit routing resource for the component directory, or every generated page returns 404.
 - Use exactly one component attribute per class. `#[AsSdcComponent]` does not need `#[AsTwigComponent]`, and `#[AsLiveComponent]` does not need `#[AsSdcComponent]`; stacking two fails the container with *"another component already has this name"*.
 
@@ -157,16 +156,12 @@ Create a configuration files:
 }
 ```
 ```yaml
-#config/packages/stimulus.yaml 
-stimulus:
-    controller_paths:
-        - '%kernel.project_dir%/assets/controllers'
-```
-```yaml
 #config/packages/ux_sdc.yaml
 ux_sdc:
     ux_components_dir: '%kernel.project_dir%/src_component'
     component_namespace: 'App\Component'
+    # ux_components_dir is also added to StimulusBundle's controller paths, next to
+    # the application's own (assets/controllers by default); false opts out.
     stimulus:
         enabled: true
     # ux_components_dir is an AssetMapper path, so component CSS and JS can be served.

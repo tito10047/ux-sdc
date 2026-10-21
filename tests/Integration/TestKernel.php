@@ -30,13 +30,15 @@ class TestKernel extends Kernel
     private array $configs = [];
 
     /**
-     * @param array $frameworkConfig loaded as a separate framework config, the way an application's own config/packages/framework.yaml would be
+     * @param array      $frameworkConfig loaded as a separate framework config, the way an application's own config/packages/framework.yaml would be
+     * @param array|null $stimulusConfig  the application's own config/packages/stimulus.yaml; null when it has none
      */
     public function __construct(
         string|array $configs = [],
         ?string $environment = 'test',
         bool $debug = true,
         private readonly array $frameworkConfig = [],
+        private readonly ?array $stimulusConfig = null,
     ) {
         if (is_string($configs)) {
             $environment = $configs;
@@ -91,6 +93,10 @@ class TestKernel extends Kernel
 
         if ([] !== $this->frameworkConfig) {
             $container->loadFromExtension('framework', $this->frameworkConfig);
+        }
+
+        if (null !== $this->stimulusConfig && class_exists(StimulusBundle::class)) {
+            $container->loadFromExtension('stimulus', $this->stimulusConfig);
         }
 
         $container->loadFromExtension('twig', [

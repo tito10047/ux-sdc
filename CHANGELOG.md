@@ -44,6 +44,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by its resolved URL instead of a suffix match, and loads injected scripts in
   the order the server sent them.
 
+- Installing the bundle no longer unregisters the application's own Stimulus
+  controllers. The bundle prepended its component directory to
+  `stimulus.controller_paths`, and a prepended value suppresses StimulusBundle's
+  default (`%kernel.project_dir%/assets/controllers`), so every controller in
+  `assets/controllers/` silently stopped working unless the application had its
+  own `config/packages/stimulus.yaml`. The component directory is now added to
+  the controller paths StimulusBundle resolved from the application
+  configuration, after the fact: that configuration — default included — is
+  left untouched, and a directory the application already lists is not added a
+  second time. A component directory that does not exist yet is skipped instead
+  of making StimulusBundle fail. The `stimulus.yaml` workaround is no longer
+  needed and can be removed.
+- `ux_sdc: { stimulus: false }` now disables the Stimulus integration. The
+  shorthand was accepted by the configuration but ignored, so the component
+  directory was registered anyway; only `stimulus: { enabled: false }` worked.
+
 ## [0.4.0] - 2026-10-02
 
 ### Added
