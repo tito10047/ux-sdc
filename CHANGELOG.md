@@ -45,6 +45,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- README rewritten against the current code: every example verified in a Flex-style
+  application; one consistent `App\Component\` ↔ `src_component/` mapping; the
+  component name (`<twig:Alert:Alert />`), `#[Asset]` (a path without `type` that
+  is not `.css` is loaded as a script) and the events actually used are documented
+  correctly; new sections for requirements, the `make:sdc-component` options and
+  what the generated `--action` code still needs per Symfony version, a complete
+  configuration reference, known limitations and non-goals.
 - **Behaviour change:** the metadata pipeline is now selected by the debug flag
   instead of the environment name. Until now only an environment named exactly
   `dev` resolved metadata on render; every other one, debug or not, used the
