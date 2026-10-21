@@ -46,6 +46,7 @@ class Configuration implements ConfigurationInterface
                 ->end()
                 ->scalarNode('placeholder')
                     ->defaultValue('<!-- __UX_TWIG_COMPONENT_ASSETS__ -->')
+                    ->cannotBeEmpty()
                     ->info('Placeholder v HTML, ktorý bude nahradený asetikami.')
                 ->end()
             ->end();

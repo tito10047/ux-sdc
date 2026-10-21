@@ -11,7 +11,9 @@
 
 namespace Tito10047\UX\Sdc\Tests\Unit\DependencyInjection;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\Config\Definition\Processor;
 use Tito10047\UX\Sdc\DependencyInjection\Configuration;
 
@@ -47,5 +49,25 @@ class ConfigurationTest extends TestCase
         $this->assertEquals('%kernel.project_dir%/custom_dir', $config['ux_components_dir']);
         $this->assertEquals('My\\Custom\\Namespace\\', $config['component_namespace']);
         $this->assertFalse($config['stimulus']['enabled']);
+    }
+
+    /**
+     * @return iterable<string, array{mixed}>
+     */
+    public static function provideEmptyPlaceholders(): iterable
+    {
+        yield 'empty string' => [''];
+        yield 'null' => [null];
+    }
+
+    /**
+     * An empty placeholder is found in every response, so it cannot mark where the assets go.
+     */
+    #[DataProvider('provideEmptyPlaceholders')]
+    public function testPlaceholderCannotBeEmpty(mixed $placeholder): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+
+        (new Processor())->processConfiguration(new Configuration(), [['placeholder' => $placeholder]]);
     }
 }

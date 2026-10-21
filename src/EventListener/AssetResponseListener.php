@@ -11,16 +11,25 @@
 
 namespace Tito10047\UX\Sdc\EventListener;
 
-use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
-use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
 use Symfony\Component\WebLink\GenericLinkProvider;
 use Symfony\Component\WebLink\Link;
 
+/**
+ * Puts the assets of the components rendered for a response into that response.
+ *
+ * Registered on `kernel.response` in `config/services.php`, where its priority
+ * is explained.
+ */
 final class AssetResponseListener
 {
+    /**
+     * @param non-empty-string $placeholder
+     */
     public function __construct(
         private AssetRegistry $assetRegistry,
         private AssetMapperInterface $assetMapper,
@@ -28,87 +37,160 @@ final class AssetResponseListener
     ) {
     }
 
-    #[AsEventListener(event: KernelEvents::RESPONSE)]
     public function onKernelResponse(ResponseEvent $event): void
     {
-        $response = $event->getResponse();
-
-        if ($this->isLiveComponentRequest($event)) {
-            $assets = $this->assetRegistry->getSortedAssets();
-            if (empty($assets)) {
-                return;
-            }
-
-            $css = [];
-            $js = [];
-
-            foreach ($assets as $asset) {
-                $mappedAsset = $this->assetMapper->getAsset($asset['path']);
-                $path = $mappedAsset ? $mappedAsset->publicPath : $asset['path'];
-
-                if ($asset['type'] === 'css' || ('' === $asset['type'] && str_ends_with($path, '.css'))) {
-                    $css[] = $path;
-                } elseif ($asset['type'] === 'js' || ('' === $asset['type'] && str_ends_with($path, '.js'))) {
-                    $js[] = $path;
-                }
-            }
-
-            if ($css) {
-                $response->headers->set('X-SDC-Assets-CSS', implode(',', array_unique($css)));
-            }
-            if ($js) {
-                $response->headers->set('X-SDC-Assets-JS', implode(',', array_unique($js)));
-            }
-
-            return;
-        }
-
+        // Components rendered in a sub-request land in the same registry and are
+        // injected into the main response; a fragment never gets them itself.
         if (!$event->isMainRequest()) {
             return;
         }
 
-        $content = $response->getContent();
+        if ($this->isLiveComponentRequest($event)) {
+            $this->addAssetHeaders($event->getResponse());
 
-        if (false === $content || !str_contains($content, $this->placeholder)) {
             return;
         }
 
-        $assets = $this->assetRegistry->getSortedAssets();
-        if (empty($assets)) {
-            $response->setContent(str_replace($this->placeholder, '', $content));
+        $this->injectAssets($event->getRequest(), $event->getResponse());
+    }
+
+    private function addAssetHeaders(Response $response): void
+    {
+        $css = [];
+        $js = [];
+
+        foreach ($this->resolveAssets() as $asset) {
+            if ('css' === $asset['type']) {
+                $css[] = $asset['path'];
+            } else {
+                $js[] = $asset['path'];
+            }
+        }
+
+        if ($css) {
+            $response->headers->set('X-SDC-Assets-CSS', implode(',', array_unique($css)));
+        }
+        if ($js) {
+            $response->headers->set('X-SDC-Assets-JS', implode(',', array_unique($js)));
+        }
+    }
+
+    private function injectAssets(Request $request, Response $response): void
+    {
+        // Streamed and binary responses have no content to inject into (false).
+        $content = $response->getContent();
+
+        if (false === $content || !str_contains($content, $this->placeholder) || !$this->isHtmlResponse($request, $response)) {
             return;
         }
 
         $html = '';
         $links = [];
 
-        foreach ($assets as $asset) {
-            $mappedAsset = $this->assetMapper->getAsset($asset['path']);
-            $path = $mappedAsset ? $mappedAsset->publicPath : $asset['path'];
+        foreach ($this->resolveAssets() as $asset) {
+            $path = htmlspecialchars($asset['path'], ENT_QUOTES);
+            $attributes = $this->renderAttributes($asset['attributes']);
 
-            $attributes = '';
-            foreach ($asset['attributes'] as $name => $value) {
-                $attributes .= sprintf(' %s="%s"', $name, htmlspecialchars((string) $value, ENT_QUOTES));
-            }
-
-            if ($asset['type'] === 'css' || ('' === $asset['type'] && str_ends_with($path, '.css'))) {
+            if ('css' === $asset['type']) {
                 $html .= sprintf('<link rel="stylesheet" href="%s"%s>' . "\n", $path, $attributes);
-                $links[] = (new Link('preload', $path))->withAttribute('as', 'style');
-            } elseif ($asset['type'] === 'js' || ('' === $asset['type'] && str_ends_with($path, '.js'))) {
+                $links[] = (new Link('preload', $asset['path']))->withAttribute('as', 'style');
+            } else {
                 $html .= sprintf('<script src="%s"%s></script>' . "\n", $path, $attributes);
-                $links[] = (new Link('preload', $path))->withAttribute('as', 'script');
+                $links[] = (new Link('preload', $asset['path']))->withAttribute('as', 'script');
             }
         }
 
-        $response->setContent(str_replace($this->placeholder, $html, $content));
+        // The tags go where the first placeholder is. Any further placeholder (a
+        // layout and a partial both calling render_component_assets()) is only
+        // removed: injecting there too would load every stylesheet twice and run
+        // every script twice.
+        $parts = explode($this->placeholder, $content);
+        $content = array_shift($parts) . $html . implode('', $parts);
 
-        if (!empty($links)) {
-            $linkProvider = $event->getRequest()->attributes->get('_links', new GenericLinkProvider());
-            foreach ($links as $link) {
-                $linkProvider = $linkProvider->withLink($link);
-            }
-            $event->getRequest()->attributes->set('_links', $linkProvider);
+        $response->setContent($content);
+
+        // A Content-Length set by the controller describes the content before the
+        // injection; left alone, clients would truncate the page.
+        if ($response->headers->has('Content-Length')) {
+            $response->headers->set('Content-Length', (string) \strlen($content));
         }
+
+        if ([] === $links) {
+            return;
+        }
+
+        // Read by WebLink's AddLinkHeaderListener, which turns it into the `Link` header.
+        $linkProvider = $request->attributes->get('_links', new GenericLinkProvider());
+        foreach ($links as $link) {
+            $linkProvider = $linkProvider->withLink($link);
+        }
+        $request->attributes->set('_links', $linkProvider);
+    }
+
+    /**
+     * The assets collected for this response, with their public paths and their
+     * type narrowed to `css` or `js`. Assets of any other type are left out.
+     *
+     * @return list<array{path: string, type: 'css'|'js', attributes: array<string, mixed>}>
+     */
+    private function resolveAssets(): array
+    {
+        $resolved = [];
+
+        foreach ($this->assetRegistry->getSortedAssets() as $asset) {
+            $path = $this->assetMapper->getAsset($asset['path'])->publicPath ?? $asset['path'];
+
+            $type = match (true) {
+                'css' === $asset['type'], '' === $asset['type'] && str_ends_with($path, '.css') => 'css',
+                'js' === $asset['type'], '' === $asset['type'] && str_ends_with($path, '.js') => 'js',
+                default => null,
+            };
+
+            if (null !== $type) {
+                $resolved[] = ['path' => $path, 'type' => $type, 'attributes' => $asset['attributes']];
+            }
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * Same convention as Twig component attributes: `true` renders the bare
+     * attribute name, `false` and `null` leave the attribute out.
+     *
+     * @param array<string, mixed> $attributes
+     */
+    private function renderAttributes(array $attributes): string
+    {
+        $html = '';
+
+        foreach ($attributes as $name => $value) {
+            if (false === $value || null === $value) {
+                continue;
+            }
+
+            $html .= true === $value
+                ? ' ' . $name
+                : sprintf(' %s="%s"', $name, htmlspecialchars((string) $value, ENT_QUOTES));
+        }
+
+        return $html;
+    }
+
+    /**
+     * Mirrors the check of the web profiler toolbar, which injects into the same
+     * responses. A response without a Content-Type is HTML unless the request
+     * format says otherwise: that is what `Response::prepare()` will send.
+     */
+    private function isHtmlResponse(Request $request, Response $response): bool
+    {
+        $contentType = $response->headers->get('Content-Type');
+
+        if (null !== $contentType) {
+            return str_contains($contentType, 'html');
+        }
+
+        return 'html' === $request->getRequestFormat();
     }
 
     private function isLiveComponentRequest(ResponseEvent $event): bool

@@ -59,6 +59,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ux_sdc: { stimulus: false }` now disables the Stimulus integration. The
   shorthand was accepted by the configuration but ignored, so the component
   directory was registered anyway; only `stimulus: { enabled: false }` worked.
+- The preload `Link` header for component assets no longer depends on the
+  order in which listeners happen to be registered. The bundle hands the links
+  to WebLink, whose listener writes the header; both ran on `kernel.response`
+  at priority 0, so the header was only sent because the bundle's listener
+  came first. It now runs at priority 64, before WebLink and before the core
+  listeners that finalise the response (`Response::prepare()`, the profiler).
+- Assets are only injected into HTML responses. A JSON, plain-text or other
+  non-HTML response that contains the placeholder is left untouched; a
+  response without a `Content-Type` counts as HTML unless the request format
+  says otherwise.
+- A page with several placeholders (a layout and a partial both calling
+  `render_component_assets()`) gets the tags once, where the first placeholder
+  is; the others are removed. Each placeholder used to get a full copy, so
+  every script ran twice.
+- A `Content-Length` set by the controller is updated after the injection
+  instead of describing the shorter original content.
+- `#[Asset]` attributes follow the convention of Twig component attributes:
+  `false` and `null` leave the attribute out and `true` renders it bare.
+  `['async' => false]` used to render `async=""`, which turns async *on*.
+  Asset URLs are now HTML-escaped in `href` and `src`.
+- `ux_sdc.placeholder` can no longer be configured empty, which would match
+  every response.
 
 ## [0.4.0] - 2026-10-02
 

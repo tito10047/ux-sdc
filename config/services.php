@@ -25,6 +25,20 @@ return static function (ContainerConfigurator $container): void {
     $services->set(AssetRegistry::class)
         ->tag('kernel.reset', ['method' => 'reset']);
 
+    // Priority 64: the listener stores the preload links in the `_links` request
+    // attribute, which WebLink's AddLinkHeaderListener (priority 0) turns into the
+    // `Link` header — so it has to run first. At equal priority the order would
+    // depend on how the two services happen to be registered.
+    //
+    // The other core `kernel.response` listeners run at 0 or below, and after this
+    // one is what they should see: ResponseListener (0, `Response::prepare()`,
+    // which empties the content of a HEAD response), the web profiler toolbar
+    // (-128, injects before `</body>`, independent of the placeholder),
+    // DisallowRobotsIndexingListener (-255), SessionListener (-1000) and
+    // ProfilerListener (-1024, records the final response). The only one above is
+    // ControllerAttributesListener (10000, Symfony 8.1+), which only applies the
+    // headers of controller attributes such as #[Cache]. 64 keeps clear of the
+    // default priority without claiming the top of the stack.
     $services->set(AssetResponseListener::class)
         ->args([
             service(AssetRegistry::class),
@@ -33,6 +47,7 @@ return static function (ContainerConfigurator $container): void {
         ->tag('kernel.event_listener', [
             'event' => 'kernel.response',
             'method' => 'onKernelResponse',
+            'priority' => 64,
         ]);
 
     $services->set(ComponentRenderListener::class)

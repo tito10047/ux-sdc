@@ -11,10 +11,12 @@
 
 namespace Tito10047\UX\Sdc\Tests\Integration;
 
+use Symfony\Bundle\FrameworkBundle\Controller\TemplateController;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Bundle\TwigBundle\TwigBundle;
 use Symfony\Component\Config\Loader\LoaderInterface;
+use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\UX\TwigComponent\TwigComponentBundle;
@@ -32,6 +34,7 @@ class TestKernel extends Kernel
     /**
      * @param array      $frameworkConfig loaded as a separate framework config, the way an application's own config/packages/framework.yaml would be
      * @param array|null $stimulusConfig  the application's own config/packages/stimulus.yaml; null when it has none
+     * @param list<CompilerPassInterface> $compilerPasses added to the container on top of those of the bundles, e.g. to rearrange listeners
      */
     public function __construct(
         string|array $configs = [],
@@ -39,6 +42,7 @@ class TestKernel extends Kernel
         bool $debug = true,
         private readonly array $frameworkConfig = [],
         private readonly ?array $stimulusConfig = null,
+        private readonly array $compilerPasses = [],
     ) {
         if (is_string($configs)) {
             $environment = $configs;
@@ -74,6 +78,12 @@ class TestKernel extends Kernel
 
     protected function configureRoutes(RoutingConfigurator $routes): void
     {
+        // Renders any template of Fixtures/templates as a full page, through the
+        // whole kernel: GET /page/auto_discovery.html.twig
+        $routes->add('sdc_test_page', '/page/{template}')
+            ->controller(TemplateController::class)
+            ->requirements(['template' => '.+\\.twig']);
+
         if (class_exists(LiveComponentBundle::class)) {
             $routes->import('@LiveComponentBundle/config/routes.php');
         }
@@ -119,6 +129,10 @@ class TestKernel extends Kernel
         ], $this->configs);
 
         $container->loadFromExtension('ux_sdc', $configs);
+
+        foreach ($this->compilerPasses as $compilerPass) {
+            $container->addCompilerPass($compilerPass);
+        }
 
         // Make services public for testing
         $container->addCompilerPass(new class () implements \Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface {
