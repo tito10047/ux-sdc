@@ -13,6 +13,8 @@ namespace Tito10047\UX\Sdc\Tests\Unit\CompilerPass;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\Argument\AbstractArgument;
+use Symfony\Component\DependencyInjection\Argument\ServiceLocatorArgument;
+use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Exception\LogicException;
@@ -26,6 +28,10 @@ use Tito10047\UX\Sdc\Tests\Unit\Service\Fixtures\Alert\Alert;
 
 #[Asset(path: 'test.css', priority: 5)]
 class MockComponent
+{
+}
+
+class MockRenderer
 {
 }
 
@@ -222,6 +228,47 @@ final class AssetComponentCompilerPassTest extends TestCase
         $definition = $container->getDefinition(ComponentInspector::class);
         $this->assertSame([Alert::class, MockComponent::class], $definition->getArgument('$componentClasses'));
         $this->assertSame([Alert::class], $definition->getArgument('$classesWithExplicitTemplate'));
+    }
+
+    /**
+     * The renderers Twig Components hands its Twig runtime (2.21+), keyed as
+     * it keys them: by the `key` of the tag, the lowercased component name.
+     */
+    public function testGivesTheInspectorTheComponentRenderers(): void
+    {
+        $container = $this->createContainer(metadataCache: false);
+        $container->register(ComponentInspector::class);
+        $container->register('ux.twig_component.twig.component_runtime')->setArguments([
+            new Reference('ux.twig_component.component_renderer'),
+            new ServiceLocatorArgument(new TaggedIteratorArgument('ux.twig_component.twig_renderer', indexAttribute: 'key', needsIndexes: true)),
+            new Reference('ux.twig_component.component_stack'),
+        ]);
+        $container->register('icon_runtime', MockRenderer::class)->addTag('ux.twig_component.twig_renderer', ['key' => 'ux:icon']);
+        $container->setParameter('renderer.class', MockRenderer::class);
+        $container->register('other_runtime', '%renderer.class%')->addTag('ux.twig_component.twig_renderer', ['key' => 'acme:chart']);
+
+        (new AssetComponentCompilerPass())->process($container);
+
+        $this->assertSame(
+            ['ux:icon' => MockRenderer::class, 'acme:chart' => MockRenderer::class],
+            $container->getDefinition(ComponentInspector::class)->getArgument('$componentRenderers'),
+        );
+    }
+
+    /**
+     * Twig Components 2.20 ignores the tag: its runtime takes the component
+     * renderer alone, and renders every component with a template.
+     */
+    public function testGivesTheInspectorNoRenderersTheTwigRuntimeDoesNotTake(): void
+    {
+        $container = $this->createContainer(metadataCache: false);
+        $container->register(ComponentInspector::class);
+        $container->register('ux.twig_component.twig.component_runtime')->setArguments([new Reference('ux.twig_component.component_renderer')]);
+        $container->register('icon_runtime', MockRenderer::class)->addTag('ux.twig_component.twig_renderer', ['key' => 'ux:icon']);
+
+        (new AssetComponentCompilerPass())->process($container);
+
+        $this->assertSame([], $container->getDefinition(ComponentInspector::class)->getArgument('$componentRenderers'));
     }
 
     /**

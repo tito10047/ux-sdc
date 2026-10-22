@@ -41,8 +41,13 @@ also shows a cache that predates a file you just added.
   like every `debug:*` command, it exits with 0. A later release may add checks,
   so `--strict` may find problems it did not find before.
 
-Anonymous components are listed too, marked `(anonymous)`. `debug:twig-component`
-complements the command with the props and hooks of a component.
+Anonymous components are listed too, marked `(anonymous)`. So are the components
+of bundles, such as `Turbo:Frame` of symfony/ux-turbo, as `debug:twig-component`
+lists them; give a name to see only some. A component that Twig Components
+renders with a service instead of a template, such as `UX:Icon` of
+symfony/ux-icons, shows that service, marked `(renderer)`, and has no template
+to miss. `debug:twig-component` complements the command with the props and hooks
+of a component.
 
 ### JSON output
 
@@ -69,8 +74,10 @@ complements the command with the props and hooks of a component.
 - `class` — `null` for an anonymous component.
 - `template.origin` — `co-located`, `explicit` (named by the registration),
   `method` (`template_from_method`; `name` is the method), `default` (the one
-  Twig Components looks up) or `anonymous`; `found` is `null` when the template is
-  only known on render.
+  Twig Components looks up), `anonymous` or `renderer` (no template: a service
+  tagged `ux.twig_component.twig_renderer` renders the component; `name` is its
+  class); `found` is `null` when the template is only known on render, and for
+  `renderer`.
 - `assets[].type` — `css`, `js`, `font` or `image`; `source` — `discovered`,
   `#[Asset]` or `#[AsSdcComponent]`; `public_path` — `null` when the asset map does
   not know the path; `mapped` — `null` for a URL, linked as it is.

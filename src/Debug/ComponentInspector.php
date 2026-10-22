@@ -39,6 +39,10 @@ use Twig\Token;
  * of anonymous components, collected by AssetComponentCompilerPass; their
  * names and templates come from Twig Components itself.
  *
+ * A component Twig Components renders with a service of its own (`UX:Icon` of
+ * symfony/ux-icons) has no template to check: it is reported as rendered by
+ * that service.
+ *
  * @phpstan-import-type SdcComponentAsset from ComponentMetadata
  * @phpstan-import-type ReportedAsset from ComponentReport
  * @phpstan-import-type ReportedRoute from ComponentReport
@@ -71,6 +75,7 @@ final class ComponentInspector
      * @param list<string>                     $classesWithExplicitTemplate component classes registered with an explicit template
      * @param ComponentTemplateFinderInterface $templateFinder              finds the template of an anonymous component the way Twig Components does
      * @param array<string, list<string>>      $anonymousTemplates          template of an anonymous component => the names it may be rendered as
+     * @param array<string, string>            $componentRenderers          lowercased component name => class of the service Twig Components renders it with, without a template
      */
     public function __construct(
         private readonly ComponentFactory $componentFactory,
@@ -86,6 +91,7 @@ final class ComponentInspector
         array $classesWithExplicitTemplate,
         private readonly ComponentTemplateFinderInterface $templateFinder,
         private readonly array $anonymousTemplates,
+        private readonly array $componentRenderers,
     ) {
         $this->classesWithExplicitTemplate = array_fill_keys($classesWithExplicitTemplate, true);
     }
@@ -211,6 +217,13 @@ final class ComponentInspector
      */
     private function describeTemplate(TwigComponentMetadata $component, ComponentMetadata $metadata, array &$problems): array
     {
+        // The rule of the Twig runtime of Twig Components, which asks the
+        // renderers first, under the lowercased name.
+        $renderer = $this->componentRenderers[strtolower($component->getName())] ?? null;
+        if (null !== $renderer) {
+            return [$renderer, ComponentReport::TEMPLATE_RENDERER, null];
+        }
+
         if (null !== $metadata->template) {
             $template = $metadata->template;
             $origin = ComponentReport::TEMPLATE_CO_LOCATED;

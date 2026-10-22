@@ -11,9 +11,13 @@
 
 namespace Tito10047\UX\Sdc\CompilerPass;
 
+use Symfony\Component\DependencyInjection\Argument\ServiceLocatorArgument;
+use Symfony\Component\DependencyInjection\Argument\TaggedIteratorArgument;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
+use Symfony\Component\DependencyInjection\Compiler\PriorityTaggedServiceTrait;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Exception\LogicException;
+use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Filesystem\Filesystem;
 use Tito10047\UX\Sdc\Debug\ComponentInspector;
 use Tito10047\UX\Sdc\ImportMap\ComponentImportMapEntries;
@@ -37,6 +41,10 @@ use Tito10047\UX\Sdc\Twig\ComponentDirectoryTemplateFinder;
  * directories, normalised and merged — rather than a second reading of the
  * raw configuration.
  *
+ * Components that Twig Components renders with a service of its own rather than
+ * a template (`UX:Icon` of symfony/ux-icons) are read the same way: from the
+ * renderers its Twig runtime is given.
+ *
  * @phpstan-import-type SdcMetadataCache from SdcMetadataRegistry
  * @phpstan-import-type SdcComponentAsset from ComponentMetadata
  * @phpstan-import-type SdcProblem from ComponentMetadata
@@ -45,6 +53,8 @@ use Tito10047\UX\Sdc\Twig\ComponentDirectoryTemplateFinder;
  */
 final class AssetComponentCompilerPass implements CompilerPassInterface
 {
+    use PriorityTaggedServiceTrait;
+
     /**
      * Whether the metadata is resolved at build time, as resolved by SdcExtension
      * from `ux_sdc.metadata_cache`: always a boolean.
@@ -63,6 +73,14 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
     private const ASSET_MAPPER_REPOSITORY = 'asset_mapper.repository';
     private const COMPONENT_FACTORY = 'ux.twig_component.component_factory';
     private const COMPONENT_TEMPLATE_FINDER = 'ux.twig_component.component_template_finder';
+    private const COMPONENT_RUNTIME = 'ux.twig_component.twig.component_runtime';
+
+    /**
+     * The tag of the services that render a component without a template,
+     * keyed by the lowercased component name (symfony/ux-icons tags its runtime
+     * with `ux:icon`). Twig Components hands them to its Twig runtime from 2.21 on.
+     */
+    private const TWIG_RENDERER_TAG = 'ux.twig_component.twig_renderer';
 
     /**
      * The directory of a bundle's Twig path Twig Components looks anonymous
@@ -114,7 +132,8 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
             $container->getDefinition(ComponentInspector::class)
                 ->setArgument('$componentClasses', $componentClasses)
                 ->setArgument('$classesWithExplicitTemplate', $classesWithExplicitTemplate)
-                ->setArgument('$anonymousTemplates', $anonymousTemplates);
+                ->setArgument('$anonymousTemplates', $anonymousTemplates)
+                ->setArgument('$componentRenderers', $this->collectComponentRenderers($container));
         }
 
         if ($container->hasDefinition(ComponentImportMapEntries::class) && $container->hasDefinition(ComponentMetadataResolver::class)) {
@@ -253,6 +272,42 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
         }
 
         return array_values(array_unique($classes));
+    }
+
+    /**
+     * The services Twig Components renders components with instead of a
+     * template: `{{ component('UX:Icon') }}` and `<twig:UX:Icon />` call the
+     * renderer keyed `ux:icon` and never look for a template.
+     *
+     * They are read from the argument of the Twig runtime of Twig Components
+     * that collects them, and keyed the way that argument keys them, so a
+     * version that does not take them (2.20) has none, and a component it
+     * renders with a template is not mistaken for one rendered without.
+     *
+     * @return array<string, string> key (a lowercased component name) => class of the renderer, or its service ID when the class is not known
+     */
+    private function collectComponentRenderers(ContainerBuilder $container): array
+    {
+        if (!$container->hasDefinition(self::COMPONENT_RUNTIME)) {
+            return [];
+        }
+
+        foreach ($container->getDefinition(self::COMPONENT_RUNTIME)->getArguments() as $argument) {
+            $renderers = $argument instanceof ServiceLocatorArgument ? $argument->getTaggedIteratorArgument() : null;
+
+            if ($renderers instanceof TaggedIteratorArgument && self::TWIG_RENDERER_TAG === $renderers->getTag()) {
+                return array_map(
+                    static function (Reference $reference) use ($container): string {
+                        $class = $container->getParameterBag()->resolveValue($container->findDefinition((string) $reference)->getClass());
+
+                        return \is_string($class) ? $class : (string) $reference;
+                    },
+                    $this->findAndSortTaggedServices($renderers, $container),
+                );
+            }
+        }
+
+        return [];
     }
 
     /**

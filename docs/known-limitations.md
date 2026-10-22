@@ -22,6 +22,10 @@
   needs a `cache:clear`. With `false`, a long-running worker picks it up after a
   restart; `debug:sdc` lists an anonymous component added since the container was
   built only once it is rebuilt.
+- **`UX:Icon` with Twig Components 2.20.** symfony/ux-icons 2.20 renders it from
+  an event listener, which `debug:sdc` cannot see, so it reports the component's
+  template as missing. From Twig Components 2.21 on, ux-icons registers a renderer
+  and `debug:sdc` shows it.
 
 ## Non-goals
 

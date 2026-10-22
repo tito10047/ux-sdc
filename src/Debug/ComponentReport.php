@@ -46,14 +46,16 @@ final class ComponentReport
     public const TEMPLATE_FROM_METHOD = 'method';
     /** The template Twig Components looks up when nothing else names one. */
     public const TEMPLATE_DEFAULT = 'default';
+    /** No template: a service of the `ux.twig_component.twig_renderer` tag renders the component (`UX:Icon` of symfony/ux-icons). */
+    public const TEMPLATE_RENDERER = 'renderer';
     /** The template of an anonymous component, which has no class. */
     public const TEMPLATE_ANONYMOUS = 'anonymous';
 
     /**
      * @param string|null                $class              null for an anonymous component
-     * @param string                     $template           the Twig name; for TEMPLATE_FROM_METHOD, the method
+     * @param string                     $template           the Twig name; for TEMPLATE_FROM_METHOD, the method; for TEMPLATE_RENDERER, the class of the renderer
      * @param self::TEMPLATE_*           $templateOrigin
-     * @param bool|null                  $templateFound      null when the template is only known on render
+     * @param bool|null                  $templateFound      null when the template is only known on render, or when there is none (TEMPLATE_RENDERER)
      * @param list<ReportedAsset>        $assets
      * @param ReportedStimulusController $stimulusController
      * @param list<ReportedRoute>        $routes             routes of the controllers in the namespace of the component class

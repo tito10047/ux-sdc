@@ -211,6 +211,7 @@ return static function (ContainerConfigurator $container): void {
                 abstract_arg('the component classes registered with an explicit template, set by AssetComponentCompilerPass'),
                 service('ux.twig_component.component_template_finder'),
                 abstract_arg('the templates of anonymous components, set by AssetComponentCompilerPass'),
+                abstract_arg('the services rendering a component without a template, set by AssetComponentCompilerPass'),
             ]);
 
         $services->set(DebugSdcCommand::class)
