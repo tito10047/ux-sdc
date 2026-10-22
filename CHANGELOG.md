@@ -77,6 +77,13 @@ documentation moved from the README to [`docs/`](docs/installation.md).
 
 ### Changed
 
+- `make:sdc-component` generates a `final` component class, as in the documentation.
+- `make:sdc-component` generates the stylesheet without `@layer components`, which
+  lost to every unlayered rule of the application whatever its specificity; the CSS
+  class is kebab-cased (`DatePicker` → `date-picker`, was `date_picker`).
+- `make:sdc-component` generates a Twig comment instead of an HTML comment that
+  reached every page, and a Stimulus controller without `console.log()` that says
+  which Stimulus features its capitalised name supports.
 - **BC break:** load component scripts as ES modules, `<script type="module">`,
   without a `Link` preload; `render_component_assets()` has to come after
   `{{ importmap() }}`. Opt out per asset with `attributes: ['type' => false]`
@@ -143,6 +150,22 @@ documentation moved from the README to [`docs/`](docs/installation.md).
 
 ### Fixed
 
+- Fix `debug:sdc` reporting a missing template, and `--strict` failing, for a
+  component Twig Components renders with a service instead of a template, such as
+  `UX:Icon` of symfony/ux-icons: it shows that service, with the new template
+  origin `renderer` (`found: null`) in the JSON output.
+- Fix an error response getting the assets of the page that failed: when the main
+  request fails, the asset registry is cleared on `kernel.exception` (priority 128,
+  before Symfony's `ErrorListener`). An `error.html.twig` that renders components
+  and the placeholder gets exactly their tags; Symfony's error page, the debug
+  exception page and the HEAD response of a failing page no longer carry an
+  `X-SDC-Assets` header listing the failed page's assets. The profiler panel lists
+  the discarded assets.
+- Fix redirects (3xx with `Location`), 204/304 responses and responses with an empty
+  body getting tags or an `X-SDC-Assets` header. A HEAD request still gets the same
+  headers as the GET request.
+- Fix the web profiler toolbar reading "4 / 9 assets" (as in "4 of 9"); it labels
+  both numbers: "4 components 9 assets".
 - Fix relative imports in component scripts (`import './format.js'`), which the
   browser requested unversioned and got a 404 for: the module script of every
   component is now an entry of AssetMapper's import map, so AssetMapper maps the

@@ -115,6 +115,13 @@ New options, all with defaults that need no change: `metadata_cache`,
     warning when it finds the import map after the placeholder;
   - opt a script that is not a module (a UMD build, a script relying on globals)
     out with `#[Asset('…', attributes: ['type' => false])]`. Do not use `nomodule`.
+  - check the cascade after the move. The component stylesheets now come after
+    the stylesheets `importmap()` renders instead of before them, so equal-specificity
+    rules of a component win over the application's, and the first `@layer`
+    statement on the page may change, which reorders the layers
+    (`components, base` → `base, components`). Compare a page before and after; to
+    keep a specific order, declare it once at the top of the layout
+    (`<style>@layer reset, base, components, utilities;</style>`).
 - **Also:** the import map of every page lists the module script of every
   component under its unversioned URL (`"/assets/Card/Card.js": "/assets/Card/Card-3b1f2a4.js"`),
   and AssetMapper adds the files they import, so `import './format.js'` in a
