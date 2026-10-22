@@ -34,6 +34,9 @@ use Tito10047\UX\Sdc\Service\ComponentMetadata;
  * of the OUTCOME_* constants, the assets the registry held at that point, and
  * the ones the response links to.
  *
+ * When the request fails, the assets the registry held are recorded as
+ * discarded: the error response replacing the page does not get them.
+ *
  * @phpstan-import-type SdcAsset from AssetRegistry
  *
  * @phpstan-type SdcRender array{name: string, class: string|null, template: string, metadata: ComponentMetadata, afterResponse: bool}
@@ -61,6 +64,12 @@ final class RequestTrace implements ResetInterface
     /** A streamed or binary response, whose content cannot be changed: nothing. */
     public const OUTCOME_STREAMED = 'streamed';
 
+    /** A redirect, whose body the client never shows: nothing. */
+    public const OUTCOME_REDIRECT = 'redirect';
+
+    /** A response without a body to show (204, 304, empty content): nothing. */
+    public const OUTCOME_EMPTY = 'empty';
+
     /** A sub-request: nothing, its components' assets go into the main response. */
     public const OUTCOME_SUB_REQUEST = 'sub_request';
 
@@ -79,12 +88,18 @@ final class RequestTrace implements ResetInterface
      */
     private \WeakMap $importMapsAfterModules;
 
+    /**
+     * @var \WeakMap<Request, list<SdcAsset>>
+     */
+    private \WeakMap $discarded;
+
     private bool $mainResponseHandled = false;
 
     public function __construct()
     {
         $this->responses = new \WeakMap();
         $this->importMapsAfterModules = new \WeakMap();
+        $this->discarded = new \WeakMap();
     }
 
     /**
@@ -117,6 +132,20 @@ final class RequestTrace implements ResetInterface
     }
 
     /**
+     * The main request failed: the assets the registry held are dropped, and
+     * the error response replacing the page starts over. Its components render
+     * for that response, even when the page had already got its assets —
+     * a `kernel.response` listener failed after AssetResponseListener.
+     *
+     * @param list<SdcAsset> $discarded
+     */
+    public function requestFailed(Request $request, array $discarded): void
+    {
+        $this->discarded[$request] = [...($this->discarded[$request] ?? []), ...$discarded];
+        $this->mainResponseHandled = false;
+    }
+
+    /**
      * The page injects module scripts before its import map.
      */
     public function importMapAfterModules(Request $request): void
@@ -140,6 +169,14 @@ final class RequestTrace implements ResetInterface
         return $this->responses[$request] ?? null;
     }
 
+    /**
+     * @return list<SdcAsset> the assets the failure of the request dropped
+     */
+    public function getDiscardedAssets(Request $request): array
+    {
+        return $this->discarded[$request] ?? [];
+    }
+
     public function hasImportMapAfterModules(Request $request): bool
     {
         return isset($this->importMapsAfterModules[$request]);
@@ -154,6 +191,7 @@ final class RequestTrace implements ResetInterface
         $this->renders = [];
         $this->responses = new \WeakMap();
         $this->importMapsAfterModules = new \WeakMap();
+        $this->discarded = new \WeakMap();
         $this->mainResponseHandled = false;
     }
 }

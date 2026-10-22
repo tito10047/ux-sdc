@@ -39,6 +39,10 @@ use Tito10047\UX\Sdc\Service\AssetType;
  * of the main request and its assets in the main response, which is where
  * the panel lists them.
  *
+ * A request that failed lists the components of the page that failed and
+ * those of the error page, and the assets the failure discarded: the error
+ * response replaced the page that asked for them.
+ *
  * `SdcCollectedAsset` is an asset of the response: the path the component
  * declared, the one the page links to (null when the response got none), how
  * it was emitted (a tag, an `X-SDC-Assets` entry, null for not at all) and
@@ -87,6 +91,10 @@ final class SdcDataCollector extends AbstractDataCollector implements LateDataCo
             'outcome' => $outcome,
             'assets' => $assets,
             'dropped' => $dropped,
+            'discarded' => array_map(
+                static fn (array $asset): array => ['path' => $asset['path'], 'type' => $asset['type']],
+                $this->trace->getDiscardedAssets($request),
+            ),
             'header_size' => null === $header ? null : \strlen($header),
             'import_map_after_modules' => $this->trace->hasImportMapAfterModules($request),
             'components' => [],
@@ -147,6 +155,17 @@ final class SdcDataCollector extends AbstractDataCollector implements LateDataCo
     public function getDroppedAssets(): array
     {
         return $this->data['dropped'] ?? [];
+    }
+
+    /**
+     * The assets registered before the request failed, which the error
+     * response does not get.
+     *
+     * @return list<array{path: string, type: string}>
+     */
+    public function getDiscardedAssets(): array
+    {
+        return $this->data['discarded'] ?? [];
     }
 
     /**

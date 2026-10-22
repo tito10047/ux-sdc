@@ -13,6 +13,8 @@ namespace Tito10047\UX\Sdc\EventListener;
 
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Tito10047\UX\Sdc\DataCollector\RequestTrace;
 use Tito10047\UX\Sdc\Response\AssetResolver;
@@ -31,8 +33,14 @@ use Tito10047\UX\Sdc\Service\AssetRegistry;
  * `X-SDC-Assets` header instead (FragmentAssetHeader), which the bundle's
  * loader controller reads.
  *
- * Registered on `kernel.response` in `config/services.php`, where its priority
- * is explained.
+ * A response the client does not show — a redirect, one without a body — gets
+ * neither. When the request fails, the assets collected so far belong to the
+ * page that failed, not to the error response replacing it: they are dropped
+ * on `kernel.exception`, and the error response gets those of the components
+ * it renders itself.
+ *
+ * Registered on `kernel.exception` and `kernel.response` in
+ * `config/services.php`, where the priorities are explained.
  *
  * @internal The `X-SDC-Assets` header it sends is the public contract, not this class or its constants.
  */
@@ -71,6 +79,31 @@ final class AssetResponseListener
     ) {
     }
 
+    /**
+     * Drops the assets of the page whose request failed.
+     *
+     * The components rendered before the failure — and the one that failed,
+     * whose assets are registered before its template renders — are not in
+     * the error response: ErrorListener renders the error page in a
+     * sub-request, whose components land in the registry like any others, and
+     * its response becomes the main response. Without this the error page
+     * would load the assets of the page it replaces, or list them in the
+     * X-SDC-Assets header of a page without the placeholder — Symfony's own
+     * error page, or a 500 whose body a HEAD request strips.
+     *
+     * Only the main request: a sub-request that fails is answered inside the
+     * page, whose own components keep their assets.
+     */
+    public function onKernelException(ExceptionEvent $event): void
+    {
+        if (!$event->isMainRequest()) {
+            return;
+        }
+
+        $this->trace?->requestFailed($event->getRequest(), $this->assetRegistry->getSortedAssets());
+        $this->assetRegistry->clear();
+    }
+
     public function onKernelResponse(ResponseEvent $event): void
     {
         $request = $event->getRequest();
@@ -90,6 +123,23 @@ final class AssetResponseListener
 
         if (false === $content) {
             $this->trace?->responseHandled($request, RequestTrace::OUTCOME_STREAMED, $this->assetRegistry->getSortedAssets());
+
+            return;
+        }
+
+        // The client follows the Location of a redirect and never shows its
+        // body, nor does a fetch() see its headers.
+        if (self::isFollowedRedirect($response)) {
+            $this->trace?->responseHandled($request, RequestTrace::OUTCOME_REDIRECT, $this->assetRegistry->getSortedAssets());
+
+            return;
+        }
+
+        // Nothing is shown that could use the assets: a 204 or 304, an empty
+        // body. A HEAD request is not one of them: its body is removed later
+        // (ResponseListener), and its headers are those of the GET request.
+        if ($response->isInformational() || $response->isEmpty() || '' === trim($content)) {
+            $this->trace?->responseHandled($request, RequestTrace::OUTCOME_EMPTY, $this->assetRegistry->getSortedAssets());
 
             return;
         }
@@ -173,6 +223,11 @@ final class AssetResponseListener
                 'placeholder' => $this->placeholder,
             ]
         );
+    }
+
+    private static function isFollowedRedirect(Response $response): bool
+    {
+        return $response->isRedirection() && $response->headers->has('Location');
     }
 
     /**

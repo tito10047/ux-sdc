@@ -165,6 +165,31 @@ final class SdcDataCollectorTest extends TestCase
         $this->assertSame([], $this->collector->getProblems());
     }
 
+    /**
+     * The error page replaced the page that failed: the panel lists both
+     * pages' components, and what the failure discarded — which is no problem.
+     */
+    public function testListsTheAssetsAFailedRequestDiscarded(): void
+    {
+        $request = new Request();
+        $this->trace->componentRendered('Broken', 'App\Component\Broken', 'Broken.html.twig', self::metadata([
+            self::asset('Broken.css', 'css', ComponentMetadata::SOURCE_DISCOVERED),
+        ]));
+        $this->trace->requestFailed($request, [['path' => 'Broken.css', 'type' => 'css', 'priority' => 0, 'attributes' => []]]);
+        $this->trace->componentRendered('Notice', null, 'Notice.html.twig', self::metadata([
+            self::asset('Notice.css', 'css', ComponentMetadata::SOURCE_DISCOVERED),
+        ]));
+        $this->trace->responseHandled($request, RequestTrace::OUTCOME_INJECTED, [], [new ResolvedAsset('/assets/Notice.css', 'css', [], 'Notice.css')]);
+
+        $this->collect($request, new Response('', 500));
+
+        $this->assertSame([['path' => 'Broken.css', 'type' => 'css']], $this->collector->getDiscardedAssets());
+        $this->assertSame(['Broken', 'Notice'], array_column($this->collector->getComponents(), 'name'));
+        $this->assertSame(['Notice.css'], array_column($this->collector->getAssets(), 'path'));
+        $this->assertSame([], $this->collector->getDroppedAssets());
+        $this->assertSame([], $this->collector->getProblems());
+    }
+
     public function testListsNoComponentsForASubRequest(): void
     {
         $this->trace->componentRendered('Alert', 'App\Component\Alert', 'Alert/Alert.html.twig', self::metadata([

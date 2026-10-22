@@ -50,6 +50,25 @@ final class RequestTraceTest extends TestCase
         $this->assertNull($trace->getHandledResponse($fragment));
     }
 
+    /**
+     * The error response replaces the page: its components render for it,
+     * even when the page had already got its assets.
+     */
+    public function testAFailedRequestStartsOver(): void
+    {
+        $trace = new RequestTrace();
+        $request = new Request();
+        $other = new Request();
+        $trace->responseHandled($request, RequestTrace::OUTCOME_INJECTED);
+
+        $trace->requestFailed($request, [['path' => 'Broken.css', 'type' => 'css', 'priority' => 0, 'attributes' => []]]);
+        $trace->componentRendered('Notice', null, 'Notice.html.twig', new ComponentMetadata());
+
+        $this->assertFalse($trace->getRenders()[0]['afterResponse']);
+        $this->assertSame([['path' => 'Broken.css', 'type' => 'css', 'priority' => 0, 'attributes' => []]], $trace->getDiscardedAssets($request));
+        $this->assertSame([], $trace->getDiscardedAssets($other));
+    }
+
     public function testResetForgetsTheRequest(): void
     {
         $trace = new RequestTrace();
@@ -57,8 +76,10 @@ final class RequestTraceTest extends TestCase
         $trace->componentRendered('Alert', 'App\Alert', 'Alert.html.twig', new ComponentMetadata());
         $trace->importMapAfterModules($request);
         $trace->responseHandled($request, RequestTrace::OUTCOME_INJECTED);
+        $trace->requestFailed($request, [['path' => 'Broken.css', 'type' => 'css', 'priority' => 0, 'attributes' => []]]);
 
         $trace->reset();
+        $this->assertSame([], $trace->getDiscardedAssets($request));
 
         $this->assertSame([], $trace->getRenders());
         $this->assertNull($trace->getHandledResponse($request));

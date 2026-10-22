@@ -67,9 +67,9 @@ return static function (ContainerConfigurator $container): void {
         ->arg('$debug', '%kernel.debug%')
         ->tag('monolog.logger', ['channel' => 'ux_sdc']);
 
-    // Priority 64: the listener stores the preload links in the `_links` request
-    // attribute, which WebLink's AddLinkHeaderListener (priority 0) turns into the
-    // `Link` header — so it has to run first. At equal priority the order would
+    // On `kernel.response`, priority 64: the listener stores the preload links in
+    // the `_links` request attribute, which WebLink's AddLinkHeaderListener
+    // (priority 0) turns into the `Link` header — so it has to run first. At equal priority the order would
     // depend on how the two services happen to be registered.
     //
     // The other core `kernel.response` listeners run at 0 or below, and after this
@@ -81,6 +81,13 @@ return static function (ContainerConfigurator $container): void {
     // ControllerAttributesListener (10000, Symfony 8.1+), which only applies the
     // headers of controller attributes such as #[Cache]. 64 keeps clear of the
     // default priority without claiming the top of the stack.
+    //
+    // On `kernel.exception` it drops the assets of the page that failed, at
+    // priority 128: before ErrorListener (-128) renders the error page, whose
+    // components register their own assets, and before an application listener
+    // at the default priority renders an error page of its own. A listener
+    // above 128 that sets a response stops the event before it: its response
+    // gets the assets of the page that failed.
     //
     // The placeholder is set by SdcExtension.
     $services->set(AssetResponseListener::class)
@@ -98,6 +105,11 @@ return static function (ContainerConfigurator $container): void {
             'event' => 'kernel.response',
             'method' => 'onKernelResponse',
             'priority' => 64,
+        ])
+        ->tag('kernel.event_listener', [
+            'event' => 'kernel.exception',
+            'method' => 'onKernelException',
+            'priority' => 128,
         ])
         ->tag('monolog.logger', ['channel' => 'ux_sdc']);
 

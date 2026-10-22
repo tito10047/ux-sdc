@@ -14,6 +14,7 @@ namespace Tito10047\UX\Sdc\Tests\Integration;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\WebProfilerBundle\WebProfilerBundle;
+use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\HttpKernel\Profiler\Profile;
 use Tito10047\UX\Sdc\DataCollector\RequestTrace;
 use Tito10047\UX\Sdc\DataCollector\SdcDataCollector;
@@ -192,6 +193,42 @@ final class ProfilerFunctionalTest extends FunctionalTestCase
         $this->assertStringContainsString('<b>Components</b>', $toolbar);
     }
 
+    /**
+     * The exception page replaced the page whose component failed: the panel
+     * still lists the components that rendered, and the assets the failure
+     * discarded.
+     */
+    public function testShowsWhatTheFailureOfARequestDiscarded(): void
+    {
+        // The test logger keeps the log of the exception off the output.
+        $client = self::createProfiledClient(compilerPasses: [new RegisterTestLoggerPass()]);
+
+        $client->request('GET', '/page/failing.html.twig');
+
+        self::assertResponseStatusCodeSame(500);
+        self::assertResponseNotHasHeader(AssetResponseListener::HEADER);
+        $collector = self::collector($client->getProfile());
+        $this->assertSame(['AutoDiscovery:AutoDiscoveryComponent', 'Failing:Broken'], array_column($collector->getComponents(), 'name'));
+        $this->assertSame(
+            [
+                ['path' => 'AutoDiscovery/AutoDiscoveryComponent.css', 'type' => 'css'],
+                ['path' => 'AutoDiscovery/AutoDiscoveryComponent.js', 'type' => 'js'],
+                ['path' => 'Failing/Broken.css', 'type' => 'css'],
+            ],
+            $collector->getDiscardedAssets(),
+        );
+        $this->assertSame([], $collector->getAssets());
+        $this->assertSame([], $collector->getProblems());
+
+        $token = $client->getResponse()->headers->get('X-Debug-Token');
+        $client->request('GET', '/_profiler/'.$token.'?panel='.SdcDataCollector::NAME);
+
+        self::assertResponseIsSuccessful();
+        $panel = (string) $client->getResponse()->getContent();
+        $this->assertStringContainsString('Assets of the page that failed', $panel);
+        $this->assertStringContainsString('Failing/Broken.css', $panel);
+    }
+
     public function testRendersThePanelOfAPageWithoutComponents(): void
     {
         $client = self::createProfiledClient();
@@ -278,9 +315,10 @@ final class ProfilerFunctionalTest extends FunctionalTestCase
     }
 
     /**
-     * @param array<string, mixed> $configs
+     * @param array<string, mixed>        $configs
+     * @param list<CompilerPassInterface> $compilerPasses
      */
-    private static function createProfiledClient(array $configs = []): KernelBrowser
+    private static function createProfiledClient(array $configs = [], array $compilerPasses = []): KernelBrowser
     {
         $routing = \dirname((string) (new \ReflectionClass(WebProfilerBundle::class))->getFileName()).'/Resources/config/routing/';
         // PHP route files since Symfony 7.3, XML before.
@@ -288,6 +326,7 @@ final class ProfilerFunctionalTest extends FunctionalTestCase
 
         return static::createClient([
             'configs' => $configs,
+            'compiler_passes' => $compilerPasses,
             'framework' => ['profiler' => ['enabled' => true, 'collect' => true]],
             'bundles' => [new WebProfilerBundle()],
             'route_imports' => [

@@ -120,7 +120,17 @@ and an `html`-ish request format):
 | Any other response without it — an htmx partial, a component fetched by your own script | header |
 
 Sub-requests, non-HTML and streamed responses get neither, and neither does a
-response that rendered no component with assets.
+response that rendered no component with assets. Nor does a response the client
+does not show: a redirect (a 3xx with a `Location`), a 204 or 304, an empty body.
+A HEAD request is answered like the GET request, headers included; Symfony drops
+the body afterwards.
+
+A request that fails throws away the assets collected so far, on
+`kernel.exception`: the error response — the exception page, your
+`error.html.twig`, the response of your own exception listener — gets the assets
+of the components it renders itself, in tags or in the header by the rules above,
+and never those of the page that failed. See
+[How it works](how-it-works.md#error-pages).
 
 The value is JSON, ASCII-only (anything else is a `\u` escape), with the assets
 in the order of the tags of a full page:

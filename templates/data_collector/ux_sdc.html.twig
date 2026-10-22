@@ -7,6 +7,8 @@
     missing_placeholder: 'A page without the placeholder of render_component_assets(): the assets only went into the X-SDC-Assets header, which nothing reads on a page load.',
     not_html: 'Not an HTML response: no assets were added to it.',
     streamed: 'A streamed or binary response, whose content cannot be changed: no assets were added to it.',
+    redirect: 'A redirect, whose body the client never shows: no assets were added to it.',
+    empty: 'A response without a body to show (204, 304, empty content): no assets were added to it.',
     sub_request: 'A sub-request: the assets of its components go into the main response, whose profile lists them.',
 } %}
 
@@ -201,6 +203,29 @@
                             <td class="font-normal">{{ asset.path }}</td>
                             <td class="font-normal">{{ asset.type|default('-') }}</td>
                             <td class="font-normal">{{ asset.reason }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+
+        {% if collector.discardedAssets is not empty %}
+            <h3>Assets of the page that failed</h3>
+
+            <p class="help">The request failed with an exception after these assets were registered. The error response replaces the page that asked for them, so it does not get them: it gets the assets of the components it renders itself.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">Asset</th>
+                        <th scope="col">Type</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for asset in collector.discardedAssets %}
+                        <tr>
+                            <td class="font-normal">{{ asset.path }}</td>
+                            <td class="font-normal">{{ asset.type|default('-') }}</td>
                         </tr>
                     {% endfor %}
                 </tbody>

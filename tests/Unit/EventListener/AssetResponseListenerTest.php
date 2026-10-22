@@ -16,9 +16,11 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LogLevel;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
 use Symfony\Component\AssetMapper\MappedAsset;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\WebLink\GenericLinkProvider;
@@ -310,6 +312,103 @@ final class AssetResponseListenerTest extends TestCase
         $response = $this->dispatch($response, null, $requestType);
 
         $this->assertFalse($response->headers->has('X-SDC-Assets'));
+    }
+
+    /**
+     * @return iterable<string, array{Response, array<string, string>}>
+     */
+    public static function provideResponsesNotShown(): iterable
+    {
+        // [response, request headers]
+        yield 'redirect' => [new RedirectResponse('/cart'), []];
+        yield 'redirect of a Turbo Frame request' => [new RedirectResponse('/cart'), ['HTTP_TURBO_FRAME' => 'cart']];
+        yield 'redirect with a page body' => [new Response(self::PAGE, 302, ['Location' => '/cart']), []];
+        yield '204' => [new Response('', 204), []];
+        yield '304' => [new Response('', 304), []];
+        yield '500 with an empty body' => [new Response('', 500), []];
+        yield 'empty Live Component response' => [new Response(''), ['HTTP_ACCEPT' => 'application/vnd.live-component+html']];
+        yield 'whitespace' => [new Response("\n  \n"), []];
+    }
+
+    /**
+     * The client never shows the body of these responses, so the assets would
+     * load for nothing: no tags, no header.
+     *
+     * @param array<string, string> $server
+     */
+    #[DataProvider('provideResponsesNotShown')]
+    public function testAddsNothingToAResponseTheClientDoesNotShow(Response $response, array $server): void
+    {
+        $this->registry->addAsset('Alert/Alert.css', 'css');
+        $content = $response->getContent();
+        $request = Request::create('/', server: $server);
+
+        $response = $this->dispatch($response, $request);
+
+        $this->assertFalse($response->headers->has('X-SDC-Assets'));
+        $this->assertSame($content, $response->getContent());
+        $this->assertFalse($request->attributes->has('_links'));
+        $this->assertSame([], $this->logger->records);
+    }
+
+    /**
+     * A HEAD request gets the headers of the GET one (RFC 9110, 9.3.2);
+     * ResponseListener removes the body afterwards.
+     */
+    public function testTreatsAHeadRequestLikeAGetRequest(): void
+    {
+        $this->registry->addAsset('Alert/Alert.css', 'css');
+
+        $request = Request::create('/', 'HEAD');
+        $response = $this->dispatch(new Response(self::PAGE), $request);
+        $this->assertStringContainsString('/assets/Alert/Alert-1a2b3c.css', (string) $response->getContent());
+        $this->assertSame(['/assets/Alert/Alert-1a2b3c.css' => 'style'], $this->preloads($request));
+
+        $response = $this->dispatch(new Response('<div class="alert"></div>'), Request::create('/', 'HEAD'));
+        $this->assertTrue($response->headers->has('X-SDC-Assets'));
+    }
+
+    /**
+     * The error page replaces the page that failed: it gets the assets of
+     * its own components only.
+     */
+    public function testAFailedRequestDropsTheAssetsCollectedSoFar(): void
+    {
+        $trace = new RequestTrace();
+        $this->listener = $this->createListener(true, trace: $trace);
+        $this->registry->addAsset('Broken.css', 'css');
+        $request = new Request();
+
+        $this->listener->onKernelException($this->exceptionEvent($request, HttpKernelInterface::MAIN_REQUEST));
+
+        $this->assertSame([], $this->registry->getSortedAssets());
+        $this->assertSame([['path' => 'Broken.css', 'type' => 'css', 'priority' => 0, 'attributes' => []]], $trace->getDiscardedAssets($request));
+
+        // The error page, rendered in a sub-request, registers its own components.
+        $this->registry->addAsset('Alert/Alert.css', 'css');
+        $response = $this->dispatch(new Response(self::PAGE, 500), $request);
+
+        $this->assertSame(
+            '<html><head><link rel="stylesheet" href="/assets/Alert/Alert-1a2b3c.css" data-turbo-track="dynamic">' . "\n" . '</head><body></body></html>',
+            $response->getContent(),
+        );
+    }
+
+    /**
+     * A sub-request answered inside the page: the page keeps the assets of its
+     * components.
+     */
+    public function testAFailedSubRequestKeepsTheAssets(): void
+    {
+        $trace = new RequestTrace();
+        $this->listener = $this->createListener(true, trace: $trace);
+        $this->registry->addAsset('Alert/Alert.css', 'css');
+        $request = new Request();
+
+        $this->listener->onKernelException($this->exceptionEvent($request, HttpKernelInterface::SUB_REQUEST));
+
+        $this->assertCount(1, $this->registry->getSortedAssets());
+        $this->assertSame([], $trace->getDiscardedAssets($request));
     }
 
     /**
@@ -764,6 +863,8 @@ final class AssetResponseListenerTest extends TestCase
         yield 'JSON' => [new Response('{}', 200, ['Content-Type' => 'application/json']), [], HttpKernelInterface::MAIN_REQUEST, RequestTrace::OUTCOME_NOT_HTML];
         yield 'streamed' => [new StreamedResponse(), [], HttpKernelInterface::MAIN_REQUEST, RequestTrace::OUTCOME_STREAMED];
         yield 'sub-request' => [new Response(self::PAGE), [], HttpKernelInterface::SUB_REQUEST, RequestTrace::OUTCOME_SUB_REQUEST];
+        yield 'redirect' => [new RedirectResponse('/cart'), [], HttpKernelInterface::MAIN_REQUEST, RequestTrace::OUTCOME_REDIRECT];
+        yield 'empty' => [new Response('', 500), [], HttpKernelInterface::MAIN_REQUEST, RequestTrace::OUTCOME_EMPTY];
     }
 
     /**
@@ -883,6 +984,11 @@ final class AssetResponseListenerTest extends TestCase
         }
 
         return $preloads;
+    }
+
+    private function exceptionEvent(Request $request, int $requestType): ExceptionEvent
+    {
+        return new ExceptionEvent($this->createMock(HttpKernelInterface::class), $request, $requestType, new \RuntimeException('The component failed.'));
     }
 
     private function dispatch(Response $response, ?Request $request = null, int $requestType = HttpKernelInterface::MAIN_REQUEST): Response

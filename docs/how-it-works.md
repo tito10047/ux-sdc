@@ -27,12 +27,34 @@
    adds a `Link: rel="preload"` header for each stylesheet, classic script, font
    and image. A Live Component re-render, a Turbo Frame or Stream, and any other
    HTML response without the placeholder get the
-   [`X-SDC-Assets` header](live-and-turbo.md#the-x-sdc-assets-header) instead. The
-   registry is reset between requests, so long-running workers do not carry assets
-   over.
+   [`X-SDC-Assets` header](live-and-turbo.md#the-x-sdc-assets-header) instead;
+   a redirect and a response without a body get neither. The registry is reset
+   between requests, so long-running workers do not carry assets over, and when a
+   request fails ([error pages](#error-pages)).
 
 Components rendered in a sub-request (`render(controller(...))`) end up in the
 main response.
+
+## Error pages
+
+When the main request fails — a component throws while the page renders, say —
+the bundle clears the registry on `kernel.exception` (priority 128), before
+Symfony's `ErrorListener` (-128) renders the error page in a sub-request and makes
+its response the main response. The error page gets exactly the assets of its own
+components:
+
+- An `error.html.twig` that extends your layout, with
+  `{{ render_component_assets() }}` and components, gets their tags, like any page.
+- Symfony's own error page and the exception page of debug have neither: no tags,
+  no header.
+- A JSON error is not HTML: nothing.
+
+An exception listener of your own that sets a response at a priority above 128
+stops the event before the bundle sees it; its response gets the assets of the
+page that failed. Only the main request clears the registry: an error rendered
+inside the page, by a sub-request, leaves the page's assets alone. The profiler
+panel lists the components that rendered before the failure and the assets it
+discarded.
 
 ## Performance
 
