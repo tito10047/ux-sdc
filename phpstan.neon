@@ -1,0 +1,18 @@
+includes:
+    - vendor/phpstan/phpstan-symfony/extension.neon
+
+parameters:
+    level: 8
+    # The PHP versions of the CI test matrix. Without it PHPStan analyses for
+    # the PHP it runs on (8.5 in CI) and accepts what 8.1 lacks: readonly
+    # classes, typed class constants, standalone true/false/null types,
+    # functions such as json_validate().
+    phpVersion:
+        min: 80100
+        max: 80599
+    paths:
+        - src
+        # PHPStan only analyses a trait in the context of a class using it, and
+        # nothing in src/ uses the public Stimulus trait. This fixture is its
+        # minimal consumer, listed so the trait is analysed instead of skipped.
+        - tests/Integration/Fixtures/Component/StimulusComponent.php

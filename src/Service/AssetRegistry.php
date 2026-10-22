@@ -11,10 +11,22 @@
 
 namespace Tito10047\UX\Sdc\Service;
 
-final class AssetRegistry
+use Symfony\Contracts\Service\ResetInterface;
+
+/**
+ * Shape of a single asset, shared by the metadata resolver, the compiled metadata
+ * cache and this registry. `type` is one of the type constants of #[Asset]; an
+ * asset added here with an empty type gets the one its path tells when the
+ * response is built, and one of no known type is not loaded.
+ *
+ * @phpstan-type SdcAsset array{path: string, type: string, priority: int, attributes: array<string, mixed>}
+ *
+ * @internal Components declare their assets with #[Asset] and #[AsSdcComponent].
+ */
+final class AssetRegistry implements ResetInterface
 {
     /**
-     * @var array<string, array{path: string, type: string, priority: int, attributes: array<string, mixed>}>
+     * @var array<string, SdcAsset>
      */
     private array $assets = [];
 
@@ -35,16 +47,14 @@ final class AssetRegistry
                 'priority' => $priority,
                 'attributes' => $attributes,
             ];
-        } else {
-            // Ak už existuje, môžeme aktualizovať prioritu na vyššiu
-            if ($priority > $this->assets[$key]['priority']) {
-                $this->assets[$key]['priority'] = $priority;
-            }
+        } elseif ($priority > $this->assets[$key]['priority']) {
+            // The same asset requested again: it is loaded once, with the highest priority asked for.
+            $this->assets[$key]['priority'] = $priority;
         }
     }
 
     /**
-     * @return array<int, array{path: string, type: string, priority: int, attributes: array<string, mixed>}>
+     * @return list<SdcAsset>
      */
     public function getSortedAssets(): array
     {
@@ -60,5 +70,18 @@ final class AssetRegistry
     public function clear(): void
     {
         $this->assets = [];
+    }
+
+    /**
+     * Called by the `services_resetter` between requests.
+     *
+     * The registry collects the assets of one response. In a long-running worker
+     * (FrankenPHP worker mode, RoadRunner, Swoole) the container outlives the request,
+     * so without this every page would also receive the assets of every component
+     * rendered on the pages served before it.
+     */
+    public function reset(): void
+    {
+        $this->clear();
     }
 }

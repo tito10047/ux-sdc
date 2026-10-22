@@ -1,0 +1,12 @@
+  <fg=blue;options=bold>UX SDC</> <fg=blue>is installed. Two steps are left to you:</>
+    1. Map the component namespace in <comment>composer.json</> and reload the autoloader:
+         <comment>"autoload": { "psr-4": { "App\\Component\\": "src_component/" } }</>
+         <comment>composer dump-autoload</>
+    2. Only for Live Components or Turbo Frames/Streams: attach the asset loader
+       to the body of <comment>templates/base.html.twig</>:
+         <comment>\<body {{ stimulus_controller(sdc_loader_controller) }}></>
+    * <comment>{{ render_component_assets() }}</> was added after <comment>{{ importmap() }}</> in
+      <comment>templates/base.html.twig</>. If a warning above says it could not be, add it to
+      the head of your layout yourself, after the import map.
+    * Create a component: <comment>php bin/console make:sdc-component Alert</>
+    * Docs: <comment>https://github.com/tito10047/ux-sdc</>

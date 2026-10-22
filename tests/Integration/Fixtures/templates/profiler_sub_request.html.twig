@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>A page rendering a sub-request</title>
+    {{ render_component_assets() }}
+</head>
+<body>
+    {{ render(path('sdc_test_page', {template: 'fragment.html.twig'})) }}
+</body>
+</html>

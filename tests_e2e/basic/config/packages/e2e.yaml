@@ -1,0 +1,7 @@
+framework:
+    asset_mapper:
+        # A relative JavaScript import that points to no file fails
+        # asset-map:compile instead of logging a warning. Bare imports
+        # ("@hotwired/stimulus") are not covered by this option; the end-to-end
+        # test checks those of the bundle with assert_imports_resolve.php.
+        missing_import_mode: strict

@@ -9,14 +9,22 @@
  * file that was distributed with this source code.
  */
 
-namespace Integration\Maker;
+namespace Tito10047\UX\Sdc\Tests\Integration\Maker;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Bundle\MakerBundle\Exception\RuntimeCommandException;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\Filesystem\Filesystem;
+use Symfony\UX\StimulusBundle\AssetMapper\ControllersMapGenerator;
+use Symfony\UX\StimulusBundle\StimulusBundle;
+use Symfony\UX\TwigComponent\ComponentRendererInterface;
 use Tito10047\UX\Sdc\Tests\Integration\IntegrationTestCase;
 
 class MakeSdcComponentTest extends IntegrationTestCase
 {
+    private const NEW_COMPONENTS_DIR = __DIR__.'/../Fixtures/maker/components';
+
     protected function setUp(): void
     {
         if (!class_exists(\Symfony\Bundle\MakerBundle\MakerBundle::class)) {
@@ -24,29 +32,30 @@ class MakeSdcComponentTest extends IntegrationTestCase
         }
 
         parent::setUp();
-        $this->removeDir(self::getContainer()->getParameter('ux_sdc.ux_components_dir') . '/UI');
-        $this->removeDir(self::getContainer()->getParameter('ux_sdc.ux_components_dir') . '/Alert');
-        $this->removeDir(self::getContainer()->getParameter('ux_sdc.ux_components_dir') . '/Page');
+        $this->removeGeneratedComponents();
     }
 
     protected function tearDown(): void
     {
+        $this->removeGeneratedComponents();
         parent::tearDown();
-        $this->removeDir(self::getContainer()->getParameter('ux_sdc.ux_components_dir') . '/UI');
-        $this->removeDir(self::getContainer()->getParameter('ux_sdc.ux_components_dir') . '/Alert');
-        $this->removeDir(self::getContainer()->getParameter('ux_sdc.ux_components_dir') . '/Page');
     }
 
-    private function removeDir(string $dir): void
+    /**
+     * Fixed paths rather than the ux_components_dir of the kernel: some tests
+     * boot one with another directory, and a failing one may have written files.
+     */
+    private function removeGeneratedComponents(): void
     {
-        if (!is_dir($dir)) {
-            return;
-        }
-        $files = array_diff(scandir($dir), ['.', '..']);
-        foreach ($files as $file) {
-            (is_dir("$dir/$file")) ? $this->removeDir("$dir/$file") : unlink("$dir/$file");
-        }
-        rmdir($dir);
+        $fixtures = \dirname(__DIR__).'/Fixtures';
+
+        (new Filesystem())->remove([
+            $fixtures.'/Component/UI',
+            $fixtures.'/Component/Alert',
+            $fixtures.'/Component/Page',
+            $fixtures.'/Library/UI',
+            self::NEW_COMPONENTS_DIR,
+        ]);
     }
 
     public function testMakeSdcComponent(): void
@@ -59,7 +68,8 @@ class MakeSdcComponentTest extends IntegrationTestCase
 
         $tester->setInputs([
             'UI\Alert', // Component name
-            'y',     // Generate stimulus controller?
+            // Generate stimulus controller? Only asked with StimulusBundle.
+            ...(self::hasStimulusBundle() ? ['y'] : []),
         ]);
 
         $tester->execute([]);
@@ -71,79 +81,121 @@ class MakeSdcComponentTest extends IntegrationTestCase
         $this->assertFileExists($baseDir . '/UI/Alert/Alert.php');
         $this->assertFileExists($baseDir . '/UI/Alert/Alert.html.twig');
         $this->assertFileExists($baseDir . '/UI/Alert/Alert.css');
-        $this->assertFileExists($baseDir . '/UI/Alert/Alert_controller.js');
+        if (self::hasStimulusBundle()) {
+            $this->assertFileExists($baseDir . '/UI/Alert/Alert_controller.js');
+        } else {
+            $this->assertFileDoesNotExist($baseDir . '/UI/Alert/Alert_controller.js');
+            $this->assertStringContainsString('No Stimulus controller is offered', $display);
+        }
 
-        $phpContent = file_get_contents($baseDir . '/UI/Alert/Alert.php');
-        $this->assertStringContainsString('namespace Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\UI\Alert;', $phpContent);
-        $this->assertStringContainsString('class Alert', $phpContent);
-        $this->assertStringContainsString('use Tito10047\UX\Sdc\Attribute\AsSdcComponent;', $phpContent);
-        $this->assertStringContainsString('#[AsSdcComponent]', $phpContent);
+        // {{ controller }} needs neither a trait nor an interface: the bundle sets it for every component in the namespace.
+        $this->assertSame(<<<'PHP'
+            <?php
 
-        $twigContent = file_get_contents($baseDir . '/UI/Alert/Alert.html.twig');
-        $this->assertStringContainsString('<div {{ attributes.defaults({class:"alert"}).defaults(stimulus_controller(controller)) }}>', $twigContent);
+            namespace Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\UI\Alert;
 
-        $cssContent = file_get_contents($baseDir . '/UI/Alert/Alert.css');
-        $this->assertStringContainsString('@layer components {', $cssContent);
-        $this->assertStringContainsString('.alert{', $cssContent);
+            use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
+
+            #[AsSdcComponent]
+            final class Alert
+            {
+            }
+
+            PHP, file_get_contents($baseDir . '/UI/Alert/Alert.php'));
+
+        $stimulus = self::hasStimulusBundle() ? '.defaults(stimulus_controller(controller))' : '';
+        $this->assertSame(<<<TWIG
+            <div {{ attributes.defaults({class: 'alert'})$stimulus }}>
+                {# The markup of Alert #}
+            </div>
+
+            TWIG, file_get_contents($baseDir . '/UI/Alert/Alert.html.twig'));
+
+        // Unlayered: a rule in @layer loses to every unlayered rule of the application, whatever its specificity.
+        $this->assertSame(<<<'CSS'
+            .alert {
+                /* Loaded only on the pages that render Alert. */
+            }
+
+            CSS, file_get_contents($baseDir . '/UI/Alert/Alert.css'));
+
+        if (self::hasStimulusBundle()) {
+            $this->assertSame(<<<'JS'
+                import { Controller } from '@hotwired/stimulus';
+
+                /*
+                 * The controller of Alert, attached to it by
+                 * {{ stimulus_controller(controller) }} in Alert.html.twig.
+                 *
+                 * Its name keeps the capitals of the file path. Targets, actions, classes and
+                 * values work, but Stimulus does not call fooValueChanged() callbacks for such a
+                 * name: read this.fooValue where it is needed instead.
+                 */
+
+                /* stimulusFetch: 'lazy' */
+                export default class extends Controller {
+                    connect() {
+                        // Called each time the element of the component is added to the page.
+                    }
+                }
+
+                JS, file_get_contents($baseDir . '/UI/Alert/Alert_controller.js'));
+        }
 
         $this->assertStringContainsString('tests/Integration/Fixtures/Component/UI/Alert/Alert.php', $display);
     }
 
-    public function testMakeSdcComponentWithAction(): void
+    /**
+     * The generated template passes {{ controller }} to stimulus_controller();
+     * it has to name the generated Alert_controller.js the way StimulusBundle does.
+     */
+    public function testGeneratedComponentRendersItsStimulusController(): void
     {
+        if (!self::hasStimulusBundle()) {
+            self::markTestSkipped('symfony/stimulus-bundle is not installed; testStimulusOptionNeedsStimulusBundle covers its absence.');
+        }
+
         self::bootKernel();
-        $application = new Application(self::$kernel);
-
-        $command = $application->find('make:sdc-component');
-        $tester = new CommandTester($command);
-
-        // UI:Homepage s voľbou --action
-        $tester->execute([
-            'name' => 'Page:Homepage',
-            '--action' => true,
-        ], [
-            'interactive' => false,
-        ]);
-
+        $tester = new CommandTester((new Application(self::$kernel))->find('make:sdc-component'));
+        $tester->execute(['name' => 'UI:Alert', '--stimulus' => true], ['interactive' => false]);
         $tester->assertCommandIsSuccessful();
 
-        $baseDir = self::getContainer()->getParameter('ux_sdc.ux_components_dir');
-        $this->assertFileExists($baseDir . '/Page/Homepage/Homepage.php');
-        $this->assertFileExists($baseDir . '/Page/Homepage/HomepageAction.php');
-        $this->assertFileExists($baseDir . '/Page/Homepage/HomepageAction.html.twig');
+        // A new container, which registers the generated class.
+        self::ensureKernelShutdown();
+        self::bootKernel();
 
-        $actionPhpContent = file_get_contents($baseDir . '/Page/Homepage/HomepageAction.php');
-        $this->assertStringContainsString('namespace Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\Page\Homepage;', $actionPhpContent);
-        $this->assertStringContainsString('class HomepageAction extends AbstractController', $actionPhpContent);
-        $this->assertStringContainsString('#[Route(\'/en\', name: \'app.homepage\')]', $actionPhpContent);
-        $this->assertStringContainsString('return $this->render(\'Page/Homepage/HomepageAction.html.twig\');', $actionPhpContent);
+        /** @var ComponentRendererInterface $renderer */
+        $renderer = self::getContainer()->get('ux.twig_component.component_renderer');
+        $html = $renderer->createAndRender('UI:Alert:Alert');
 
-        $actionTwigContent = file_get_contents($baseDir . '/Page/Homepage/HomepageAction.html.twig');
-        $this->assertStringContainsString('{% extends \'layout.html.twig\' %}', $actionTwigContent);
-        $this->assertStringContainsString('<twig:Page:Homepage:Homepage />', $actionTwigContent);
+        $generator = self::getContainer()->get('stimulus.asset_mapper.controllers_map_generator');
+        $this->assertInstanceOf(ControllersMapGenerator::class, $generator);
+        $this->assertArrayHasKey('UI--Alert--Alert', $generator->getControllersMap());
+
+        $this->assertStringContainsString('data-controller="UI--Alert--Alert"', $html);
     }
 
-    public function testMakeSdcComponentInteractiveWithAction(): void
+    /**
+     * Without StimulusBundle the template of the controller would call a Twig
+     * function that does not exist, and the component would not render.
+     */
+    public function testStimulusOptionNeedsStimulusBundle(): void
     {
+        if (self::hasStimulusBundle()) {
+            self::markTestSkipped('Only without symfony/stimulus-bundle installed, as in the "Tests without LiveComponent" CI job.');
+        }
+
         self::bootKernel();
-        $application = new Application(self::$kernel);
+        $tester = new CommandTester((new Application(self::$kernel))->find('make:sdc-component'));
 
-        $command = $application->find('make:sdc-component');
-        $tester = new CommandTester($command);
+        try {
+            $tester->execute(['name' => 'UI:Alert', '--stimulus' => true], ['interactive' => false]);
+            $this->fail('The maker generated a Stimulus controller without StimulusBundle.');
+        } catch (RuntimeCommandException $e) {
+            $this->assertStringContainsString('Run "composer require symfony/stimulus-bundle" first, or leave --stimulus out.', $e->getMessage());
+        }
 
-        $tester->setInputs([
-            'Page:Homepage', // Component name
-            'n',             // Stimulus?
-            'y',             // Action?
-        ]);
-
-        $tester->execute([]);
-
-        $tester->assertCommandIsSuccessful();
-
-        $baseDir = self::getContainer()->getParameter('ux_sdc.ux_components_dir');
-        $this->assertFileExists($baseDir . '/Page/Homepage/HomepageAction.php');
-        $this->assertFileExists($baseDir . '/Page/Homepage/HomepageAction.html.twig');
+        $this->assertDirectoryDoesNotExist(\dirname(__DIR__).'/Fixtures/Component/UI');
     }
 
     public function testMakeSdcComponentWithColonSeparator(): void
@@ -156,7 +208,8 @@ class MakeSdcComponentTest extends IntegrationTestCase
 
         $tester->setInputs([
             'UI:Alert', // Component name with colon
-            'n',     // Generate stimulus controller?
+            // Generate stimulus controller? Only asked with StimulusBundle.
+            ...(self::hasStimulusBundle() ? ['n'] : []),
         ]);
 
         $tester->execute([]);
@@ -196,5 +249,75 @@ class MakeSdcComponentTest extends IntegrationTestCase
 
         $twigContent = file_get_contents($baseDir . '/Alert/Alert.html.twig');
         $this->assertStringNotContainsString('stimulus_controller', $twigContent);
+    }
+
+    /**
+     * The class of the root element, and the selector of the stylesheet, are
+     * kebab-cased like CSS class names, as the path of a generated page is.
+     */
+    public function testCssClassIsKebabCased(): void
+    {
+        self::bootKernel();
+        $tester = new CommandTester((new Application(self::$kernel))->find('make:sdc-component'));
+        $tester->execute(['name' => 'UI:date_picker'], ['interactive' => false]);
+        $tester->assertCommandIsSuccessful();
+
+        $baseDir = self::getContainer()->getParameter('ux_sdc.ux_components_dir');
+        $this->assertStringStartsWith("<div {{ attributes.defaults({class: 'date-picker'}) }}>\n", (string) file_get_contents($baseDir . '/UI/DatePicker/DatePicker.html.twig'));
+        $this->assertStringStartsWith(".date-picker {\n", (string) file_get_contents($baseDir . '/UI/DatePicker/DatePicker.css'));
+    }
+
+    private static function hasStimulusBundle(): bool
+    {
+        return class_exists(StimulusBundle::class);
+    }
+
+    /**
+     * Kernel options, and the message. ux_components_dir does not exist yet, as
+     * in an application about to get its first component: once it holds classes,
+     * a namespace that does not match makes the container fail to build.
+     *
+     * @return iterable<string, array{array<string, mixed>, string}>
+     */
+    public static function provideMismatchedConfiguration(): iterable
+    {
+        $fixtures = \dirname(__DIR__).'/Fixtures';
+
+        yield 'namespace of another directory' => [
+            ['configs' => ['component_namespace' => 'Tito10047\\UX\\Sdc\\Tests\\Integration\\Fixtures\\Library', 'ux_components_dir' => self::NEW_COMPONENTS_DIR]],
+            'would be written to "'.$fixtures.'/Library/UI/Alert", but its template and assets to "'.$fixtures.'/maker/components/UI/Alert". "ux_sdc.component_namespace" (Tito10047\\UX\\Sdc\\Tests\\Integration\\Fixtures\\Library\\) has to be the namespace Composer\'s PSR-4 autoloading maps to "ux_sdc.ux_components_dir"',
+        ];
+        yield 'namespace Composer does not autoload' => [
+            ['configs' => ['component_namespace' => 'Acme\\NotAutoloaded', 'ux_components_dir' => self::NEW_COMPONENTS_DIR]],
+            'Composer\'s autoloading does not know where to put the class "Acme\\NotAutoloaded\\UI\\Alert\\Alert".',
+        ];
+        yield 'no namespace' => [
+            // Without component_namespace, TwigComponent 3 wants defaults of the application.
+            ['configs' => ['component_namespace' => null], 'twig_component' => ['defaults' => ['App\\Twig\\Components\\' => 'components/']]],
+            'make:sdc-component needs "ux_sdc.component_namespace"',
+        ];
+    }
+
+    /**
+     * Instead of a class in one directory and its template and assets in another.
+     *
+     * @param array<string, mixed> $kernelOptions
+     */
+    #[DataProvider('provideMismatchedConfiguration')]
+    public function testMismatchedConfigurationFailsBeforeAnythingIsWritten(array $kernelOptions, string $message): void
+    {
+        self::bootKernel($kernelOptions);
+        $tester = new CommandTester((new Application(self::$kernel))->find('make:sdc-component'));
+
+        try {
+            $tester->execute(['name' => 'UI:Alert'], ['interactive' => false]);
+            $this->fail('The maker generated a component with a configuration that scatters it.');
+        } catch (RuntimeCommandException $e) {
+            $this->assertStringContainsString($message, $e->getMessage());
+        }
+
+        $this->assertDirectoryDoesNotExist(self::NEW_COMPONENTS_DIR);
+        $this->assertDirectoryDoesNotExist(\dirname(__DIR__).'/Fixtures/Library/UI');
+        $this->assertDirectoryDoesNotExist(\dirname(__DIR__).'/Fixtures/Component/UI');
     }
 }

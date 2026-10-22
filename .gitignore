@@ -3,8 +3,6 @@ composer.lock
 /.idea
 .phpunit.result.cache
 .phpunit.cache
-/.php-cs-fixer.dist.php
-/phpstan.neon
 /.php-cs-fixer.cache
 e2e-test/
 tests/Visual/Generated

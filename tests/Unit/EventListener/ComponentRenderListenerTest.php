@@ -16,24 +16,32 @@ use Symfony\UX\TwigComponent\Event\PostMountEvent;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\EventListener\ComponentRenderListener;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
+use Tito10047\UX\Sdc\Service\StimulusControllerNameResolver;
 
 final class ComponentRenderListenerTest extends TestCase
 {
     public function testOnPostMountAddsAssetsToRegistry(): void
     {
-        $cachePath = sys_get_temp_dir() . '/listener_test_metadata.php';
+        $cachePath = sys_get_temp_dir().'/'.uniqid('ux-sdc-listener-', true).'.php';
         $component = new class () {};
         $componentClass = $component::class;
         $data = [
-            $componentClass => [
-                ['path' => 'comp.css', 'type' => 'css', 'priority' => 10, 'attributes' => []]
-            ]
+            'components' => [
+                $componentClass => [
+                    'assets' => [
+                        ['path' => 'comp.css', 'type' => 'css', 'priority' => 10, 'attributes' => []],
+                    ],
+                    'template' => null,
+                    'problems' => [],
+                ],
+            ],
+            'anonymous' => [],
         ];
         file_put_contents($cachePath, '<?php return ' . var_export($data, true) . ';');
 
         $metadataRegistry = new SdcMetadataRegistry($cachePath);
         $registry = new AssetRegistry();
-        $listener = new ComponentRenderListener($metadataRegistry, $registry);
+        $listener = new ComponentRenderListener($metadataRegistry, $registry, new StimulusControllerNameResolver(null));
 
         $event = new PostMountEvent($component, []);
         $listener->onPostMount($event);

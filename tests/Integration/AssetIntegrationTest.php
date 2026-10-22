@@ -26,14 +26,13 @@ class AssetIntegrationTest extends IntegrationTestCase
 {
     public function testCompilerPassCollectsAssets(): void
     {
-        self::bootKernel();
+        self::bootKernel(['configs' => ['metadata_cache' => true]]);
         $container = self::getContainer();
 
         /** @var SdcMetadataRegistry $metadataRegistry */
         $metadataRegistry = $container->get(SdcMetadataRegistry::class);
 
-        $this->assertNotNull($metadataRegistry->getMetadata(TestComponent::class));
-        $assets = $metadataRegistry->getMetadata(TestComponent::class);
+        $assets = $metadataRegistry->getAssets(TestComponent::class);
         $this->assertCount(2, $assets);
 
         $paths = array_column($assets, 'path');
@@ -82,17 +81,16 @@ class AssetIntegrationTest extends IntegrationTestCase
 
         // 3. Verify assets are injected
         $this->assertStringNotContainsString('<!-- __UX_TWIG_COMPONENT_ASSETS__ -->', $finalHtml);
-        $this->assertStringContainsString('<link rel="stylesheet" href="/assets/css/test.css">', $finalHtml);
-        $this->assertStringContainsString('<script src="/assets/js/test.js"></script>', $finalHtml);
+        $this->assertStringContainsString('<link rel="stylesheet" href="/assets/css/test.css" data-turbo-track="dynamic">', $finalHtml);
+        $this->assertStringContainsString('<script src="/assets/js/test.js" type="module"></script>', $finalHtml);
 
-        // 4. Verify Link headers (preload)
+        // 4. Verify Link headers (preload): the stylesheet only, a module script gets none
         $linkProvider = $request->attributes->get('_links');
         $this->assertNotNull($linkProvider);
-        $links = iterator_to_array($linkProvider->getLinks());
-        $this->assertCount(2, $links);
+        $links = [...$linkProvider->getLinks()];
+        $this->assertCount(1, $links);
 
         $linkPaths = array_map(fn ($l) => $l->getHref(), $links);
         $this->assertContains('/assets/css/test.css', $linkPaths);
-        $this->assertContains('/assets/js/test.js', $linkPaths);
     }
 }
