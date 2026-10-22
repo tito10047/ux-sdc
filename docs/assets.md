@@ -78,8 +78,9 @@ from `#[AsSdcComponent(js: …)]` or from `#[Asset]` — is loaded as one:
 
 A component script can therefore `import` what the application's import map
 provides (`import { Controller } from '@hotwired/stimulus'`) and files next to it
-(`import './format.js'`). Like every module, it runs once the page is parsed, in
-strict mode, with its own scope: a top-level `var` or `function` is not a global.
+(`import './format.js'`, see [Imports in a component script](#imports-in-a-component-script)).
+Like every module, it runs once the page is parsed, in strict mode, with its own
+scope: a top-level `var` or `function` is not a global.
 
 The import map must come first. A browser that does not merge import maps ignores
 one that comes after a module script, and then the bare imports of the whole
@@ -103,6 +104,51 @@ Stylesheets and classic scripts are announced early with a
 `rel="preload"; as="script"` would make the browser download them twice, and
 `rel="modulepreload"` in a header starts loading modules before the import map
 is parsed. The browser fetches a module as soon as it parses its tag.
+
+### Imports in a component script
+
+```js
+// src_component/Card/Card.js
+import { format } from './format.js';
+```
+
+AssetMapper does not rewrite a relative import to the versioned file: the browser
+asks for `/assets/Card/format.js`, an unversioned URL that neither AssetMapper's
+debug server nor `asset-map:compile` publishes, and only the import map maps it to
+`/assets/Card/format-1a2b3c4.js`. AssetMapper adds such entries for the modules
+it walks — those of `importmap.php` and what they import — so the bundle adds the
+module script of every component to the import map, under its unversioned URL:
+
+```json
+{
+    "imports": {
+        "app": "/assets/app-9f8e7d6.js",
+        "/assets/Card/Card.js": "/assets/Card/Card-3b1f2a4.js",
+        "/assets/Card/format.js": "/assets/Card/format-1a2b3c4.js"
+    }
+}
+```
+
+AssetMapper then maps every file the component scripts import, relatively or
+through other files, as it does for the application's own modules; nothing is
+preloaded that the page does not load. A bare import (`'@hotwired/stimulus'`,
+`'chart.js'`) still needs its entry in `importmap.php`
+(`bin/console importmap:require chart.js`).
+
+- The entries are the same on every page, those of the components a page does not
+  render included: a component a [Live re-render or a Turbo Frame](live-and-turbo.md)
+  inserts later needs them in the import map the page already has — a browser
+  takes one import map (Firefox does not merge a second one) — and Turbo Drive
+  sees no new import map on a visit (the import map of `symfony new --webapp` has
+  `data-turbo-track="reload"`: a different one would reload the page).
+- Only module scripts of the asset map get an entry: not a classic script
+  (`'type' => false`), which cannot `import`, nor a URL.
+- `importmap.php` is not changed: `importmap:require`, `remove` and `update` write
+  it back without the component entries. An entry of `importmap.php` under the
+  same name wins.
+- The page needs `{{ importmap() }}`, as for any module. In production, run
+  `asset-map:compile` after changing a component script, as for every asset:
+  `public/assets/importmap.json` holds the import map then.
 
 ## Fonts and images
 

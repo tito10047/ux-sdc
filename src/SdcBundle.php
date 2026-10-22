@@ -19,6 +19,7 @@ use Tito10047\UX\Sdc\CompilerPass\AssetComponentCompilerPass;
 use Tito10047\UX\Sdc\CompilerPass\ComponentRoutesCompilerPass;
 use Tito10047\UX\Sdc\CompilerPass\ProfilerCompilerPass;
 use Tito10047\UX\Sdc\CompilerPass\SdcComponentAttributePass;
+use Tito10047\UX\Sdc\CompilerPass\ImportMapCompilerPass;
 use Tito10047\UX\Sdc\CompilerPass\StimulusControllerPathsCompilerPass;
 use Tito10047\UX\Sdc\DependencyInjection\SdcExtension;
 
@@ -57,6 +58,7 @@ class SdcBundle extends Bundle
         $container->addCompilerPass(new SdcComponentAttributePass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, SdcComponentAttributePass::PRIORITY);
         $container->addCompilerPass(new AssetComponentCompilerPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, AssetComponentCompilerPass::PRIORITY);
         $container->addCompilerPass(new StimulusControllerPathsCompilerPass());
+        $container->addCompilerPass(new ImportMapCompilerPass());
         $container->addCompilerPass(new ComponentRoutesCompilerPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, ComponentRoutesCompilerPass::PRIORITY);
         $container->addCompilerPass(new ProfilerCompilerPass());
     }

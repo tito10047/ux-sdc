@@ -143,6 +143,13 @@ documentation moved from the README to [`docs/`](docs/installation.md).
 
 ### Fixed
 
+- Fix relative imports in component scripts (`import './format.js'`), which the
+  browser requested unversioned and got a 404 for: the module script of every
+  component is now an entry of AssetMapper's import map, so AssetMapper maps the
+  files it imports, in debug and in `asset-map:compile`. The entries are the same
+  on every page, for components inserted later by Live Components or Turbo too;
+  `importmap.php` is not changed
+  ([docs](docs/assets.md#imports-in-a-component-script)).
 - Fix component assets leaking from one request into the next in long-running
   workers (FrankenPHP, RoadRunner, Swoole): `AssetRegistry` is reset between
   requests.

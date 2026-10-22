@@ -28,6 +28,7 @@ use Tito10047\UX\Sdc\CompilerPass\ComponentRoutesCompilerPass;
 use Tito10047\UX\Sdc\CompilerPass\StimulusControllerPathsCompilerPass;
 use Tito10047\UX\Sdc\Csp\NelmioNonceProvider;
 use Tito10047\UX\Sdc\Debug\ComponentInspector;
+use Tito10047\UX\Sdc\ImportMap\ComponentImportMapEntries;
 use Tito10047\UX\Sdc\EventListener\AssetResponseListener;
 use Tito10047\UX\Sdc\EventListener\ComponentRenderListener;
 use Tito10047\UX\Sdc\EventListener\DevComponentRenderListener;
@@ -93,8 +94,10 @@ final class SdcExtension extends Extension implements PrependExtensionInterface
         $metadataCache = $this->isMetadataCacheEnabled($container, $config['metadata_cache']);
         $container->setParameter(AssetComponentCompilerPass::METADATA_CACHE_PARAMETER, $metadataCache);
         $container->removeDefinition($metadataCache ? DevComponentRenderListener::class : ComponentRenderListener::class);
-        if ($container->hasDefinition(ComponentInspector::class)) {
-            $container->getDefinition(ComponentInspector::class)->setArgument('$metadataCache', $metadataCache);
+        foreach ([ComponentInspector::class, ComponentImportMapEntries::class] as $id) {
+            if ($container->hasDefinition($id)) {
+                $container->getDefinition($id)->setArgument('$metadataCache', $metadataCache);
+            }
         }
 
         $this->registerNelmioNonceProvider($container);

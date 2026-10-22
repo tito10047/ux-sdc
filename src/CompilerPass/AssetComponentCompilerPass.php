@@ -16,6 +16,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Exception\LogicException;
 use Symfony\Component\Filesystem\Filesystem;
 use Tito10047\UX\Sdc\Debug\ComponentInspector;
+use Tito10047\UX\Sdc\ImportMap\ComponentImportMapEntries;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadata;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
@@ -114,6 +115,20 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
                 ->setArgument('$componentClasses', $componentClasses)
                 ->setArgument('$classesWithExplicitTemplate', $classesWithExplicitTemplate)
                 ->setArgument('$anonymousTemplates', $anonymousTemplates);
+        }
+
+        if ($container->hasDefinition(ComponentImportMapEntries::class) && $container->hasDefinition(ComponentMetadataResolver::class)) {
+            // A resolver of its own, without a logger: the files it has to
+            // leave out are reported when their component renders, not on
+            // every page that has an import map.
+            $silentResolver = (clone $container->getDefinition(ComponentMetadataResolver::class))
+                ->setArgument('$logger', null)
+                ->clearTags();
+
+            $container->getDefinition(ComponentImportMapEntries::class)
+                ->setArgument('$metadataResolver', $silentResolver)
+                ->setArgument('$componentClasses', $componentClasses)
+                ->setArgument('$anonymousTemplates', array_keys($anonymousTemplates));
         }
 
         if (!$container->hasDefinition(SdcMetadataRegistry::class)) {

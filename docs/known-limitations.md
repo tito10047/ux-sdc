@@ -28,6 +28,9 @@
 - **SCSS, TypeScript or any other compilation.** Compiling assets is AssetMapper's
   job (or that of a dedicated bundle such as `symfonycasts/sass-bundle`). Compile
   `Alert.scss` to `Alert.css` next to the class and discovery picks it up.
-- **Bundling or importmap manipulation.** The bundle is a thin layer between
-  TwigComponent and AssetMapper and does not build its own asset pipeline.
+- **Bundling.** The bundle is a thin layer between TwigComponent and AssetMapper
+  and does not build its own asset pipeline. It only lists the component scripts
+  in AssetMapper's import map, so that their relative imports resolve
+  ([Imports in a component script](assets.md#imports-in-a-component-script)), and
+  leaves `importmap.php` to the application.
 - **Webpack Encore.** Component assets are served through AssetMapper only.

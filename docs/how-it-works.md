@@ -9,7 +9,10 @@
    AssetMapper paths and the templates of anonymous components; with
    `metadata_cache` on, it resolves the template and assets of every
    `twig.component` service and the assets of every anonymous component, and
-   writes them to `%kernel.cache_dir%/sdc_metadata.php`.
+   writes them to `%kernel.cache_dir%/sdc_metadata.php`. AssetMapper's import map
+   configuration reader gets the module scripts of every component as entries,
+   in addition to those of `importmap.php`, so that the files they import resolve
+   ([Imports in a component script](assets.md#imports-in-a-component-script)).
 2. **Rendering.** On TwigComponent's `PostMountEvent` and `PreRenderEvent`, a
    listener adds the component's assets to a per-request registry, points the
    component at its co-located template unless one was named explicitly, and sets

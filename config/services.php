@@ -24,6 +24,7 @@ use Tito10047\UX\Sdc\Routing\ComponentRouteLoader;
 use Tito10047\UX\Sdc\Command\DebugSdcCommand;
 use Tito10047\UX\Sdc\DataCollector\RequestTrace;
 use Tito10047\UX\Sdc\Debug\ComponentInspector;
+use Tito10047\UX\Sdc\ImportMap\ComponentImportMapEntries;
 
 use function Symfony\Component\DependencyInjection\Loader\Configurator\abstract_arg;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
@@ -175,6 +176,21 @@ return static function (ContainerConfigurator $container): void {
             abstract_arg('component_namespace, or null'),
         ])
         ->tag('routing.loader');
+
+    // The module scripts of the components, as entries of the import map
+    // (ImportMapCompilerPass hands them to AssetMapper's config reader, and
+    // removes this service without AssetMapper). The resolver, without a
+    // logger, and the components are set by AssetComponentCompilerPass.
+    $services->set(ComponentImportMapEntries::class)
+        ->args([
+            service(SdcMetadataRegistry::class),
+            abstract_arg('a ComponentMetadataResolver without a logger, set by AssetComponentCompilerPass'),
+            abstract_arg('whether ux_sdc.metadata_cache resolved to true, set by SdcExtension'),
+            service('asset_mapper.repository'),
+            service('asset_mapper.public_assets_path_resolver'),
+            abstract_arg('the classes of the twig.component services, set by AssetComponentCompilerPass'),
+            abstract_arg('the templates of anonymous components, set by AssetComponentCompilerPass'),
+        ]);
 
     if (class_exists(Command::class)) {
         // Instantiated only when debug:sdc runs: the command is lazy, its name

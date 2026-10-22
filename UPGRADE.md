@@ -115,6 +115,14 @@ New options, all with defaults that need no change: `metadata_cache`,
     warning when it finds the import map after the placeholder;
   - opt a script that is not a module (a UMD build, a script relying on globals)
     out with `#[Asset('…', attributes: ['type' => false])]`. Do not use `nomodule`.
+- **Also:** the import map of every page lists the module script of every
+  component under its unversioned URL (`"/assets/Card/Card.js": "/assets/Card/Card-3b1f2a4.js"`),
+  and AssetMapper adds the files they import, so `import './format.js'` in a
+  component script resolves. `importmap.php` is not changed. A workaround that
+  listed component scripts in `importmap.php` for that can go; one under the same
+  name wins. An application that replaced the `asset_mapper.importmap.config_reader`
+  service with a class of its own does not get the entries (noted in the container
+  compiler log) — see [Imports in a component script](docs/assets.md#imports-in-a-component-script).
 
 #### `#[Asset]` types are validated
 
