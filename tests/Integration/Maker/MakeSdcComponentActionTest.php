@@ -19,6 +19,7 @@ use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Kernel;
+use Symfony\Component\Process\Process;
 use Symfony\Component\Routing\Loader\AttributeServicesLoader;
 use Symfony\UX\StimulusBundle\StimulusBundle;
 use Tito10047\UX\Sdc\Maker\MakeSdcComponent;
@@ -122,7 +123,7 @@ final class MakeSdcComponentActionTest extends FunctionalTestCase
 
         self::assertResponseIsSuccessful();
         $html = (string) $client->getResponse()->getContent();
-        $this->assertStringContainsString('<!-- Component: Homepage -->', $html);
+        $this->assertMatchesRegularExpression('#<div\s+class="homepage">#', $html);
         $this->assertMatchesRegularExpression('#<link rel="stylesheet" href="[^"]*/Page/Homepage/Homepage-[^"]*\.css"#', $html);
     }
 
@@ -232,10 +233,45 @@ final class MakeSdcComponentActionTest extends FunctionalTestCase
             'HomepageAction.php',
             ...($withStimulus ? ['Homepage_controller.js'] : []),
         ], $files);
-        $this->assertStringStartsWith('/* Styles for Homepage component */', (string) file_get_contents(self::COMPONENT_DIR.'/Page/Homepage/Homepage.css'));
+        $this->assertStringStartsWith('.homepage {', (string) file_get_contents(self::COMPONENT_DIR.'/Page/Homepage/Homepage.css'));
         if ($withStimulus) {
             $this->assertStringStartsWith("import { Controller } from '@hotwired/stimulus';", (string) file_get_contents(self::COMPONENT_DIR.'/Page/Homepage/Homepage_controller.js'));
         }
+    }
+
+    /**
+     * The files are the application's from the start: they have to pass its
+     * coding standard as they are, and end with a newline like every file of it.
+     */
+    public function testGeneratedFilesFollowTheCodingStandard(): void
+    {
+        $withStimulus = class_exists(StimulusBundle::class);
+        $this->runMaker(self::FLEX, ['name' => 'Page:Blog:BlogPost', '--action' => true, '--stimulus' => $withStimulus])->assertCommandIsSuccessful();
+
+        $phpFiles = 0;
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(self::COMPONENT_DIR.'/Page', \FilesystemIterator::SKIP_DOTS)) as $file) {
+            $this->assertInstanceOf(\SplFileInfo::class, $file);
+            $content = (string) file_get_contents($file->getPathname());
+
+            $this->assertStringEndsWith("\n", $content, $file->getFilename().' ends without a newline.');
+            $this->assertStringEndsNotWith("\n\n", $content, $file->getFilename().' ends with a blank line.');
+            $this->assertStringNotContainsString("\t", $content, $file->getFilename().' is indented with tabs.');
+            $this->assertDoesNotMatchRegularExpression('/[ \t]$/m', $content, $file->getFilename().' has trailing whitespace.');
+
+            $phpFiles += (int) ('php' === $file->getExtension());
+        }
+
+        $this->assertSame(2, $phpFiles, 'The component class and the action.');
+
+        // The rule sets of a Symfony application, run where there is no
+        // configuration file: the bundle's own excludes the fixtures.
+        $fixer = new Process(
+            [\PHP_BINARY, \dirname(__DIR__, 3).'/vendor/bin/php-cs-fixer', 'fix', '--dry-run', '--diff', '--using-cache=no', '--rules=@PSR12,@Symfony', '.'],
+            self::COMPONENT_DIR.'/Page',
+        );
+        $fixer->run();
+
+        $this->assertTrue($fixer->isSuccessful(), $fixer->getOutput().$fixer->getErrorOutput());
     }
 
     public function testSuccessMessageTellsHowTheRouteIsLoaded(): void

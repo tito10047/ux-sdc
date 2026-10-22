@@ -17,7 +17,6 @@ namespace <?= $namespace ?>;
 use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
 
 #[AsSdcComponent]
-class <?= $class_name ?>
-
+final class <?= $class_name."\n" ?>
 {
 }

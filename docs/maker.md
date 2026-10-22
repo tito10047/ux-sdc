@@ -16,6 +16,47 @@ src_component/UI/Alert/
 └── Alert_controller.js  # only with --stimulus, or when confirmed interactively
 ```
 
+For `UI:DatePicker` with `--stimulus`:
+
+```php
+// DatePicker.php
+namespace App\Component\UI\DatePicker;
+
+use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
+
+#[AsSdcComponent]
+final class DatePicker
+{
+}
+```
+
+```twig
+{# DatePicker.html.twig #}
+<div {{ attributes.defaults({class: 'date-picker'}).defaults(stimulus_controller(controller)) }}>
+    {# The markup of DatePicker #}
+</div>
+```
+
+```css
+/* DatePicker.css */
+.date-picker {
+    /* Loaded only on the pages that render DatePicker. */
+}
+```
+
+`DatePicker_controller.js` is a Stimulus controller with an empty `connect()`.
+Its name, `UI--DatePicker--DatePicker`, keeps capitals, so Stimulus does not call
+its `…ValueChanged()` callbacks; see
+[Capital letters in controller names](components.md#capital-letters-in-controller-names).
+
+The stylesheet is not in a cascade layer. Rules in an `@layer` lose to every
+unlayered rule, whatever their specificity: against the unlayered `app.css` of a
+Flex application, a layered component rule would never apply. Unlayered, and
+loaded after the application's styles (see step 4 of
+[Without the recipe](installation.md#without-the-recipe)), it wins wherever
+specificity is equal. An application that orders its styles with layers wraps the
+rules itself (`@layer components { … }`).
+
 | Option | Effect |
 |--------|--------|
 | `name` | Component name; `:` or `/` separate directories (`UI:Alert`, `UI/Alert`). Asked for when omitted. |

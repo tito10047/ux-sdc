@@ -207,11 +207,15 @@ EOF
 
         $this->generateComponentClass($generator, $fullNamespace . '\\' . $componentName, $directory);
 
+        // The root element's class, which the stylesheet's rule selects: kebab-case, as CSS class names usually are.
+        $cssClass = $this->kebabCase($componentName);
+
         $generator->generateFile(
             $directory . '/' . $componentName . '.html.twig',
             self::SKELETON_DIR.'/template.tpl.php',
             [
                 'component_name' => $componentName,
+                'css_class' => $cssClass,
                 'with_stimulus' => $withStimulus,
             ]
         );
@@ -221,6 +225,7 @@ EOF
             self::SKELETON_DIR.'/style.tpl.php',
             [
                 'component_name' => $componentName,
+                'css_class' => $cssClass,
             ]
         );
 
@@ -304,7 +309,7 @@ EOF
     {
         if (null === $routePath) {
             return '/' . implode('/', array_map(
-                static fn (string $segment): string => str_replace('_', '-', Str::asSnakeCase($segment)),
+                $this->kebabCase(...),
                 $this->routeSegments($namespaces, $componentName),
             ));
         }
@@ -314,6 +319,11 @@ EOF
         }
 
         return $routePath;
+    }
+
+    private function kebabCase(string $name): string
+    {
+        return str_replace('_', '-', Str::asSnakeCase($name));
     }
 
     /**

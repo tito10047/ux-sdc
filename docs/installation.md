@@ -32,7 +32,8 @@ available — and with contrib recipes allowed
   directory;
 - creates the `src_component/` directory;
 - adds `{{ render_component_assets() }}` after `{{ importmap('app') }}` in
-  `templates/base.html.twig`, and removes it again with `composer remove`.
+  `templates/base.html.twig`, and removes it again with `composer remove` (see
+  [Removing the bundle](#removing-the-bundle) for what it does not remove).
 
 Flex also enables the bundle's loader controller in `assets/controllers.json`.
 Two steps are left to you, and the recipe prints them:
@@ -137,3 +138,27 @@ AssetMapper's paths (with its `*.twig` files excluded, so templates are not
 published to `public/assets/`) and StimulusBundle's controller paths, next to the
 application's own. See the [configuration reference](configuration.md) for the
 options.
+
+## Removing the bundle
+
+`composer remove tito10047/ux-sdc` undoes what the recipe did, not what you added
+by hand. Once the bundle is gone, Twig no longer knows its functions and
+variables, and every page that still uses one fails to render. The usual one is
+the loader controller on `<body>`, which the recipe never adds:
+
+```text
+Variable "sdc_loader_controller" does not exist.
+```
+
+Before removing the bundle, take out of your templates:
+
+- `{{ stimulus_controller(sdc_loader_controller) }}` on `<body>`;
+- `{{ render_component_assets() }}`, if you added it yourself rather than the
+  recipe (`Unknown "render_component_assets" function`);
+- the components in `ux_components_dir`, or move them to plain Twig components:
+  the bundle registers their classes as services, and sets the `controller`
+  variable their templates pass to `stimulus_controller()`.
+
+Then delete `config/packages/ux_sdc.yaml` and `config/routes/ux_sdc.yaml` if you
+created them yourself, and the `@tito10047/ux-sdc` entry of
+`assets/controllers.json` if Flex did not remove it.

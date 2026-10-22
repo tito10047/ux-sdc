@@ -99,6 +99,13 @@ modal) would go on applying to the pages after it. An asset opts out with
 full reload. Scripts get no mark — Turbo never removes a script; a module that
 was already loaded is not run again.
 
+A component script therefore runs once per page load, not once per render: a
+Turbo visit, a frame or a Live re-render brings new elements but does not run it
+again. Code that sets up an element — binds events, starts a widget — belongs
+in the component's [Stimulus controller](components.md#stimulus-controllers),
+whose `connect()` runs for every element that enters the page, and whose
+`disconnect()` cleans up after it.
+
 A Turbo Frame or Stream keeps only the frame or the streams of the response, so
 tags in its `<head>` would be lost. Those responses get the
 [`X-SDC-Assets` header](#the-x-sdc-assets-header) instead — even a whole page

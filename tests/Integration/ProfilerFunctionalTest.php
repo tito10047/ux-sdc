@@ -191,6 +191,9 @@ final class ProfilerFunctionalTest extends FunctionalTestCase
         $toolbar = (string) $client->getResponse()->getContent();
         $this->assertMatchesRegularExpression('/sf-toolbar-block-ux_sdc sf-toolbar-status-yellow/', $toolbar);
         $this->assertStringContainsString('<b>Components</b>', $toolbar);
+        // Each number with its label, as TwigComponent's "5 in 3 ms": not "4 / 9 assets", which reads as 4 of 9.
+        $this->assertMatchesRegularExpression('#<span class="sf-toolbar-value">4</span>\s*<span class="sf-toolbar-label">components</span>#', $toolbar);
+        $this->assertMatchesRegularExpression('#<span class="sf-toolbar-value">9</span>\s*<span class="sf-toolbar-label">assets</span>#', $toolbar);
     }
 
     /**

@@ -88,21 +88,59 @@ class MakeSdcComponentTest extends IntegrationTestCase
             $this->assertStringContainsString('No Stimulus controller is offered', $display);
         }
 
-        $phpContent = file_get_contents($baseDir . '/UI/Alert/Alert.php');
-        $this->assertStringContainsString('namespace Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\UI\Alert;', $phpContent);
-        $this->assertStringContainsString('class Alert', $phpContent);
-        $this->assertStringContainsString('use Tito10047\UX\Sdc\Attribute\AsSdcComponent;', $phpContent);
-        $this->assertStringContainsString('#[AsSdcComponent]', $phpContent);
-        // {{ controller }} needs neither: the bundle sets it for every component in the namespace.
-        $this->assertStringNotContainsString('ComponentNamespaceInterface', $phpContent);
-        $this->assertStringNotContainsString('Stimulus', $phpContent);
+        // {{ controller }} needs neither a trait nor an interface: the bundle sets it for every component in the namespace.
+        $this->assertSame(<<<'PHP'
+            <?php
 
-        $twigContent = file_get_contents($baseDir . '/UI/Alert/Alert.html.twig');
-        $this->assertStringContainsString(self::hasStimulusBundle() ? '<div {{ attributes.defaults({class:"alert"}).defaults(stimulus_controller(controller)) }}>' : '<div {{ attributes.defaults({class:"alert"}) }}>', $twigContent);
+            namespace Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\UI\Alert;
 
-        $cssContent = file_get_contents($baseDir . '/UI/Alert/Alert.css');
-        $this->assertStringContainsString('@layer components {', $cssContent);
-        $this->assertStringContainsString('.alert{', $cssContent);
+            use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
+
+            #[AsSdcComponent]
+            final class Alert
+            {
+            }
+
+            PHP, file_get_contents($baseDir . '/UI/Alert/Alert.php'));
+
+        $stimulus = self::hasStimulusBundle() ? '.defaults(stimulus_controller(controller))' : '';
+        $this->assertSame(<<<TWIG
+            <div {{ attributes.defaults({class: 'alert'})$stimulus }}>
+                {# The markup of Alert #}
+            </div>
+
+            TWIG, file_get_contents($baseDir . '/UI/Alert/Alert.html.twig'));
+
+        // Unlayered: a rule in @layer loses to every unlayered rule of the application, whatever its specificity.
+        $this->assertSame(<<<'CSS'
+            .alert {
+                /* Loaded only on the pages that render Alert. */
+            }
+
+            CSS, file_get_contents($baseDir . '/UI/Alert/Alert.css'));
+
+        if (self::hasStimulusBundle()) {
+            $this->assertSame(<<<'JS'
+                import { Controller } from '@hotwired/stimulus';
+
+                /*
+                 * The controller of Alert, attached to it by
+                 * {{ stimulus_controller(controller) }} in Alert.html.twig.
+                 *
+                 * Its name keeps the capitals of the file path. Targets, actions, classes and
+                 * values work, but Stimulus does not call fooValueChanged() callbacks for such a
+                 * name: read this.fooValue where it is needed instead.
+                 */
+
+                /* stimulusFetch: 'lazy' */
+                export default class extends Controller {
+                    connect() {
+                        // Called each time the element of the component is added to the page.
+                    }
+                }
+
+                JS, file_get_contents($baseDir . '/UI/Alert/Alert_controller.js'));
+        }
 
         $this->assertStringContainsString('tests/Integration/Fixtures/Component/UI/Alert/Alert.php', $display);
     }
@@ -211,6 +249,22 @@ class MakeSdcComponentTest extends IntegrationTestCase
 
         $twigContent = file_get_contents($baseDir . '/Alert/Alert.html.twig');
         $this->assertStringNotContainsString('stimulus_controller', $twigContent);
+    }
+
+    /**
+     * The class of the root element, and the selector of the stylesheet, are
+     * kebab-cased like CSS class names, as the path of a generated page is.
+     */
+    public function testCssClassIsKebabCased(): void
+    {
+        self::bootKernel();
+        $tester = new CommandTester((new Application(self::$kernel))->find('make:sdc-component'));
+        $tester->execute(['name' => 'UI:date_picker'], ['interactive' => false]);
+        $tester->assertCommandIsSuccessful();
+
+        $baseDir = self::getContainer()->getParameter('ux_sdc.ux_components_dir');
+        $this->assertStringStartsWith("<div {{ attributes.defaults({class: 'date-picker'}) }}>\n", (string) file_get_contents($baseDir . '/UI/DatePicker/DatePicker.html.twig'));
+        $this->assertStringStartsWith(".date-picker {\n", (string) file_get_contents($baseDir . '/UI/DatePicker/DatePicker.css'));
     }
 
     private static function hasStimulusBundle(): bool

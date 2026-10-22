@@ -10,9 +10,6 @@
  */
 
 ?>
-/* Styles for <?= $component_name ?> component */
-@layer components {
-	.<?= \Symfony\Bundle\MakerBundle\Str::asSnakeCase($component_name) ?>{
-		
-	}
+.<?= $css_class ?> {
+    /* Loaded only on the pages that render <?= $component_name ?>. */
 }

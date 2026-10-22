@@ -30,10 +30,10 @@
         {% set icon %}
             {{ source('@Sdc/data_collector/icon.svg') }}
             <span class="sf-toolbar-value">{{ collector.components|length }}</span>
+            <span class="sf-toolbar-label">{{ collector.components|length == 1 ? 'component' : 'components' }}</span>
             <span class="sf-toolbar-info-piece-additional-detail">
-                <span class="sf-toolbar-label">/</span>
                 <span class="sf-toolbar-value">{{ collector.emittedAssetCount }}</span>
-                <span class="sf-toolbar-label">assets</span>
+                <span class="sf-toolbar-label">{{ collector.emittedAssetCount == 1 ? 'asset' : 'assets' }}</span>
             </span>
         {% endset %}
 
