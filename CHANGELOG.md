@@ -9,11 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Component icons (prototype): an SVG in the component's directory is what a bare
+- Component icons (experimental): an SVG in the component's folder is what a bare
   `ux_icon('arrow')` / `<twig:ux:icon name="arrow" />` in that component's template
-  renders, with the global icon as a fallback. `ux:sdc:icons:import <component> <icons>`
-  imports from Iconify into the component. Needs `symfony/ux-icons`; configured under
-  `ux_sdc.icons`.
+  renders, with the global icon as a fallback. The name is rewritten when Twig compiles
+  the template, so rendering does no extra work. Needs `symfony/ux-icons`; configured
+  under `ux_sdc.icons`.
+- `ux:sdc:icons:import <component> <icons> [--as] [--force]` imports icons from Iconify
+  into a component's folder.
+- CI: *Tests without UX Icons*; the *Tests (UX 2.x)* job pins `symfony/ux-icons` to 2.x
+  as well.
 
 ## [0.4.0] - 2026-10-02
 
