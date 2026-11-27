@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   renders, with the global icon as a fallback. The name is rewritten when Twig compiles
   the template, so rendering does no extra work. Needs `symfony/ux-icons`; configured
   under `ux_sdc.icons`.
+- A component's icon can be used from any template by its full name,
+  `sdc:<component folder>:<icon>` (e.g. `sdc:form:text-input:eye`).
 - `ux:sdc:icons:import <component> <icons> [--as] [--force]` imports icons from Iconify
   into a component's folder.
 - CI: *Tests without UX Icons*; the *Tests (UX 2.x)* job pins `symfony/ux-icons` to 2.x

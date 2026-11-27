@@ -51,6 +51,7 @@ class ImportComponentIconCommandTest extends TestCase
         $this->assertFileExists($this->dir . '/Alert/close.svg');
         $this->assertStringContainsString('<path d="HOME"/>', file_get_contents($this->dir . '/Alert/home.svg'));
         $this->assertStringContainsString('License: Apache 2.0', $tester->getDisplay());
+        $this->assertStringContainsString('sdc:alert:', $tester->getDisplay());
     }
 
     public function testRenamesWithAsAndUsesTheSubdirectory(): void

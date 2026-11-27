@@ -278,8 +278,33 @@ What a name in a component's template resolves to:
 | `mdi:home` (prefixed) | the global icon, untouched |
 | an alias from `ux_icons.aliases` | the alias, untouched |
 | `ux_icon(iconName)` (a variable) | the global icon, untouched: the name is not known at compile time |
+| `sdc:alert:arrow` (full name) | Alert's `arrow.svg`, from any template (see below) |
 
 Templates outside `ux_components_dir` are never affected. The lookup follows the file the icon is *written* in: an icon in `Alert.html.twig` belongs to Alert, even inside the content block it passes to another component.
+
+#### Using a component's icon from elsewhere
+
+Every component icon also has a full name, `sdc:<component folder>:<icon>`, which works in any template: another component's or a regular one. The folder path relative to `ux_components_dir` is kebab-cased and its parts are joined with `:`:
+
+| Icon file | Full name |
+|---|---|
+| `src_component/Alert/arrow.svg` | `sdc:alert:arrow` |
+| `src_component/Form/TextInput/eye.svg` | `sdc:form:text-input:eye` |
+| `src_component/UI/HTMLEditor/bold.svg` | `sdc:ui:html-editor:bold` |
+| `src_component/logo.svg` (top level) | `sdc:logo` |
+
+```twig
+{# src_component/Toast/Toast.html.twig: borrows Alert's icon #}
+<twig:ux:icon name="sdc:alert:arrow" />
+
+{# templates/home.html.twig #}
+{{ ux_icon('sdc:form:text-input:eye') }}
+```
+
+A full name is prefixed, so it is used as written, without the rewrite. `ux:sdc:icons:import` prints it after importing. Keep in mind:
+
+- The name follows the folder: renaming or moving `Alert/` changes it, and templates that borrow its icons must change with it. An icon several components share is usually better in the global `assets/icons/`.
+- With `fallback_to_global: true`, a full name whose file is missing (`sdc:alert:arrow` when Alert has no `arrow.svg`) renders the global `arrow`, the same as the bare name inside Alert would.
 
 #### Importing icons into a component
 

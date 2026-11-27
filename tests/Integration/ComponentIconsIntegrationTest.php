@@ -62,6 +62,15 @@ class ComponentIconsIntegrationTest extends IntegrationTestCase
         $this->assertStringContainsString('GLOBAL-ARROW', $this->part($html, 'outside-tag'));
     }
 
+    public function testAnotherComponentOrTemplateCanUseTheFullName(): void
+    {
+        $html = $this->render('component_icons_full_name.html.twig');
+
+        $this->assertStringContainsString('LOCAL-ARROW', $this->part($html, 'borrowed-tag'));
+        $this->assertStringContainsString('LOCAL-ARROW', $this->part($html, 'borrowed-func'));
+        $this->assertStringContainsString('LOCAL-ARROW', $this->part($html, 'outside-full'));
+    }
+
     public function testNameIsRewrittenInTheCompiledTemplate(): void
     {
         self::bootKernel();
@@ -121,11 +130,11 @@ class ComponentIconsIntegrationTest extends IntegrationTestCase
         $this->assertContains('sdc:icon-demo:arrow', $names);
     }
 
-    private function render(): string
+    private function render(string $template = 'component_icons.html.twig'): string
     {
         self::bootKernel();
 
-        return self::getContainer()->get('twig')->render('component_icons.html.twig');
+        return self::getContainer()->get('twig')->render($template);
     }
 
     private function part(string $html, string $testId): string

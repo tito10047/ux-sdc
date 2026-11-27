@@ -21,6 +21,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\UX\Icons\Iconify;
 use Symfony\UX\TwigComponent\ComponentFactory;
+use Tito10047\UX\Sdc\Icons\ComponentIconName;
 
 /**
  * Imports icons from Iconify into a component's directory.
@@ -140,7 +141,14 @@ final class ImportComponentIconCommand extends Command
         }
 
         if ($imported > 0) {
-            $io->success(\sprintf('Imported %d/%d icons. Use them in the component\'s template as <twig:ux:icon name="%s" />.', $imported, \count($names), $lastSaved));
+            $messages = [\sprintf('Imported %d/%d icons. Use them in the component\'s template as <twig:ux:icon name="%s" />.', $imported, \count($names), $lastSaved)];
+
+            $root = realpath($this->componentsDir);
+            if (false !== $root && null !== $fullName = ComponentIconName::forDirectory($root, $directory, $lastSaved)) {
+                $messages[] = \sprintf('Anywhere else: <twig:ux:icon name="%s" />.', $fullName);
+            }
+
+            $io->success($messages);
         }
 
         return $result;
