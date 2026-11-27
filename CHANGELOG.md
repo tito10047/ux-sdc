@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Component icons (prototype): an SVG in the component's directory is what a bare
+  `ux_icon('arrow')` / `<twig:ux:icon name="arrow" />` in that component's template
+  renders, with the global icon as a fallback. `ux:sdc:icons:import <component> <icons>`
+  imports from Iconify into the component. Needs `symfony/ux-icons`; configured under
+  `ux_sdc.icons`.
+
 ## [0.4.0] - 2026-10-02
 
 ### Added

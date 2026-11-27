@@ -240,6 +240,53 @@ In your `Search.html.twig`:
 </div>
 ```
 
+### Component Icons
+
+> Prototype. Requires `symfony/ux-icons` (tested with 2.36; 3.x not tested yet).
+
+An icon can live in the component's directory, next to its template and CSS:
+
+```
+src_component/Alert/
+  Alert.php
+  Alert.html.twig
+  arrow.svg
+```
+
+```twig
+{# Alert.html.twig #}
+<twig:ux:icon name="arrow" />      {# Alert/arrow.svg #}
+{{ ux_icon('arrow', {class: 'w-4'}) }}
+<twig:ux:icon name="mdi:home" />   {# prefixed: the global icon, as before #}
+```
+
+A bare name in a component's template is looked up in that component first, then
+globally (`ux_icons.icon_dir`). Prefixed names, aliases and names held in variables are
+global. Import an icon straight into a component:
+
+```bash
+bin/console ux:sdc:icons:import Alert mdi:home tabler:x
+bin/console ux:sdc:icons:import Alert tabler:arrow-right --as=arrow
+```
+
+```yaml
+ux_sdc:
+  icons:
+    subdir: ''                # 'icons' → Alert/icons/arrow.svg
+    fallback_to_global: true
+
+ux_icons:
+  icon_sets:
+    sdc:                      # attributes for every component icon
+      icon_attributes: { class: 'icon' }
+```
+
+How it works: while Twig compiles a template from the components directory, a node visitor
+rewrites `'arrow'` to `'sdc:alert:arrow'`. That name is unique per component, so it is safe in
+the ux-icons cache, and a registry in the ux-icons chain serves it from `Alert/arrow.svg`.
+Rendering costs nothing extra: the compiled template already holds the final name.
+After enabling it, run `cache:clear` so the templates are compiled again.
+
 ### Generating Components
 
 You can use the built-in maker command to create a new component:

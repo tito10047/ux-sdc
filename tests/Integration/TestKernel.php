@@ -65,6 +65,10 @@ class TestKernel extends Kernel
             $bundles[] = new StimulusBundle();
         }
 
+        if (class_exists(\Symfony\UX\Icons\UXIconsBundle::class)) {
+            $bundles[] = new \Symfony\UX\Icons\UXIconsBundle();
+        }
+
         return $bundles;
     }
 
@@ -101,6 +105,15 @@ class TestKernel extends Kernel
             ]);
         }
 
+        if (class_exists(\Symfony\UX\Icons\UXIconsBundle::class)) {
+            $container->loadFromExtension('ux_icons', [
+                'icon_dir' => '%kernel.project_dir%/tests/Integration/Fixtures/icons',
+                'aliases' => ['go' => 'arrow'],
+                // the tests never reach iconify.design
+                'iconify' => ['on_demand' => false],
+            ]);
+        }
+
         $configs = array_merge([
             'component_namespace' => 'Tito10047\\UX\\Sdc\\Tests\\Integration\\Fixtures\\Component',
             'ux_components_dir' => '%kernel.project_dir%/tests/Integration/Fixtures/Component'
@@ -113,7 +126,7 @@ class TestKernel extends Kernel
             public function process(ContainerBuilder $container): void
             {
                 foreach ($container->getDefinitions() as $id => $definition) {
-                    if (str_starts_with($id, 'Tito10047\UX\Sdc') || str_contains($id, 'twig_component')) {
+                    if (str_starts_with($id, 'Tito10047\UX\Sdc') || str_starts_with($id, 'ux_sdc.') || str_contains($id, 'twig_component')) {
                         $definition->setPublic(true);
                     }
                 }
