@@ -11,6 +11,9 @@
 
 namespace Tito10047\UX\Sdc\Tests\Integration;
 
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\UX\Icons\IconFinderInterface;
 use Symfony\UX\Icons\UXIconsBundle;
 use Twig\Environment;
@@ -124,10 +127,11 @@ class ComponentIconsIntegrationTest extends IntegrationTestCase
             $this->markTestSkipped('Icon finders are pluggable from ux-icons 3 on.');
         }
 
-        self::bootKernel();
-        $names = iterator_to_array(self::getContainer()->get('.ux_icons.icon_finder')->icons(), false);
+        $application = new Application(self::bootKernel());
+        $tester = new CommandTester($application->find('ux:icons:warm-cache'));
+        $tester->execute([], ['verbosity' => OutputInterface::VERBOSITY_VERBOSE]);
 
-        $this->assertContains('sdc:icon-demo:arrow', $names);
+        $this->assertStringContainsString('Warmed icon sdc:icon-demo:arrow.', $tester->getDisplay());
     }
 
     private function render(string $template = 'component_icons.html.twig'): string
