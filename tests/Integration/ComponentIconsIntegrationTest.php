@@ -14,6 +14,7 @@ namespace Tito10047\UX\Sdc\Tests\Integration;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\UX\Icons\IconFactory;
 use Symfony\UX\Icons\IconFinderInterface;
 use Symfony\UX\Icons\UXIconsBundle;
 use Twig\Environment;
@@ -22,8 +23,8 @@ class ComponentIconsIntegrationTest extends IntegrationTestCase
 {
     protected function setUp(): void
     {
-        if (!class_exists(UXIconsBundle::class)) {
-            $this->markTestSkipped('symfony/ux-icons is not installed.');
+        if (!class_exists(IconFactory::class)) {
+            $this->markTestSkipped('symfony/ux-icons 2.36.1+ is not installed.');
         }
     }
 
@@ -76,7 +77,7 @@ class ComponentIconsIntegrationTest extends IntegrationTestCase
 
     public function testNameIsRewrittenInTheCompiledTemplate(): void
     {
-        self::bootKernel();
+        self::bootKernel(self::withIcons([]));
         /** @var Environment $twig */
         $twig = self::getContainer()->get('twig');
 
@@ -91,7 +92,7 @@ class ComponentIconsIntegrationTest extends IntegrationTestCase
 
     public function testWorksInTheDevEnvironment(): void
     {
-        self::bootKernel(['environment' => 'dev']);
+        self::bootKernel(self::withIcons(['environment' => 'dev']));
         $html = self::getContainer()->get('twig')->render('component_icons.html.twig');
 
         $this->assertStringContainsString('LOCAL-ARROW', $this->part($html, 'tag'));
@@ -100,7 +101,7 @@ class ComponentIconsIntegrationTest extends IntegrationTestCase
 
     public function testImportCommandFindsTheComponentDirectoryByName(): void
     {
-        self::bootKernel();
+        self::bootKernel(self::withIcons([]));
         $container = self::getContainer();
         $this->assertTrue($container->has('ux_sdc.icons.command.import'));
 
@@ -112,7 +113,7 @@ class ComponentIconsIntegrationTest extends IntegrationTestCase
 
     public function testCanBeDisabled(): void
     {
-        self::bootKernel(['configs' => ['icons' => false]]);
+        self::bootKernel(self::withIcons(['configs' => ['icons' => false]]));
         $container = self::getContainer();
 
         $this->assertFalse($container->has('ux_sdc.icons.registry'));
@@ -127,16 +128,36 @@ class ComponentIconsIntegrationTest extends IntegrationTestCase
             $this->markTestSkipped('Icon finders are pluggable from ux-icons 3 on.');
         }
 
-        $application = new Application(self::bootKernel());
+        $application = new Application(self::bootKernel(self::withIcons([])));
         $tester = new CommandTester($application->find('ux:icons:warm-cache'));
         $tester->execute([], ['verbosity' => OutputInterface::VERBOSITY_VERBOSE]);
 
         $this->assertStringContainsString('Warmed icon sdc:icon-demo:arrow.', $tester->getDisplay());
     }
 
+    /**
+     * The options of a kernel with UXIconsBundle, which the other tests do without.
+     *
+     * @param array<string, mixed> $options
+     *
+     * @return array<string, mixed>
+     */
+    private static function withIcons(array $options): array
+    {
+        return $options + [
+            'bundles' => [new UXIconsBundle()],
+            'extensions' => ['ux_icons' => [
+                'icon_dir' => '%kernel.project_dir%/tests/Integration/Fixtures/icons',
+                'aliases' => ['go' => 'arrow'],
+                // the tests never reach iconify.design
+                'iconify' => ['on_demand' => false],
+            ]],
+        ];
+    }
+
     private function render(string $template = 'component_icons.html.twig'): string
     {
-        self::bootKernel();
+        self::bootKernel(self::withIcons([]));
 
         return self::getContainer()->get('twig')->render($template);
     }

@@ -1,0 +1,17 @@
+{# The base.html.twig of the symfony/twig-bundle Flex recipe, with render_component_assets() for importmap() #}
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>{% block title %}Welcome!{% endblock %}</title>
+        {% block stylesheets %}
+        {% endblock %}
+
+        {% block javascripts %}
+            {{ render_component_assets() }}
+        {% endblock %}
+    </head>
+    <body>
+        {%- block body -%}{%- endblock -%}
+    </body>
+</html>

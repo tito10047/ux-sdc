@@ -28,8 +28,8 @@ class ImportComponentIconCommandTest extends TestCase
 
     protected function setUp(): void
     {
-        if (!class_exists(Iconify::class) || !class_exists(MockHttpClient::class)) {
-            $this->markTestSkipped('symfony/ux-icons and symfony/http-client are needed.');
+        if (!class_exists(IconFactory::class) || !class_exists(MockHttpClient::class)) {
+            $this->markTestSkipped('symfony/ux-icons 2.36.1+ and symfony/http-client are needed.');
         }
 
         $this->dir = sys_get_temp_dir() . '/ux-sdc-icons-' . uniqid();

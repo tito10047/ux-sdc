@@ -60,7 +60,7 @@ final class ComponentIconName
         }
 
         $segments = [];
-        foreach (preg_split('#[/\\\\]#', substr($directory, \strlen($root) + 1)) as $part) {
+        foreach (preg_split('#[/\\\\]#', substr($directory, \strlen($root) + 1)) ?: [] as $part) {
             $segment = self::segment($part);
             if (!preg_match(self::SEGMENT, $segment)) {
                 return null;
@@ -86,7 +86,7 @@ final class ComponentIconName
         $parts = explode(':', substr($name, \strlen(self::PREFIX) + 1));
         $icon = array_pop($parts);
 
-        if (null === $icon || '' === $icon) {
+        if ('' === $icon) {
             return null;
         }
 

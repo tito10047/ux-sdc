@@ -11,15 +11,23 @@
 
 namespace Tito10047\UX\Sdc\EventListener;
 
-use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
-use Symfony\UX\TwigComponent\ComponentAttributes;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
 use Symfony\UX\TwigComponent\Event\PostMountEvent;
 use Symfony\UX\TwigComponent\Event\PreRenderEvent;
+use Tito10047\UX\Sdc\DataCollector\RequestTrace;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
-use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
+use Tito10047\UX\Sdc\Service\StimulusControllerNameResolver;
 
+/**
+ * Reads the metadata of a component from the cache dumped when the container
+ * is built (`ux_sdc.metadata_cache` true).
+ *
+ * Its events are tagged in config/services.php; SdcExtension keeps either this
+ * listener or DevComponentRenderListener.
+ *
+ * @internal
+ */
 final class ComponentRenderListener
 {
     use ComponentRenderTrait;
@@ -27,27 +35,24 @@ final class ComponentRenderListener
     public function __construct(
         private SdcMetadataRegistry $metadataRegistry,
         private AssetRegistry $assetRegistry,
-        private ?string $componentNamespace = null
+        private StimulusControllerNameResolver $controllerNameResolver,
+        private ?string $componentNamespace = null,
+        private ?RequestTrace $trace = null,
     ) {
     }
 
-    #[AsEventListener(event: PostMountEvent::class)]
     public function onPostMount(PostMountEvent $event): void
     {
         $component = $event->getComponent();
 
-        $this->setNamespace($component);
+        $this->setComponentNamespace($component);
 
-        $assets = $this->metadataRegistry->getMetadata($component::class);
-
-        if (!$assets) {
-            return;
+        // An anonymous component is known by its template, which onPreRender() gets.
+        if (true !== $event->getMetadata()?->isAnonymous()) {
+            $this->addAssets($this->metadataRegistry->getAssets($component::class));
         }
-
-        $this->addAssets($assets);
     }
 
-    #[AsEventListener(event: ControllerEvent::class)]
     public function onKernelController(ControllerEvent $event): void
     {
         $controller = $event->getController();
@@ -56,32 +61,38 @@ final class ComponentRenderListener
             $controller = $controller[0];
         }
 
-        $this->setNamespace($controller);
-    }
-
-    private function setNamespace(object $component): void
-    {
-        if ($component instanceof ComponentNamespaceInterface && null !== $this->componentNamespace) {
-            $component->setComponentNamespace($this->componentNamespace);
+        // Static callables ("Class::method", [Class::class, 'method']) have no instance to configure.
+        if (\is_object($controller)) {
+            $this->setComponentNamespace($controller);
         }
     }
 
-    #[AsEventListener(event: PreRenderEvent::class)]
     public function onPreRender(PreRenderEvent $event): void
     {
-        $component = $event->getComponent();
-        $templatePath = $this->metadataRegistry->getMetadata($component::class . '_template');
+        $metadata = $event->getMetadata();
+        if ($metadata->isAnonymous()) {
+            $componentMetadata = $this->metadataRegistry->getAnonymousComponentMetadata($metadata->getTemplate());
+            $this->addAssets($componentMetadata->assets);
+            $this->traceRender($event, $componentMetadata);
 
-        if ($templatePath) {
-            $event->setTemplate($templatePath);
-        }
-
-        // Inject data-sdc-css and data-sdc-js attributes so they render via {{ attributes }}
-        $assets = $this->metadataRegistry->getMetadata($component::class);
-        if (!$assets) {
             return;
         }
 
-        $this->addAssets($assets);
+        $component = $event->getComponent();
+        $template = $this->metadataRegistry->getTemplate($component::class);
+
+        if (null !== $template) {
+            $event->setTemplate($template);
+        }
+
+        $this->addAssets($this->metadataRegistry->getAssets($component::class));
+
+        $this->setStimulusController($event);
+
+        // Only the profiler needs the whole metadata; rendering takes just the
+        // assets and the template, without building an object per render.
+        if (null !== $this->trace) {
+            $this->traceRender($event, $this->metadataRegistry->getComponentMetadata($component::class));
+        }
     }
 }

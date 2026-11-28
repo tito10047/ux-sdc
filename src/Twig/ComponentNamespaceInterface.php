@@ -11,8 +11,14 @@
 
 namespace Tito10047\UX\Sdc\Twig;
 
+/**
+ * Hands `ux_sdc.component_namespace` to a class using the Stimulus trait: the
+ * bundle calls setComponentNamespace() on a component after it is mounted, and
+ * on a controller before it is called.
+ */
 interface ComponentNamespaceInterface
 {
     public function setComponentNamespace(string $namespace): void;
-    public function getController(): string ;
+
+    public function getController(): string;
 }

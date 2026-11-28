@@ -19,7 +19,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\UX\TwigComponent\TwigComponentBundle;
-use Tito10047\UX\Sdc\UxSdcBundle;
+use Tito10047\UX\Sdc\SdcBundle;
 
 class BenchmarkKernel extends Kernel
 {
@@ -39,7 +39,7 @@ class BenchmarkKernel extends Kernel
             new FrameworkBundle(),
             new TwigBundle(),
             new TwigComponentBundle(),
-            new UxSdcBundle(),
+            new SdcBundle(),
         ];
     }
 
@@ -95,11 +95,6 @@ class BenchmarkKernel extends Kernel
                     $container->register('twig.extension.profiler', \Twig\Extension\ProfilerExtension::class)
                         ->addArgument(new Definition(\Twig\Profiler\Profile::class))
                         ->setPublic(false);
-
-                    // Možno budeš potrebovať aj toto pre AssetMapper, ak ho používaš
-                    if (!$container->has('assets._asset_mapper_debug_command')) {
-                        $container->register('assets._asset_mapper_debug_command', \stdClass::class)->setPublic(false);
-                    }
                 }
 
                 if (!$container->hasDefinition('asset_mapper')) {

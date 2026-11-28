@@ -20,48 +20,41 @@ use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\EventListener\AssetResponseListener;
 use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\AutoDiscovery\AutoDiscoveryComponent;
+use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\AutoDiscovery\SdcAutoDiscoveryComponent;
 use Twig\Environment;
 
 class AutoDiscoveryIntegrationTest extends IntegrationTestCase
 {
     public function testAutoDiscoveryCollectsAssetsAndTemplate(): void
     {
-        self::bootKernel(['configs' => ['auto_discovery' => true]]);
+        self::bootKernel(['configs' => ['auto_discovery' => true, 'metadata_cache' => true]]);
         $container = self::getContainer();
 
         /** @var SdcMetadataRegistry $metadataRegistry */
         $metadataRegistry = $container->get(SdcMetadataRegistry::class);
 
-        $this->assertNotNull($metadataRegistry->getMetadata(AutoDiscoveryComponent::class));
-        $this->assertNotNull($metadataRegistry->getMetadata(AutoDiscoveryComponent::class.'_template'));
-
-        $assets = $metadataRegistry->getMetadata(AutoDiscoveryComponent::class);
+        $assets = $metadataRegistry->getAssets(AutoDiscoveryComponent::class);
         $paths = array_column($assets, 'path');
         $this->assertContains('AutoDiscovery/AutoDiscoveryComponent.css', $paths);
         $this->assertContains('AutoDiscovery/AutoDiscoveryComponent.js', $paths);
 
-        $templatePath = $metadataRegistry->getMetadata(AutoDiscoveryComponent::class.'_template');
-        $this->assertStringEndsWith('AutoDiscoveryComponent.html.twig', $templatePath);
+        $this->assertSame('AutoDiscovery/AutoDiscoveryComponent.html.twig', $metadataRegistry->getTemplate(AutoDiscoveryComponent::class));
     }
 
     public function testAutoDiscoveryWorksWithSdcComponentAttribute(): void
     {
-        self::bootKernel(['configs' => ['auto_discovery' => true]]);
+        self::bootKernel(['configs' => ['auto_discovery' => true, 'metadata_cache' => true]]);
         $container = self::getContainer();
 
         /** @var SdcMetadataRegistry $metadataRegistry */
         $metadataRegistry = $container->get(SdcMetadataRegistry::class);
 
-        $this->assertNotNull($metadataRegistry->getMetadata(AutoDiscoveryComponent::class));
-        $this->assertNotNull($metadataRegistry->getMetadata(AutoDiscoveryComponent::class.'_template'));
-
-        $assets = $metadataRegistry->getMetadata(AutoDiscoveryComponent::class);
+        $assets = $metadataRegistry->getAssets(SdcAutoDiscoveryComponent::class);
         $paths = array_column($assets, 'path');
-        $this->assertContains('AutoDiscovery/AutoDiscoveryComponent.css', $paths);
-        $this->assertContains('AutoDiscovery/AutoDiscoveryComponent.js', $paths);
+        $this->assertContains('AutoDiscovery/SdcAutoDiscoveryComponent.css', $paths);
+        $this->assertContains('AutoDiscovery/SdcAutoDiscoveryComponent.js', $paths);
 
-        $templatePath = $metadataRegistry->getMetadata(AutoDiscoveryComponent::class.'_template');
-        $this->assertStringEndsWith('AutoDiscoveryComponent.html.twig', $templatePath);
+        $this->assertSame('AutoDiscovery/SdcAutoDiscoveryComponent.html.twig', $metadataRegistry->getTemplate(SdcAutoDiscoveryComponent::class));
     }
 
     public function testAutoDiscoveryFullRenderCycle(): void
@@ -109,7 +102,7 @@ class AutoDiscoveryIntegrationTest extends IntegrationTestCase
         $finalHtml = $response->getContent();
 
         // Verify assets are injected (based on auto-discovery filenames)
-        $this->assertStringContainsString('<link rel="stylesheet" href="/assets/AutoDiscovery/AutoDiscoveryComponent.css">', $finalHtml);
-        $this->assertStringContainsString('<script src="/assets/AutoDiscovery/AutoDiscoveryComponent.js"></script>', $finalHtml);
+        $this->assertStringContainsString('<link rel="stylesheet" href="/assets/AutoDiscovery/AutoDiscoveryComponent.css" data-turbo-track="dynamic">', $finalHtml);
+        $this->assertStringContainsString('<script src="/assets/AutoDiscovery/AutoDiscoveryComponent.js" type="module"></script>', $finalHtml);
     }
 }

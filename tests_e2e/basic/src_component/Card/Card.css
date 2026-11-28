@@ -1,0 +1,4 @@
+/* e2e: Card stylesheet */
+.card {
+    border: 1px solid currentColor;
+}

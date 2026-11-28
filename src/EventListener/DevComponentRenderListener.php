@@ -11,35 +11,41 @@
 
 namespace Tito10047\UX\Sdc\EventListener;
 
-use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
-use Symfony\UX\TwigComponent\ComponentAttributes;
 use Symfony\UX\TwigComponent\Event\PostMountEvent;
 use Symfony\UX\TwigComponent\Event\PreRenderEvent;
+use Tito10047\UX\Sdc\DataCollector\RequestTrace;
 use Tito10047\UX\Sdc\Service\AssetRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
-use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
+use Tito10047\UX\Sdc\Service\StimulusControllerNameResolver;
 
+/**
+ * Resolves the metadata of a component when it renders, from the files next to
+ * its class, or to its template for an anonymous component
+ * (`ux_sdc.metadata_cache` false). The resolver caches it per class and template.
+ *
+ * Wired like ComponentRenderListener, which it replaces in that mode.
+ *
+ * @internal
+ */
 final class DevComponentRenderListener
 {
     use ComponentRenderTrait;
 
-    private array $runtimeMetadata = [];
-
     public function __construct(
         private ComponentMetadataResolver $metadataResolver,
         private AssetRegistry $assetRegistry,
-        private ?string $componentNamespace = null
+        private StimulusControllerNameResolver $controllerNameResolver,
+        private ?string $componentNamespace = null,
+        private ?RequestTrace $trace = null,
     ) {
     }
 
-    #[AsEventListener(event: PostMountEvent::class)]
     public function onPostMount(PostMountEvent $event): void
     {
-        $this->setNamespace($event->getComponent());
+        $this->setComponentNamespace($event->getComponent());
     }
 
-    #[AsEventListener(event: ControllerEvent::class)]
     public function onKernelController(ControllerEvent $event): void
     {
         $controller = $event->getController();
@@ -48,38 +54,32 @@ final class DevComponentRenderListener
             $controller = $controller[0];
         }
 
-        $this->setNamespace($controller);
-    }
-
-    private function setNamespace(object $component): void
-    {
-        if ($component instanceof ComponentNamespaceInterface && null !== $this->componentNamespace) {
-            $component->setComponentNamespace($this->componentNamespace);
+        // Static callables ("Class::method", [Class::class, 'method']) have no instance to configure.
+        if (\is_object($controller)) {
+            $this->setComponentNamespace($controller);
         }
     }
 
-    #[AsEventListener(event: PreRenderEvent::class)]
     public function onPreRender(PreRenderEvent $event): void
     {
         $metadata = $event->getMetadata();
         if ($metadata->isAnonymous()) {
+            $componentMetadata = $this->metadataResolver->resolveAnonymous($metadata->getTemplate());
+            $this->addAssets($componentMetadata->assets);
+            $this->traceRender($event, $componentMetadata);
+
             return;
         }
-        $componentName = $metadata->getName();
 
-        if (isset($this->runtimeMetadata[$componentName])) {
-            $assets = $this->runtimeMetadata[$componentName];
-        } else {
-            $componentClass = $metadata->getClass();
-            $assets = $this->metadataResolver->resolveMetadata($componentClass, $componentName, $this->runtimeMetadata);
-            $this->runtimeMetadata[$componentName] = $assets;
+        $componentMetadata = $this->metadataResolver->resolve($metadata->getClass());
+
+        $this->addAssets($componentMetadata->assets);
+
+        if (null !== $componentMetadata->template) {
+            $event->setTemplate($componentMetadata->template);
         }
 
-        $this->addAssets($assets);
-
-        $templatePath = $this->runtimeMetadata[$componentName . '_template'] ?? null;
-        if (is_string($templatePath)) {
-            $event->setTemplate($templatePath);
-        }
+        $this->setStimulusController($event);
+        $this->traceRender($event, $componentMetadata);
     }
 }

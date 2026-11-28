@@ -1,0 +1,3 @@
+ux_sdc:
+    resource: .
+    type: ux_sdc
