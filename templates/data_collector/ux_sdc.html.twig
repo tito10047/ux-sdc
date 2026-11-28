@@ -1,0 +1,283 @@
+{% extends '@WebProfiler/Profiler/layout.html.twig' %}
+
+{% set outcomes = {
+    injected: 'A page: the tags replaced the placeholder of render_component_assets(), and the stylesheets, classic scripts, fonts and images are also announced in the Link header.',
+    fragment: 'A fragment — a Live Component re-render, a Turbo Frame or Turbo Streams: the assets went into the X-SDC-Assets header, from which the loader controller adds those the page does not have yet.',
+    partial: 'HTML without the placeholder and without a <head>, a partial a script inserts into the page: the assets went into the X-SDC-Assets header.',
+    missing_placeholder: 'A page without the placeholder of render_component_assets(): the assets only went into the X-SDC-Assets header, which nothing reads on a page load.',
+    not_html: 'Not an HTML response: no assets were added to it.',
+    streamed: 'A streamed or binary response, whose content cannot be changed: no assets were added to it.',
+    redirect: 'A redirect, whose body the client never shows: no assets were added to it.',
+    empty: 'A response without a body to show (204, 304, empty content): no assets were added to it.',
+    sub_request: 'A sub-request: the assets of its components go into the main response, whose profile lists them.',
+} %}
+
+{% block head %}
+    {{ parent() }}
+
+    <style>
+        .ux-sdc-paths { list-style: none; margin: 0; padding: 0; }
+        .ux-sdc-paths li { margin: 0 0 2px; padding: 0; }
+        .ux-sdc-muted { color: var(--color-muted); display: block; overflow-wrap: anywhere; }
+        .ux-sdc-tag { white-space: nowrap; }
+    </style>
+{% endblock %}
+
+{% block toolbar %}
+    {% if collector.components is not empty or collector.assets is not empty or collector.problems is not empty %}
+        {% set status_color = collector.problems is not empty ? 'yellow' %}
+
+        {% set icon %}
+            {{ source('@Sdc/data_collector/icon.svg') }}
+            <span class="sf-toolbar-value">{{ collector.components|length }}</span>
+            <span class="sf-toolbar-label">{{ collector.components|length == 1 ? 'component' : 'components' }}</span>
+            <span class="sf-toolbar-info-piece-additional-detail">
+                <span class="sf-toolbar-value">{{ collector.emittedAssetCount }}</span>
+                <span class="sf-toolbar-label">{{ collector.emittedAssetCount == 1 ? 'asset' : 'assets' }}</span>
+            </span>
+        {% endset %}
+
+        {% set text %}
+            <div class="sf-toolbar-info-piece">
+                <b>Components</b>
+                <span class="sf-toolbar-status">{{ collector.components|length }}</span>
+            </div>
+            <div class="sf-toolbar-info-piece">
+                <b>Renders</b>
+                <span class="sf-toolbar-status">{{ collector.renderCount }}</span>
+            </div>
+            <div class="sf-toolbar-info-piece">
+                <b>Assets loaded</b>
+                <span class="sf-toolbar-status">{{ collector.emittedAssetCount }}</span>
+            </div>
+            <div class="sf-toolbar-info-piece">
+                <b>Problems</b>
+                <span class="sf-toolbar-status {{- collector.problems is not empty ? ' sf-toolbar-status-yellow' }}">{{ collector.problems|length }}</span>
+            </div>
+        {% endset %}
+
+        {{ include('@WebProfiler/Profiler/toolbar_item.html.twig', {link: profiler_url, status: status_color, accessible_label: 'UX SDC'}) }}
+    {% endif %}
+{% endblock %}
+
+{% block menu %}
+    <span class="label {{- collector.problems is not empty ? ' label-status-warning' }} {{- collector.components is empty and collector.assets is empty ? ' disabled' }}">
+        <span class="icon" aria-hidden="true">{{ source('@Sdc/data_collector/icon.svg') }}</span>
+        <strong>UX SDC</strong>
+        {% if collector.problems is not empty %}
+            <span class="count">
+                <span>{{ collector.problems|length }}</span>
+            </span>
+        {% endif %}
+    </span>
+{% endblock %}
+
+{% block panel %}
+    <h2>Component assets</h2>
+
+    {% if collector.outcome == 'sub_request' %}
+        <div class="empty empty-panel">
+            <p>{{ outcomes.sub_request }}</p>
+        </div>
+    {% elseif collector.components is empty and collector.assets is empty and collector.problems is empty %}
+        <div class="empty empty-panel">
+            <p>No component with assets was rendered.</p>
+        </div>
+    {% else %}
+        <div class="metrics">
+            <div class="metric-group">
+                <div class="metric">
+                    <span class="value">{{ collector.components|length }}</span>
+                    <span class="label">Components</span>
+                </div>
+
+                <div class="metric">
+                    <span class="value">{{ collector.renderCount }}</span>
+                    <span class="label">Renders</span>
+                </div>
+            </div>
+
+            <div class="metric-divider"></div>
+
+            <div class="metric-group">
+                <div class="metric">
+                    <span class="value">{{ collector.emittedAssetCount }}</span>
+                    <span class="label">Assets loaded</span>
+                </div>
+
+                <div class="metric">
+                    <span class="value">{{ collector.assetRequestCount }}</span>
+                    <span class="label">Asked for by renders</span>
+                </div>
+            </div>
+
+            <div class="metric-divider"></div>
+
+            <div class="metric">
+                <span class="value">{{ collector.problems|length }}</span>
+                <span class="label">Problems</span>
+            </div>
+        </div>
+
+        <p class="help">
+            {{ outcomes[collector.outcome]|default('The bundle did not handle this response.') }}
+            {% if collector.headerSize is not null %}
+                The X-SDC-Assets header is {{ collector.headerSize }} bytes long.
+            {% endif %}
+        </p>
+
+        {% if collector.problems is not empty %}
+            <h3>Problems</h3>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">Component</th>
+                        <th scope="col">Problem</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for problem in collector.problems %}
+                        <tr class="status-warning">
+                            <td class="font-normal">{{ problem.component|default('-') }}</td>
+                            <td class="font-normal">{{ problem.message }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+
+        <h3>Assets of the response</h3>
+
+        {% if collector.assets is empty %}
+            <div class="empty">
+                <p>The rendered components have no assets.</p>
+            </div>
+        {% else %}
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">Asset</th>
+                        <th scope="col">Type</th>
+                        <th scope="col">Loaded as</th>
+                        <th scope="col">Link preload</th>
+                        <th scope="col">Asked for by</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for asset in collector.assets %}
+                        <tr>
+                            <td class="font-normal">
+                                {{ asset.path }}
+                                {% if asset.public_path is not null and asset.public_path != asset.path %}
+                                    <span class="ux-sdc-muted">{{ asset.public_path }}</span>
+                                {% endif %}
+                                {% for name, value in asset.attributes %}
+                                    <span class="ux-sdc-muted">{{ name }}: {{ value|json_encode }}</span>
+                                {% endfor %}
+                            </td>
+                            <td class="font-normal">{{ asset.type }}</td>
+                            <td class="font-normal ux-sdc-tag">{{ asset.emitted_as|default('not loaded') }}</td>
+                            <td class="font-normal">{{ asset.link_header ? 'yes' : 'no' }}</td>
+                            <td class="font-normal">{{ asset.requested_by|join(', ')|default('-') }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+
+        {% if collector.droppedAssets is not empty %}
+            <h3>Assets left out</h3>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">Asset</th>
+                        <th scope="col">Type</th>
+                        <th scope="col">Reason</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for asset in collector.droppedAssets %}
+                        <tr class="status-warning">
+                            <td class="font-normal">{{ asset.path }}</td>
+                            <td class="font-normal">{{ asset.type|default('-') }}</td>
+                            <td class="font-normal">{{ asset.reason }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+
+        {% if collector.discardedAssets is not empty %}
+            <h3>Assets of the page that failed</h3>
+
+            <p class="help">The request failed with an exception after these assets were registered. The error response replaces the page that asked for them, so it does not get them: it gets the assets of the components it renders itself.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">Asset</th>
+                        <th scope="col">Type</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for asset in collector.discardedAssets %}
+                        <tr>
+                            <td class="font-normal">{{ asset.path }}</td>
+                            <td class="font-normal">{{ asset.type|default('-') }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+
+        <h3>Rendered components</h3>
+
+        {% if collector.components is empty %}
+            <div class="empty">
+                <p>No component was rendered.</p>
+            </div>
+        {% else %}
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">Component</th>
+                        <th scope="col" class="num-col">Renders</th>
+                        <th scope="col">Assets</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for component in collector.components %}
+                        <tr {{- component.problems is not empty ? ' class="status-warning"' }}>
+                            <td class="font-normal">
+                                {{ component.name }}
+                                <span class="ux-sdc-muted">{{ component.class ?? 'anonymous component' }}</span>
+                                <span class="ux-sdc-muted">{{ component.template }}</span>
+                            </td>
+                            <td class="font-normal num-col">{{ component.render_count }}</td>
+                            <td class="font-normal">
+                                {% if component.assets is empty %}
+                                    -
+                                {% else %}
+                                    <ul class="ux-sdc-paths">
+                                        {% for asset in component.assets %}
+                                            <li>
+                                                {{ asset.path }}
+                                                <span class="ux-sdc-muted">{{ asset.type }}, {{ asset.source }}{{ asset.priority ? ', priority ' ~ asset.priority }}</span>
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+
+        <p class="help">
+            <code>bin/console debug:sdc</code> lists every component of the application with its assets and template, whether this request rendered it or not.
+        </p>
+    {% endif %}
+{% endblock %}

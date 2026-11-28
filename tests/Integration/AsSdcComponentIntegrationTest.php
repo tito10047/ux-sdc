@@ -15,7 +15,6 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\UX\TwigComponent\ComponentFactory;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\SdcComponent;
-use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\SdcComponentWithAsset;
 
 class AsSdcComponentIntegrationTest extends KernelTestCase
@@ -44,13 +43,13 @@ class AsSdcComponentIntegrationTest extends KernelTestCase
 
     public function testSdcComponentAssetsAreCollected(): void
     {
-        $kernel = new TestKernel([]);
+        $kernel = new TestKernel(['metadata_cache' => true]);
         $kernel->boot();
         $container = $kernel->getContainer();
 
         /** @var SdcMetadataRegistry $metadataRegistry */
         $metadataRegistry = $container->get(SdcMetadataRegistry::class);
-        $assets = $metadataRegistry->getMetadata(SdcComponent::class);
+        $assets = $metadataRegistry->getAssets(SdcComponent::class);
 
         $this->assertCount(2, $assets);
 
@@ -63,13 +62,13 @@ class AsSdcComponentIntegrationTest extends KernelTestCase
 
     public function testSdcComponentWithAssetAttribute(): void
     {
-        $kernel = new TestKernel([]);
+        $kernel = new TestKernel(['metadata_cache' => true]);
         $kernel->boot();
         $container = $kernel->getContainer();
 
         /** @var SdcMetadataRegistry $metadataRegistry */
         $metadataRegistry = $container->get(SdcMetadataRegistry::class);
-        $assets = $metadataRegistry->getMetadata(SdcComponentWithAsset::class);
+        $assets = $metadataRegistry->getAssets(SdcComponentWithAsset::class);
 
         $this->assertCount(3, $assets);
 

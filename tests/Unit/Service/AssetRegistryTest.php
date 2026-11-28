@@ -35,11 +35,48 @@ final class AssetRegistryTest extends TestCase
     {
         $registry = new AssetRegistry();
         $registry->addAsset('style.css', 'css', 10);
-        $registry->addAsset('style.css', 'css', 20); // Vyššia priorita
+        $registry->addAsset('style.css', 'css', 20); // Higher priority
 
         $assets = $registry->getSortedAssets();
 
         $this->assertCount(1, $assets);
         $this->assertSame(20, $assets[0]['priority']);
+    }
+
+    public function testResetDropsAssetsOfThePreviousRequest(): void
+    {
+        $registry = new AssetRegistry();
+        $registry->addAsset('page-a.css', 'css');
+        $registry->addAsset('page-a.js', 'js');
+
+        $registry->reset();
+
+        $registry->addAsset('page-b.css', 'css');
+
+        $this->assertSame(['page-b.css'], array_column($registry->getSortedAssets(), 'path'));
+    }
+
+    public function testClearDropsAssetsOfThePreviousBatch(): void
+    {
+        $registry = new AssetRegistry();
+        $registry->addAsset('first.css', 'css', 10);
+
+        $registry->clear();
+
+        $registry->addAsset('second.css', 'css');
+
+        $this->assertSame(['second.css'], array_column($registry->getSortedAssets(), 'path'));
+    }
+
+    public function testResetForgetsThePriorityOfAPreviousRequest(): void
+    {
+        $registry = new AssetRegistry();
+        $registry->addAsset('style.css', 'css', 50);
+
+        $registry->reset();
+
+        $registry->addAsset('style.css', 'css', 5);
+
+        $this->assertSame(5, $registry->getSortedAssets()[0]['priority']);
     }
 }

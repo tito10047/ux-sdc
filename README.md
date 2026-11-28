@@ -1,341 +1,170 @@
 # UX SDC Bundle
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/tito10047/ux-sdc/ci.yml?branch=main)](https://github.com/tito10047/ux-sdc/actions)
-[![PHP-CS-Fixer](https://img.shields.io/github/actions/workflow/status/tito10047/ux-sdc/ci.yml?branch=main&label=code%20style)](https://github.com/tito10047/ux-sdc/actions/workflows/ci.yml)
-[![PHPStan](https://img.shields.io/github/actions/workflow/status/tito10047/ux-sdc/ci.yml?branch=main&label=phpstan)](https://github.com/tito10047/ux-sdc/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/tito10047/ux-sdc/ci.yml?branch=main&label=CI)](https://github.com/tito10047/ux-sdc/actions/workflows/ci.yml)
 [![Latest Stable Version](https://img.shields.io/packagist/v/tito10047/ux-sdc.svg)](https://packagist.org/packages/tito10047/ux-sdc)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![PHP Version](https://img.shields.io/badge/php-%3E%3D%208.1-8892bf.svg)](https://php.net)
-[![Symfony Version](https://img.shields.io/badge/Symfony-%3E%3D%206.4-black?logo=symfony)](https://symfony.com/)
-[![Symfony Style](https://img.shields.io/badge/code%20style-symfony-black?logo=symfony)](https://symfony.com/)
+[![PHP Version](https://img.shields.io/packagist/php-v/tito10047/ux-sdc.svg)](https://packagist.org/packages/tito10047/ux-sdc)
+[![Symfony Version](https://img.shields.io/badge/Symfony-6.4%20%7C%207%20%7C%208-black?logo=symfony)](https://symfony.com/)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE.md)
 
-A Symfony bundle that implements the **Single Directory Component (SDC)** methodology for Symfony UX. It bridges the gap between **AssetMapper** and **Twig Components** by providing a fully automated, convention-over-configuration workflow.
+**Single Directory Components** for Symfony UX: a component's PHP class, Twig
+template, CSS and JavaScript live in one directory, and the CSS and JS reach the
+page only when the component is rendered on it.
 
-## Real-world Usage & Developer Experience
-
-This bundle is actively used in production. Here are some real-world examples:
-- [formalitka.mostka.sk](https://formalitka.mostka.sk/)
-- [mostka.sk](https://mostka.sk/)
-- [ycon.cc](https://ycon.cc)
-
-### Developer Evaluation
-Working with UX SDC provides an excellent developer experience. A recommended project structure organizes the code into distinct functional areas:
-- **UI**: Generic interface elements (e.g., `Button`, `Spinner`, `Tabs`).
-- **Layout**: Structural page elements (e.g., `TopBar`, `Footer`, `FlashMessage`).
-- **Component**: Reusable feature blocks.
-- **Page**: Complete page components (e.g., `Homepage`, `AboutUs`).
-
-A significant advantage of this architecture is the ability to place Symfony controllers directly within the page-level SDC component directory (e.g., `HomepageAction.php`). The controller merely handles routing and renders the base layout, while all business and presentation logic remains encapsulated in isolated SDC components.
-
-Because the code is highly granular and strictly structured, AI tools work exceptionally well within this architecture, easily generating robust and creative design implementations.
-
-## AI Agent Skill
-
-An agent skill for this bundle is available at **[tito10047/ux-sdc-skills](https://github.com/tito10047/ux-sdc-skills)**. It teaches coding agents how SDC components are discovered, how their assets reach the browser, and which traps the bundle sets — instead of letting them guess from the package name.
-
-```
-/plugin marketplace add tito10047/ux-sdc-skills
-/plugin install ux-sdc-skills
-```
-
-For agents other than Claude Code, the skill is a plain directory of Markdown following the [agentskills.io](https://agentskills.io) layout; `AGENTS.md`, `CLAUDE.md` and `llms.txt` are provided as well.
-
-It covers the recommended project structure and the `make:sdc-component --action` page workflow, asset discovery and injection, Stimulus controller naming, Live Component asset headers, and the differences between the `dev` and `prod` pipelines — plus a set of failure modes with their root causes, including several that are not documented here:
-
-- The bundle prepends `stimulus.controller_paths`, which suppresses StimulusBundle's default value. Unless your application declares `%kernel.project_dir%/assets/controllers` in `config/packages/stimulus.yaml`, your own Stimulus controllers silently stop being registered.
-- Routes on co-located `--action` controllers reach the router through autoconfiguration, which requires `controllers: { resource: routing.controllers }` in `config/routes.yaml`. That loader arrived in Symfony 7.4; on earlier versions add an explicit routing resource for the component directory, or every generated page returns 404.
-- `ux_components_dir` is registered as an AssetMapper path so component CSS can be served, which also maps the component `.html.twig` files — `asset-map:compile` writes them into `public/assets/`. Add `*/src_component/*.html.twig` to `framework.asset_mapper.excluded_patterns`. (`.php` files are skipped by AssetMapper itself.)
-- Use exactly one component attribute per class. `#[AsSdcComponent]` does not need `#[AsTwigComponent]`, and `#[AsLiveComponent]` does not need `#[AsSdcComponent]`; stacking two fails the container with *"another component already has this name"*.
-
-## The Concept
-
-This bundle is inspired by the architectural challenges discussed in **["A Better Architecture for Your Symfony UX Twig Components"](https://hugo.alliau.me/blog/posts/a-better-architecture-for-your-symfony-ux-twig-components)** by **Hugo Alliaume**.
-
-Instead of scattering your component files across `src/`, `templates/`, and `assets/`, this bundle allows you to keep everything in one place.
-
-## Quick Example
-
-Just create a directory for your component. Everything else is handled automatically.
-```yaml
-ux_sdc:
-    ux_components_dir: '%kernel.project_dir%/src_component/Component'
-    component_namespace: 'App\Component'
-```
-```json
-{
-   "autoload": {
-      "psr-4": {
-         "App\\": "src/",
-         "App\\Component\\": "src_component/"
-      }
-   }
-}
-```
 ```text
 src_component/
-└── Component/
-    └── Alert/
-        ├── Alert.php           # Auto-registered logic
-        ├── Alert.html.twig     # Auto-mapped template
-        ├── Alert.css           # Auto-injected styles
-        └── alert_controller.js # Auto-mapped Stimulus controller
+└── Alert/
+    ├── Alert.php            # the component class
+    ├── Alert.html.twig      # its template, found without configuration
+    ├── Alert.css            # added to <head> when an Alert is rendered
+    └── Alert_controller.js  # its Stimulus controller (optional)
 ```
 
+The bundle connects [Twig Components](https://symfony.com/bundles/ux-twig-component/current/index.html)
+with [AssetMapper](https://symfony.com/doc/current/frontend/asset_mapper.html): it
+registers the component directory with Twig, AssetMapper and StimulusBundle, finds
+the files next to each component class (or template, for an anonymous component),
+and injects the `<link>` and `<script>` tags of the components a response actually
+rendered — into the page, or for Live Components and Turbo fragments, through a
+response header the bundle's Stimulus controller reads.
+
+The idea comes from Hugo Alliaume's article
+[*A Better Architecture for Your Symfony UX Twig Components*](https://hugo.alliau.me/blog/posts/a-better-architecture-for-your-symfony-ux-twig-components).
+It is used in production on [mostka.sk](https://mostka.sk/),
+[formalitka.mostka.sk](https://formalitka.mostka.sk/) and [ycon.cc](https://ycon.cc).
+
+## Requirements
+
+PHP 8.1+, Symfony 6.4, 7.x or 8.x, `symfony/ux-twig-component` 2.20+ or 3.x, and
+AssetMapper (Webpack Encore is not supported). StimulusBundle, LiveComponent and
+MakerBundle are optional. See [Installation](docs/installation.md#requirements).
+
+## Installation
+
+```bash
+composer require tito10047/ux-sdc
+```
+
+A [Flex recipe](docs/installation.md#with-the-flex-recipe) is proposed to
+`symfony/recipes-contrib`. It configures the bundle, imports its routes and adds
+`{{ render_component_assets() }}` to `templates/base.html.twig`; what is left to
+you — the Composer PSR-4 entry, and for Live Components or Turbo the loader
+controller on `<body>` — it prints. Until it is available, or without Flex,
+follow [Without the recipe](docs/installation.md#without-the-recipe): five short
+steps.
+
+## Quick start
+
+With `App\Component\` mapped to `src_component/` and the bundle configured as
+above, `src_component/Alert/Alert.php`:
+
 ```php
+<?php
+
 namespace App\Component\Alert;
 
 use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
-use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
-use Tito10047\UX\Sdc\Twig\Stimulus;
 
-#[AsSdcComponent] // No need to define names, templates, or assets. It's all inferred!
-class Alert
+#[AsSdcComponent]
+final class Alert
 {
-    use Stimulus;
-
     public string $type = 'info';
     public string $message;
 }
 ```
 
-In the `Alert.html.twig` template, you can then use the automatically generated stimulus controller name:
+`src_component/Alert/Alert.html.twig`:
+
 ```twig
-<div class="alert alert-{{ type }}" {{ stimulus_controller(controller) }}>
+<div {{ attributes.defaults({class: 'alert alert-' ~ type}) }}>
     {{ message }}
 </div>
 ```
 
-> [!TIP]
-> **Zero Configuration Magic:** The bundle automatically registers the component, maps the template based on its location, and injects the required CSS/JS into your HTML header only when the component is rendered.
+`src_component/Alert/Alert.css`:
 
----
-
-## Key Features
-
-* **Automatic Registration:** Every class marked with `#[AsSdcComponent]` is automatically discovered and registered.
-* **Smart Template Mapping:** Forget `template: 'components/Alert.html.twig'`. If the template is in the same folder as your class, it's found automatically.
-* **Asset Orchestration:** CSS and JS files in your component folder are collected during rendering and injected into the `<head>`.
-* **Automatic Stimulus Controllers:** By using the `Stimulus` trait and `ComponentNamespaceInterface`, your component automatically gets a `controller` variable representing its Stimulus controller name based on its namespace.
-* **Support for Live Components:** Works seamlessly with `#[AsLiveComponent]` and `#[Asset]` attributes for modern, reactive interfaces.
-* **No "Phantom" Controllers:** Load component-specific CSS via **AssetMapper** without the need for empty Stimulus controllers just for imports.
-* **Performance First:** * **Compiler Pass:** All file discovery happens at build time. Zero reflection in production.
-* **Response Post-processing:** Assets are injected at the end of the request.
-* **HTTP Preload:** Automatic generation of `Link` headers to trigger early browser downloads.
-* **Maker Command:** Quickly generate new SDC components with all necessary files using `php bin/console make:sdc-component`.
-
-
-
----
-
-## Installation & Setup
-
-1. **Install via Composer:**
-```bash
-composer require tito10047/ux-sdc
+```css
+.alert { padding: 1rem; border-radius: .25rem; }
+.alert-success { background: #e6f4ea; }
 ```
 
-2. **Register the bundle** (if not done automatically by Symfony Flex):
-
-```php
-// config/bundles.php
-return [
-    // ...
-    Tito10047\UX\Sdc\SdcBundle::class => ['all' => true],
-];
-```
-
-3. **Configure the bundle:**
-Create a configuration files:
-```json
-/*composer.json*/
-{
-    "autoload": {
-        "psr-4": {
-            "App\\": "src/",
-            "App\\Component\\": "src_component/"
-        }
-    }
-}
-```
-```yaml
-#config/packages/stimulus.yaml 
-stimulus:
-    controller_paths:
-        - '%kernel.project_dir%/assets/controllers'
-```
-```yaml
-#config/packages/ux_sdc.yaml
-ux_sdc:
-    ux_components_dir: '%kernel.project_dir%/src_component'
-    component_namespace: 'App\Component'
-    stimulus:
-        enabled: true
-```
-
-4. **Add the placeholder to your base template:**
-   Place this in your `<head>` to define where the collected assets should be injected:
-```twig
-<head>
-    {# ... #}
-    {{ render_component_assets() }}
-</head>
-```
-
-## Usage
-
-### Live Components
-
-The bundle also supports **Live Components**. It handles both initial rendering and AJAX updates automatically.
-
-#### How it works with Live Components:
-1. **Initial Render:** Assets are collected and injected into the `<head>` just like with regular Twig components.
-2. **AJAX Updates:** When a Live Component is updated via AJAX, the bundle identifies the request and sends asset paths via HTTP headers (`X-SDC-Assets-CSS` and `X-SDC-Assets-JS`) to the browser.
-3. **Dynamic Loading:** The bundle includes a Stimulus controller that listens for Live Component events and dynamically injects any missing assets into the `<head>` of the document.
-
-#### Enabling Dynamic Asset Loading
-
-To enable dynamic loading of assets during Live Component updates, you must add the bundle's Stimulus controller to your base template (ideally on the `<body>` element):
+Render it from any template:
 
 ```twig
-<body {{ stimulus_controller(sdc_loader_controller) }}>
-    {# ... #}
-</body>
+<twig:Alert:Alert type="success" message="Saved." />
 ```
 
-#### Usage with Live Components:
-To get full support (including the `controller` variable in Twig), your Live Component should implement 
-`ComponentNamespaceInterface` and use the `Stimulus` trait:
+A page that renders an Alert gets
+`<link rel="stylesheet" href="/assets/Alert/Alert-….css" data-turbo-track="dynamic">`
+in its `<head>` and a `Link: </assets/Alert/Alert-….css>; rel="preload"; as="style"`
+header. A page without an Alert gets neither.
 
-```php
-namespace App\Component\Search;
+`php bin/console make:sdc-component Alert` generates such a skeleton, and
+`php bin/console debug:sdc` shows what each component gets.
 
-use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
-use Symfony\UX\LiveComponent\DefaultActionTrait;
-use Tito10047\UX\Sdc\Attribute\Asset;
-use Tito10047\UX\Sdc\Twig\ComponentNamespaceInterface;
-use Tito10047\UX\Sdc\Twig\Stimulus;
+## Documentation
 
-#[AsLiveComponent]
-#[Asset] // Automatically discovers Search.css and Search_controller.js
-class Search implements ComponentNamespaceInterface
-{
-    use DefaultActionTrait;
-    use Stimulus;
+- [Installation](docs/installation.md) — requirements, the Flex recipe, manual setup
+- [Components](docs/components.md) — names, co-located files, templates, Stimulus
+  controllers, where components can live, anonymous components
+- [Assets](docs/assets.md) — `#[AsSdcComponent]`, `#[Asset]`, ES modules, font and
+  image preloads, CSP nonces
+- [Live Components and Turbo](docs/live-and-turbo.md) — the loader controller and
+  the `X-SDC-Assets` header
+- [Generating components](docs/maker.md) — `make:sdc-component`, page components
+  with `--action`
+- [Configuration](docs/configuration.md) — every option
+- [Diagnostics](docs/diagnostics.md) — `debug:sdc`, logs, the web profiler panel
+- [How it works](docs/how-it-works.md) — the build-time and runtime pipelines,
+  performance
+- [Known limitations and non-goals](docs/known-limitations.md)
+- [Upgrading from 0.4 to 1.0](UPGRADE.md) and the [changelog](CHANGELOG.md)
 
-    // ... logic
-}
-```
+[tito10047/ux-sdc-skills](https://github.com/tito10047/ux-sdc-skills) teaches
+coding agents how components are discovered, how their assets reach the browser
+and how to diagnose the failure modes. In Claude Code:
+`/plugin marketplace add tito10047/ux-sdc-skills`, then
+`/plugin install ux-sdc-skills`. For other agents it is a plain directory of
+Markdown in the [agentskills.io](https://agentskills.io) layout, with `AGENTS.md`,
+`CLAUDE.md` and `llms.txt`.
 
-In your `Search.html.twig`:
-```twig
-<div
-    {{ attributes.defaults({
-        class: 'wizard [ l-container ]',
-        'data-controller': controller,
-        ('data-' ~ controller ~ '-sound-value'): asset('sound/stamp-102627.mp3'),
-        ('data-' ~ controller ~ '-intensities-value'): intensityMap|json_encode
-    }) }}
->
-   <!-- ... -->
-</div>
-```
+## Backward compatibility
 
-### Generating Components
+The bundle follows [Semantic Versioning](https://semver.org/). From 1.0, a minor
+or patch release does not break:
 
-You can use the built-in maker command to create a new component:
+- **Configuration:** the `ux_sdc` options, their defaults and accepted values
+  ([Configuration](docs/configuration.md)), and the `ux_sdc.ux_components_dir`
+  parameter.
+- **PHP:** `Attribute\AsSdcComponent` and `Attribute\Asset` (with its `CSS`, `JS`,
+  `FONT` and `IMAGE` constants), the `Twig\Stimulus` trait,
+  `Twig\ComponentNamespaceInterface`, `Csp\NonceProviderInterface`,
+  `Csp\NelmioNonceProvider` as a value of `csp_nonce_provider`, and `SdcBundle`
+  with `SdcBundle::STIMULUS_CONTROLLER` — all in `Tito10047\UX\Sdc`.
+- **Twig:** the `render_component_assets()` function, the `sdc_loader_controller`
+  global, the `controller` variable and how its value is derived, how components
+  and their co-located files are named.
+- **HTTP:** the `X-SDC-Assets` header, format version 1, and the loader Stimulus
+  controller that reads it.
+- **Routing:** the `type: ux_sdc` route import.
+- **Logging:** the `ux_sdc` log channel.
+- **Console:** the names, arguments and options of `debug:sdc` and
+  `make:sdc-component`, the exit codes and the JSON structure of `debug:sdc`.
 
-`php bin/console make:sdc-component UI:Alert`
+Not covered, and free to change in any release: every class, method and constant
+marked `@internal` (all of `src/` not listed above), service IDs, other container
+parameters, the format of the metadata cache, the text output of `debug:sdc`, the
+wording of log messages and the code `make:sdc-component` generates. A minor
+release may add `debug:sdc` checks, so `--strict` may find problems it did not
+find before. Something covered is deprecated in a minor release, with a deprecation
+notice where possible, and removed in the next major one.
 
-This will create:
-- `src/Component/UI/Alert/Alert.php` (PHP logic)
-- `src/Component/UI/Alert/Alert.html.twig` (Twig template)
-- `src/Component/UI/Alert/Alert.css` (CSS styles)
-- (Optional) `src/Component/UI/Alert/Alert_controller.js` (Stimulus controller)
+## Contributing
 
-The maker supports options and interactive mode:
-- `--stimulus` to force generating a Stimulus controller (non-interactive mode will not create it unless explicitly set)
-- `--action` to generate a minimal controller action and a wrapper Twig template for the component
-
-Example with an action:
-
-```bash
-php bin/console make:sdc-component Page:Homepage --action
-```
-
-This will additionally create:
-- `src/Component/Page/Homepage/HomepageAction.php` (Symfony controller)
-- `src/Component/Page/Homepage/HomepageAction.html.twig` (page template rendering the component)
-
-Generated files contents:
-
-```php
-// src/Component/Page/Homepage/HomepageAction.php
-namespace App\Component\Page\Homepage;
-
-use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\Routing\Attribute\Route;
-
-class HomepageAction extends AbstractController
-{
-    #[Route('/en', name: 'app.homepage')]
-    public function index(): \Symfony\Component\HttpFoundation\Response
-    {
-        return $this->render('Page/Homepage/HomepageAction.html.twig');
-    }
-}
-```
-
-```twig
-{# src/Component/Page/Homepage/HomepageAction.html.twig #}
-{% extends 'layout.html.twig' %}
-
-{% block content %}
-    <twig:Page:Homepage:Homepage />
-{% endblock %}
-```
-
-In interactive mode, you will be asked:
-- for the component name (supports `:` or `/` separators, e.g. `UI:Alert` or `UI/Alert`)
-- whether to generate a Stimulus controller
-- whether to generate an Action class and template
-
----
-
-## How It Works
-
-1. **Discovery:** During container compilation, the bundle scans your component directory. It maps PHP classes to their neighboring `.twig`, `.css`, and `.js` files.
-2. **Rendering:** When a component is used on a page, the bundle's listener intercepts the `PreCreateForRenderEvent` and logs its required assets.
-3. **Injection:** The `AssetResponseListener` replaces your Twig placeholder with the actual `<link>` and `<script>` tags and adds HTTP preload headers to the response.
-
-## Why SDC?
-
-1. **Maintainability:** Everything related to a UI element is in one folder.
-2. **Developer Experience:** No more jumping between four different directories to change one button's color.
-3. **Efficiency:** Only the CSS/JS needed for the current page is sent to the user.
-
-## Benchmarks
-
-This bundle is designed for high performance with minimal overhead. We've conducted extensive benchmarks comparing the SDC approach with the classic Twig component approach.
-
-### Performance Summary (500 Components)
-
-| Scenario | Classic Approach | SDC Approach | Difference |
-|----------|------------------|--------------|------------|
-| **Warmup (Dev/Debug)** | 809.8ms | 782.0ms | -27.8ms |
-| **Warmup (Prod)** | 583.1ms | 586.2ms | +3.1ms |
-| **Render (Prod Runtime)** | 26.5ms | 31.6ms | +5.1ms |
-| **Render (Dev Runtime - 500 unique)** | 26.5ms | 88.4ms | +61.9ms |
-| **Render (Dev Runtime - 10 unique repeated)** | 26.5ms | 58.0ms | +31.5ms |
-
-### Key Findings
-- **Developer Experience (Dev Runtime):** In `dev` mode, there is a measurable overhead for **unique** components (~84µs per component) due to runtime autodiscovery. This allows developers to add CSS/JS/Twig files and see changes instantly without clearing the cache.
-- **Caching:** Thanks to internal metadata caching, repeated rendering of the same component in `dev` is significantly faster as the file system is only scanned once per unique component class per request.
-- **Production Performance:** In `prod` mode, the overhead for rendering 500 unique components is practically zero, as all metadata is pre-generated during container compilation.
-- **Warmup:** The SDC approach slightly increases container compilation time in `prod` (~15ms for 500 unique components) but remains very efficient.
-- **Memory Usage:** The SDC approach requires approximately **8MB** more memory during container compilation for 500 components, which is well within acceptable limits for modern applications.
-
-For detailed results and methodology, see the [Full Benchmark Report](benchmark.md).
+Bug reports and pull requests are welcome on
+[GitHub](https://github.com/tito10047/ux-sdc/issues). Run `./vendor/bin/phpunit`,
+`./vendor/bin/phpstan analyse` and `./vendor/bin/php-cs-fixer fix --dry-run`
+before opening a pull request.
 
 ## License
 
-MIT
+MIT — see [LICENSE.md](LICENSE.md).
