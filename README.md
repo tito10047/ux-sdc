@@ -35,8 +35,8 @@ It is used in production on [mostka.sk](https://mostka.sk/),
 ## Requirements
 
 PHP 8.1+, Symfony 6.4, 7.x or 8.x, `symfony/ux-twig-component` 2.20+ or 3.x, and
-AssetMapper (Webpack Encore is not supported). StimulusBundle, LiveComponent and
-MakerBundle are optional. See [Installation](docs/installation.md#requirements).
+AssetMapper (Webpack Encore is not supported). StimulusBundle, LiveComponent,
+MakerBundle and UX Icons are optional. See [Installation](docs/installation.md#requirements).
 
 ## Installation
 
@@ -108,6 +108,8 @@ header. A page without an Alert gets neither.
   controllers, where components can live, anonymous components
 - [Assets](docs/assets.md) — `#[AsSdcComponent]`, `#[Asset]`, ES modules, font and
   image preloads, CSP nonces
+- [Component icons](docs/icons.md) — SVG icons in the component's folder with
+  symfony/ux-icons, `ux:sdc:icons:import` (experimental)
 - [Live Components and Turbo](docs/live-and-turbo.md) — the loader controller and
   the `X-SDC-Assets` header
 - [Generating components](docs/maker.md) — `make:sdc-component`, page components
@@ -150,7 +152,9 @@ or patch release does not break:
 - **Console:** the names, arguments and options of `debug:sdc` and
   `make:sdc-component`, the exit codes and the JSON structure of `debug:sdc`.
 
-Not covered, and free to change in any release: every class, method and constant
+Not covered, and free to change in any release: the experimental
+[component icons](docs/icons.md) (the `icons` options, the `sdc:` icon names and
+`ux:sdc:icons:import`), every class, method and constant
 marked `@internal` (all of `src/` not listed above), service IDs, other container
 parameters, the format of the metadata cache, the text output of `debug:sdc`, the
 wording of log messages and the code `make:sdc-component` generates. A minor

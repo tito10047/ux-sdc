@@ -26,6 +26,14 @@
   an event listener, which `debug:sdc` cannot see, so it reports the component's
   template as missing. From Twig Components 2.21 on, ux-icons registers a renderer
   and `debug:sdc` shows it.
+- **Component icons with a dynamic name.** A component's own icon is found when
+  its name is a constant in the template (`ux_icon('arrow')`); the name is
+  rewritten when Twig compiles the template. `ux_icon(iconName)` resolves
+  globally — pass the full name (`sdc:alert:arrow`) instead. See
+  [Component icons](icons.md).
+- **Component icons and the icon cache warmer on ux-icons 2.** Only ux-icons 3
+  lets bundles add icons to `cache:warmup` and `ux:icons:warm-cache`; on 2.x a
+  component icon is cached the first time it is rendered.
 
 ## Non-goals
 

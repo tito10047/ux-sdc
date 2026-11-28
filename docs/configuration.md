@@ -28,6 +28,16 @@ ux_sdc:
         # Load those routes through the "ux_sdc" route import (resource: ., type: ux_sdc) and, on Symfony 7.4+, through "resource: routing.controllers". Off: the import loads nothing and the classes are left out of routing.controllers; an import of the directory the application writes itself still works.
         enabled:              true
 
+    # Experimental. Icons kept in the component's own folder: a bare name in the component's template, ux_icon('arrow') or <twig:ux:icon name="arrow" />, renders the arrow.svg next to it. Takes effect only with symfony/ux-icons 2.36.1+ installed and its bundle enabled. Accepts false as a shorthand for "enabled: false".
+    icons:
+        enabled:              true
+
+        # Folder inside the component for its icons, e.g. "icons" for Alert/icons/arrow.svg. Empty: the component folder itself.
+        subdir:               ''
+
+        # When the component has no icon of that name, use the global icon (ux_icons.icon_dir).
+        fallback_to_global:   true
+
     # Load the CSS, JS and Twig template named after a component class and sitting next to it (Alert.php: Alert.css, Alert.js, Alert.html.twig) without declaring them. Assets declared with #[AsSdcComponent] or #[Asset] are loaded either way.
     auto_discovery:       true
 

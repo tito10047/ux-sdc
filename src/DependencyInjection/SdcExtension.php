@@ -34,6 +34,13 @@ use Tito10047\UX\Sdc\EventListener\ComponentRenderListener;
 use Tito10047\UX\Sdc\EventListener\DevComponentRenderListener;
 use Tito10047\UX\Sdc\Response\PageAssetInjector;
 use Tito10047\UX\Sdc\Routing\ComponentRouteLoader;
+use Symfony\UX\Icons\IconFactory;
+use Symfony\UX\Icons\IconRegistryInterface;
+use Tito10047\UX\Sdc\Icons\Command\ImportComponentIconCommand;
+use Tito10047\UX\Sdc\Icons\ComponentIconFinder;
+use Tito10047\UX\Sdc\Icons\ComponentIconRegistry;
+use Tito10047\UX\Sdc\Icons\Twig\ComponentIconExtension;
+use Tito10047\UX\Sdc\Icons\Twig\ComponentIconNodeVisitor;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
 use Tito10047\UX\Sdc\Twig\AssetExtension;
@@ -88,6 +95,7 @@ final class SdcExtension extends Extension implements PrependExtensionInterface
         );
 
         $this->registerMetadataResolver($container, $config);
+        $this->registerIcons($container, $config);
 
         // One decision, made here and read by AssetComponentCompilerPass too: the
         // pass dumps the metadata cache exactly when the listener reading it is kept.
@@ -202,6 +210,53 @@ final class SdcExtension extends Extension implements PrependExtensionInterface
                 ],
             ]);
         }
+    }
+
+    /**
+     * Component-local icons. Everything is registered only when ux-icons is
+     * installed; ComponentIconsCompilerPass removes it again when its bundle
+     * is not enabled.
+     *
+     * @param array<string, mixed> $config
+     */
+    private function registerIcons(ContainerBuilder $container, array $config): void
+    {
+        // IconFactory arrived in ux-icons 2.36.1; older versions leave the feature off.
+        if (!($config['icons']['enabled'] ?? true) || !interface_exists(IconRegistryInterface::class) || !class_exists(IconFactory::class)) {
+            return;
+        }
+
+        $componentsDir = $config['ux_components_dir'];
+        $subdir = $config['icons']['subdir'] ?? '';
+
+        $container->register('ux_sdc.icons.registry', ComponentIconRegistry::class)
+            ->setArguments([
+                new Reference('.ux_icons.icon_factory'),
+                $componentsDir,
+                $subdir,
+                ($config['icons']['fallback_to_global'] ?? true) ? new Reference('.ux_icons.local_svg_icon_registry') : null,
+            ])
+            // in front of the local (10) and the Iconify (-10) registries
+            ->addTag('ux_icons.registry', ['priority' => 20]);
+
+        $container->register('ux_sdc.icons.node_visitor', ComponentIconNodeVisitor::class)
+            ->setArguments([$componentsDir, []]);
+
+        $container->register('ux_sdc.icons.twig_extension', ComponentIconExtension::class)
+            ->setArguments([new Reference('ux_sdc.icons.node_visitor')])
+            ->addTag('twig.extension');
+
+        $container->register('ux_sdc.icons.finder', ComponentIconFinder::class)
+            ->setArguments([$componentsDir, $subdir]);
+
+        $container->register('ux_sdc.icons.command.import', ImportComponentIconCommand::class)
+            ->setArguments([
+                new Reference('.ux_icons.iconify'),
+                new Reference('ux.twig_component.component_factory', ContainerBuilder::NULL_ON_INVALID_REFERENCE),
+                $componentsDir,
+                $subdir,
+            ])
+            ->addTag('console.command', ['command' => 'ux:sdc:icons:import']);
     }
 
     /**

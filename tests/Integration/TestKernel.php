@@ -208,7 +208,7 @@ class TestKernel extends Kernel
             public function process(ContainerBuilder $container): void
             {
                 foreach ($container->getDefinitions() as $id => $definition) {
-                    if (str_starts_with($id, 'Tito10047\UX\Sdc') || str_contains($id, 'twig_component')) {
+                    if (str_starts_with($id, 'Tito10047\UX\Sdc') || str_starts_with($id, 'ux_sdc.') || str_contains($id, 'twig_component')) {
                         $definition->setPublic(true);
                     }
                 }

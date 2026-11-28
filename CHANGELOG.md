@@ -14,6 +14,15 @@ documentation moved from the README to [`docs/`](docs/installation.md).
 
 ### Added
 
+- Component icons (experimental): an SVG in the component's folder is what a bare
+  `ux_icon('arrow')` / `<twig:ux:icon name="arrow" />` in that component's template
+  renders, with the global icon as a fallback. The name is rewritten when Twig compiles
+  the template, so rendering does no extra work. Needs `symfony/ux-icons` 2.36.1+ or 3.x;
+  configured under `ux_sdc.icons`. See [Component icons](docs/icons.md).
+- A component's icon can be used from any template by its full name,
+  `sdc:<component folder>:<icon>` (e.g. `sdc:form:text-input:eye`).
+- `ux:sdc:icons:import <component> <icons> [--as] [--force]` imports icons from Iconify
+  into a component's folder.
 - Add the `metadata_cache` option (`auto` | `true` | `false`, default `auto` =
   `false` in debug, `true` otherwise): whether component metadata is resolved once,
   into `%kernel.cache_dir%/sdc_metadata.php`, when the container is built, or on

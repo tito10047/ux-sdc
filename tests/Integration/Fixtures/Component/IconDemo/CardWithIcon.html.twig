@@ -1,0 +1,9 @@
+<div data-testid="card">
+    <span data-testid="tag"><twig:ux:icon name="arrow" class="big" /></span>
+    <span data-testid="func">{{ ux_icon('arrow', {class: 'small'}) }}</span>
+    <span data-testid="named">{{ ux_icon(name: 'arrow') }}</span>
+    <span data-testid="fallback">{{ ux_icon('star') }}</span>
+    <span data-testid="prefixed">{{ ux_icon('mdi:home') }}</span>
+    <span data-testid="alias">{{ ux_icon('go') }}</span>
+    <span data-testid="dynamic">{{ ux_icon(dynamic) }}</span>
+</div>

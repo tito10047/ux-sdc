@@ -8,7 +8,7 @@
 - AssetMapper — component assets are served through it (Webpack Encore is not supported)
 - Optional: `symfony/stimulus-bundle` for component Stimulus controllers,
   `symfony/ux-live-component` for Live Components, `symfony/maker-bundle` for
-  `make:sdc-component`
+  `make:sdc-component`, `symfony/ux-icons` 2.36.1+ for [component icons](icons.md)
 
 A Flex application created with `symfony new --webapp` has all of them except
 `symfony/ux-twig-component`, which is installed with this bundle, as are

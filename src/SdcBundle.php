@@ -16,6 +16,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
 use Symfony\Component\HttpKernel\Bundle\Bundle;
 use Tito10047\UX\Sdc\CompilerPass\AssetComponentCompilerPass;
+use Tito10047\UX\Sdc\CompilerPass\ComponentIconsCompilerPass;
 use Tito10047\UX\Sdc\CompilerPass\ComponentRoutesCompilerPass;
 use Tito10047\UX\Sdc\CompilerPass\ProfilerCompilerPass;
 use Tito10047\UX\Sdc\CompilerPass\SdcComponentAttributePass;
@@ -61,5 +62,7 @@ class SdcBundle extends Bundle
         $container->addCompilerPass(new ImportMapCompilerPass());
         $container->addCompilerPass(new ComponentRoutesCompilerPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, ComponentRoutesCompilerPass::PRIORITY);
         $container->addCompilerPass(new ProfilerCompilerPass());
+        // before TwigBundle collects the "twig.extension" tags
+        $container->addCompilerPass(new ComponentIconsCompilerPass(), PassConfig::TYPE_BEFORE_OPTIMIZATION, 100);
     }
 }

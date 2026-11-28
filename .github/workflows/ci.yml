@@ -204,7 +204,7 @@ jobs:
             -   name: "Pin Symfony UX to 2.x"
                 run: |
                     composer require --no-update "symfony/ux-twig-component:^2.20"
-                    composer require --no-update --dev "symfony/ux-live-component:^2.32" "symfony/stimulus-bundle:^2.32"
+                    composer require --no-update --dev "symfony/ux-live-component:^2.32" "symfony/stimulus-bundle:^2.32" "symfony/ux-icons:^2.36.1"
             -   name: "Install dependencies"
                 run: composer update --no-interaction --no-progress
             -   *check-symfony-version
@@ -259,6 +259,28 @@ jobs:
                 run: composer update --no-interaction --no-progress
             -   name: "Remove LiveComponent"
                 run: composer remove --dev symfony/ux-live-component symfony/stimulus-bundle --no-interaction
+            -   *check-symfony-version
+            -   name: Execute tests via PHPUnit
+                run: vendor/bin/phpunit
+
+    tests-no-ux-icons:
+        name: "Tests without UX Icons (PHP 8.5, Symfony 8.1.*)"
+        runs-on: ubuntu-latest
+        env:
+            SYMFONY_REQUIRE: '8.1.*'
+        steps:
+            -   name: Checkout
+                uses: actions/checkout@v4
+            -   name: "Install PHP"
+                uses: "shivammathur/setup-php@v2"
+                with:
+                    php-version: "8.5"
+                    ini-values: memory_limit=-1
+                    tools: flex
+            -   name: "Install highest dependencies"
+                run: composer update --no-interaction --no-progress
+            -   name: "Remove UX Icons"
+                run: composer remove --dev symfony/ux-icons --no-interaction
             -   *check-symfony-version
             -   name: Execute tests via PHPUnit
                 run: vendor/bin/phpunit
