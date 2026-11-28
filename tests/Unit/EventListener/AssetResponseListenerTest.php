@@ -15,7 +15,6 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LogLevel;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
-use Symfony\Component\AssetMapper\MappedAsset;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -917,9 +916,9 @@ final class AssetResponseListenerTest extends TestCase
     private function createListener(bool $debug, ?NonceProviderInterface $nonceProvider = null, ?RequestTrace $trace = null): AssetResponseListener
     {
         $assetMapper = $this->createMock(AssetMapperInterface::class);
-        $assetMapper->method('getAsset')->willReturnCallback(static fn (string $logicalPath): ?MappedAsset => match ($logicalPath) {
-            'Alert/Alert.css' => new MappedAsset($logicalPath, publicPath: '/assets/Alert/Alert-1a2b3c.css'),
-            'Alert/Alert.js' => new MappedAsset($logicalPath, publicPath: '/assets/Alert/Alert-4d5e6f.js'),
+        $assetMapper->method('getPublicPath')->willReturnCallback(static fn (string $logicalPath): ?string => match ($logicalPath) {
+            'Alert/Alert.css' => '/assets/Alert/Alert-1a2b3c.css',
+            'Alert/Alert.js' => '/assets/Alert/Alert-4d5e6f.js',
             default => null,
         });
 

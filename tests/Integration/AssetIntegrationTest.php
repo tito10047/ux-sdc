@@ -12,7 +12,6 @@
 namespace Tito10047\UX\Sdc\Tests\Integration;
 
 use Symfony\Component\AssetMapper\AssetMapperInterface;
-use Symfony\Component\AssetMapper\MappedAsset;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
@@ -47,10 +46,8 @@ class AssetIntegrationTest extends IntegrationTestCase
         $container = self::getContainer();
 
         $assetMapper = $this->createMock(AssetMapperInterface::class);
-        $assetMapper->method('getAsset')
-            ->willReturnCallback(function ($path) {
-                return new MappedAsset($path, publicPath: '/assets/'.$path);
-            });
+        $assetMapper->method('getPublicPath')
+            ->willReturnCallback(static fn (string $path): string => '/assets/'.$path);
 
         $container->set(AssetMapperInterface::class, $assetMapper);
 

@@ -53,7 +53,10 @@ final class AssetResolver
         $resolved = [];
 
         foreach ($assets as $asset) {
-            $path = $this->assetMapper->getAsset($asset['path'])->publicPath ?? $this->passThrough($asset['path']);
+            // getPublicPath() reads the manifest written by asset-map:compile,
+            // and finds the asset in the asset map only when there is none (or
+            // it does not list the path): the compiled asset is not needed.
+            $path = $this->assetMapper->getPublicPath($asset['path']) ?? $this->passThrough($asset['path']);
 
             $type = '' === $asset['type'] ? AssetType::fromPath($path) : $asset['type'];
 

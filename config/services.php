@@ -196,12 +196,12 @@ return static function (ContainerConfigurator $container): void {
     $services->set(ComponentImportMapEntries::class)
         ->args([
             service(SdcMetadataRegistry::class),
-            abstract_arg('a ComponentMetadataResolver without a logger, set by AssetComponentCompilerPass'),
+            abstract_arg('a ComponentMetadataResolver without a logger, or null with the metadata cache on, set by AssetComponentCompilerPass'),
             abstract_arg('whether ux_sdc.metadata_cache resolved to true, set by SdcExtension'),
             service('asset_mapper.repository'),
             service('asset_mapper.public_assets_path_resolver'),
-            abstract_arg('the classes of the twig.component services, set by AssetComponentCompilerPass'),
-            abstract_arg('the templates of anonymous components, set by AssetComponentCompilerPass'),
+            abstract_arg('the classes of the twig.component services that can have a script, set by AssetComponentCompilerPass'),
+            abstract_arg('the templates of anonymous components that can have a script, set by AssetComponentCompilerPass'),
         ]);
 
     if (class_exists(Command::class)) {
