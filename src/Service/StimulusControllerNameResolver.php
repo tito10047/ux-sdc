@@ -44,10 +44,18 @@ final class StimulusControllerNameResolver
      *
      * @var array<string, array{bool, bool}>
      */
-    private array $ownControllerVariables = [];
+    private array $ownControllerVariables;
 
-    public function __construct(?string $componentNamespace)
+    /**
+     * @param array<string, array{bool, bool}> $ownControllerVariables what findOwnControllerVariable() returns, per
+     *                                                                 class, worked out when the container is built
+     *                                                                 with `ux_sdc.metadata_cache` on; a class
+     *                                                                 missing from it is looked into on render
+     */
+    public function __construct(?string $componentNamespace, array $ownControllerVariables = [])
     {
+        $this->ownControllerVariables = $ownControllerVariables;
+
         $componentNamespace = trim((string) $componentNamespace, '\\');
 
         $this->componentNamespace = '' === $componentNamespace ? null : $componentNamespace.'\\';
@@ -94,7 +102,7 @@ final class StimulusControllerNameResolver
      *
      * @return array{bool, bool}
      */
-    private static function findOwnControllerVariable(string $class): array
+    public static function findOwnControllerVariable(string $class): array
     {
         $reflection = new \ReflectionClass($class);
 

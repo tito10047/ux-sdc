@@ -227,6 +227,15 @@ documentation moved from the README to [`docs/`](docs/installation.md).
   `twig.file_name_pattern` (dozens of Twig deprecations, and two templates that do
   not compile): TwigBundle registers the bundle's `templates/` as `@Sdc`, so the
   skeletons moved to `skeleton/`.
+- Speed up requests: a component asset gets its public path from AssetMapper's
+  `manifest.json` (`getPublicPath()`) instead of the whole `MappedAsset`, which
+  read the asset map, unserialized the compiled asset and, without a compiled
+  cache, compiled it during the request. With `metadata_cache` on, the import map
+  no longer builds a metadata resolver, and whether a component exposes its own
+  `controller` is worked out when the container is built, not on each render.
+  With it off, the import map resolves only the components that can have a script
+  (an `#[Asset]` / `#[AsSdcComponent]`, or a class or anonymous template in an
+  AssetMapper path), not those of other bundles.
 
 ## [0.4.0] - 2026-10-02
 

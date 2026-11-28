@@ -22,9 +22,14 @@ use Symfony\Component\DependencyInjection\Reference;
 use Tito10047\UX\Sdc\Attribute\Asset;
 use Tito10047\UX\Sdc\CompilerPass\AssetComponentCompilerPass;
 use Tito10047\UX\Sdc\Debug\ComponentInspector;
+use Tito10047\UX\Sdc\ImportMap\ComponentImportMapEntries;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
+use Tito10047\UX\Sdc\Service\StimulusControllerNameResolver;
+use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\Stimulus\Own\OwnMethod;
+use Tito10047\UX\Sdc\Tests\Integration\Fixtures\Component\Stimulus\Plain\Plain;
 use Tito10047\UX\Sdc\Tests\Unit\Service\Fixtures\Alert\Alert;
+use Tito10047\UX\Sdc\Tests\Unit\Service\Fixtures\Homepage\HomepageAction;
 
 #[Asset(path: 'test.css', priority: 5)]
 class MockComponent
@@ -347,6 +352,102 @@ final class AssetComponentCompilerPassTest extends TestCase
             '/Notice.html.twig' => ['Notice'],
             '/Panel/index.html.twig' => ['Panel', 'Panel:index'],
         ], $container->getDefinition(ComponentInspector::class)->getArgument('$anonymousTemplates'));
+    }
+
+    /**
+     * The import map gets the components that can have a script: one with
+     * #[Asset] wherever it is (Alert, MockComponent), one in an AssetMapper
+     * path with auto discovery (HomepageAction),
+     * an anonymous one whose template is in an AssetMapper path — not a class
+     * elsewhere without either attribute, such as one of another bundle, nor a
+     * template outside every AssetMapper path. Without the metadata cache, it
+     * gets a resolver of its own, without a logger.
+     */
+    public function testGivesTheImportMapTheComponentsThatCanHaveAScript(): void
+    {
+        $container = $this->createContainer(metadataCache: false, autoDiscovery: true, component: Alert::class);
+        $container->register(ComponentMetadataResolver::class)->setArgument('$logger', new Reference('logger'))->addTag('monolog.logger');
+        $container->register(ComponentImportMapEntries::class);
+        $container->register('asset_component', MockComponent::class)->addTag('twig.component', ['key' => 'asset']);
+        $container->register('foreign_component', MockRenderer::class)->addTag('twig.component', ['key' => 'foreign']);
+        $container->register('mapped_component', HomepageAction::class)->addTag('twig.component', ['key' => 'mapped']);
+        $this->addTwigPaths($container, [self::FIXTURES, self::FIXTURES . '/Acme' => 'Acme']);
+        $this->addAssetMapperPaths($container, [self::FIXTURES . '/components' => '', self::FIXTURES . '/Homepage' => 'home']);
+        $container->register('ux.twig_component.component_template_finder', \stdClass::class)->setArguments([new Reference('twig.loader'), 'components/']);
+
+        (new AssetComponentCompilerPass())->process($container);
+
+        $definition = $container->getDefinition(ComponentImportMapEntries::class);
+        $this->assertSame([Alert::class, MockComponent::class, HomepageAction::class], $definition->getArgument('$componentClasses'));
+        $this->assertSame(['components/Default.html.twig', 'components/Notice.html.twig', 'components/Panel/index.html.twig'], $definition->getArgument('$anonymousTemplates'), 'Not @Acme/components/Button.html.twig: Acme/ is no AssetMapper path.');
+
+        $resolver = $definition->getArgument('$metadataResolver');
+        $this->assertInstanceOf(Definition::class, $resolver);
+        $this->assertNull($resolver->getArgument('$logger'));
+        $this->assertSame([], $resolver->getTags());
+    }
+
+    /**
+     * Without auto discovery, a script is declared with an attribute or there
+     * is none: an anonymous component cannot have one.
+     */
+    public function testGivesTheImportMapOnlyTheComponentsWithAnAttributeWithoutAutoDiscovery(): void
+    {
+        $container = $this->createContainer(metadataCache: false, component: HomepageAction::class);
+        $container->register(ComponentMetadataResolver::class);
+        $container->register(ComponentImportMapEntries::class);
+        $container->register('asset_component', MockComponent::class)->addTag('twig.component', ['key' => 'asset']);
+        $this->addTwigPaths($container, [self::FIXTURES]);
+        $this->addAssetMapperPaths($container, [self::FIXTURES => '']);
+        $container->register('ux.twig_component.component_template_finder', \stdClass::class)->setArguments([new Reference('twig.loader'), 'components/']);
+
+        (new AssetComponentCompilerPass())->process($container);
+
+        $definition = $container->getDefinition(ComponentImportMapEntries::class);
+        $this->assertSame([MockComponent::class], $definition->getArgument('$componentClasses'));
+        $this->assertSame([], $definition->getArgument('$anonymousTemplates'));
+    }
+
+    /**
+     * With the metadata cache on, the import map reads the registry: no
+     * resolver is built for it.
+     */
+    public function testGivesTheImportMapNoResolverWithMetadataCache(): void
+    {
+        $container = $this->createContainer(metadataCache: true);
+        $container->register(ComponentMetadataResolver::class);
+        $container->register(ComponentImportMapEntries::class);
+
+        (new AssetComponentCompilerPass())->process($container);
+
+        $definition = $container->getDefinition(ComponentImportMapEntries::class);
+        $this->assertNull($definition->getArgument('$metadataResolver'));
+        $this->assertSame([MockComponent::class], $definition->getArgument('$componentClasses'));
+    }
+
+    /**
+     * With the metadata cache on, whether a component in the namespace
+     * exposes a `controller` of its own is worked out when the container is
+     * built; without it, on render.
+     */
+    public function testGivesTheControllerNameResolverTheOwnControllerVariables(): void
+    {
+        foreach ([true, false] as $metadataCache) {
+            $container = $this->createContainer(metadataCache: $metadataCache, component: OwnMethod::class);
+            $container->setParameter('ux_sdc.component_namespace', 'Tito10047\\UX\\Sdc\\Tests\\Integration\\Fixtures\\Component\\');
+            $container->register(StimulusControllerNameResolver::class)->setArguments(['%ux_sdc.component_namespace%']);
+            $container->register('plain_component', Plain::class)->addTag('twig.component', ['key' => 'plain']);
+            $container->register('outside_component', MockComponent::class)->addTag('twig.component', ['key' => 'outside']);
+
+            (new AssetComponentCompilerPass())->process($container);
+
+            $arguments = $container->getDefinition(StimulusControllerNameResolver::class)->getArguments();
+            if ($metadataCache) {
+                $this->assertSame([OwnMethod::class => [true, false], Plain::class => [false, false]], $arguments['$ownControllerVariables']);
+            } else {
+                $this->assertArrayNotHasKey('$ownControllerVariables', $arguments);
+            }
+        }
     }
 
     /**

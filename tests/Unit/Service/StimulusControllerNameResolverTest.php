@@ -107,4 +107,18 @@ final class StimulusControllerNameResolverTest extends TestCase
         $this->assertFalse($resolver->isExposedByComponent(OwnProperty::class, false), 'Public properties are not exposed.');
         $this->assertFalse($resolver->isExposedByComponent(Plain::class, true));
     }
+
+    /**
+     * What the container build worked out is used as it is; a class it does
+     * not know is looked into.
+     */
+    public function testUsesTheOwnControllerVariablesWorkedOutWhenTheContainerWasBuilt(): void
+    {
+        $resolver = new StimulusControllerNameResolver('App\\Component', [Plain::class => [true, false], OwnMethod::class => [false, true]]);
+
+        $this->assertTrue($resolver->isExposedByComponent(Plain::class, false));
+        $this->assertFalse($resolver->isExposedByComponent(OwnMethod::class, false));
+        $this->assertTrue($resolver->isExposedByComponent(OwnMethod::class, true));
+        $this->assertTrue($resolver->isExposedByComponent(OwnPrivateProperty::class, false));
+    }
 }

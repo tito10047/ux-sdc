@@ -262,7 +262,7 @@ final class ComponentInspector
         $mapped = null;
         $publicPath = null;
         if (!AssetPath::isUrl($path)) {
-            $publicPath = $this->assetMapper->getAsset($path)?->publicPath;
+            $publicPath = $this->assetMapper->getPublicPath($path);
             $mapped = null !== $publicPath;
 
             if (!$mapped) {

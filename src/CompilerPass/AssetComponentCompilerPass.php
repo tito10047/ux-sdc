@@ -19,11 +19,14 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Exception\LogicException;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Filesystem\Filesystem;
+use Tito10047\UX\Sdc\Attribute\Asset;
+use Tito10047\UX\Sdc\Attribute\AsSdcComponent;
 use Tito10047\UX\Sdc\Debug\ComponentInspector;
 use Tito10047\UX\Sdc\ImportMap\ComponentImportMapEntries;
 use Tito10047\UX\Sdc\Runtime\SdcMetadataRegistry;
 use Tito10047\UX\Sdc\Service\ComponentMetadata;
 use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
+use Tito10047\UX\Sdc\Service\StimulusControllerNameResolver;
 use Tito10047\UX\Sdc\Twig\ComponentDirectoryTemplateFinder;
 
 /**
@@ -139,15 +142,24 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
         if ($container->hasDefinition(ComponentImportMapEntries::class) && $container->hasDefinition(ComponentMetadataResolver::class)) {
             // A resolver of its own, without a logger: the files it has to
             // leave out are reported when their component renders, not on
-            // every page that has an import map.
-            $silentResolver = (clone $container->getDefinition(ComponentMetadataResolver::class))
+            // every page that has an import map. With the metadata cache on,
+            // the entries come from the registry, and no resolver is built
+            // for each import map.
+            $silentResolver = $metadataCache ? null : (clone $container->getDefinition(ComponentMetadataResolver::class))
                 ->setArgument('$logger', null)
                 ->clearTags();
 
             $container->getDefinition(ComponentImportMapEntries::class)
                 ->setArgument('$metadataResolver', $silentResolver)
-                ->setArgument('$componentClasses', $componentClasses)
-                ->setArgument('$anonymousTemplates', array_keys($anonymousTemplates));
+                ->setArgument('$componentClasses', $this->filterScriptCandidates($container, $componentClasses, $assetRoots, $autoDiscovery))
+                ->setArgument('$anonymousTemplates', $this->filterScriptTemplateCandidates(array_keys($anonymousTemplates), $resolver, $assetRoots, $autoDiscovery));
+        }
+
+        // The reflection StimulusControllerNameResolver would do on render,
+        // done here with the rest of the build-time metadata.
+        if ($metadataCache && $container->hasDefinition(StimulusControllerNameResolver::class)) {
+            $container->getDefinition(StimulusControllerNameResolver::class)
+                ->setArgument('$ownControllerVariables', $this->collectOwnControllerVariables($container, $componentClasses));
         }
 
         if (!$container->hasDefinition(SdcMetadataRegistry::class)) {
@@ -354,6 +366,107 @@ final class AssetComponentCompilerPass implements CompilerPassInterface
         }
 
         return array_values(array_unique($classes));
+    }
+
+    /**
+     * @param list<class-string> $componentClasses
+     *
+     * @return array<class-string, array{bool, bool}> per class in `component_namespace`, as StimulusControllerNameResolver::findOwnControllerVariable() returns it
+     */
+    private function collectOwnControllerVariables(ContainerBuilder $container, array $componentClasses): array
+    {
+        $namespace = $container->hasParameter('ux_sdc.component_namespace') ? $container->getParameter('ux_sdc.component_namespace') : null;
+        $nameResolver = new StimulusControllerNameResolver(\is_string($namespace) ? $namespace : null);
+
+        $variables = [];
+        foreach ($componentClasses as $class) {
+            if (null !== $nameResolver->resolve($class)) {
+                $variables[$class] = StimulusControllerNameResolver::findOwnControllerVariable($class);
+            }
+        }
+
+        return $variables;
+    }
+
+    /**
+     * The component classes that can have a script, for the import map: those
+     * declaring one with #[Asset] or #[AsSdcComponent], and, with auto
+     * discovery, those in a directory of the AssetMapper paths — a script next
+     * to any other class is left out by the resolver anyway. A component of a
+     * bundle that does not use this bundle (EasyAdmin's, say) is none of them,
+     * so it is not resolved for every import map with the metadata cache off.
+     *
+     * The list is fixed when the container is built. A class file is tracked
+     * as a resource (ReflectionClassResource, attributes included), so adding
+     * an #[Asset] rebuilds a debug container; a script added next to a class
+     * of the list is still seen without one.
+     *
+     * @param list<class-string>    $componentClasses
+     * @param array<string, string> $assetRoots       real path => namespace
+     *
+     * @return list<class-string>
+     */
+    private function filterScriptCandidates(ContainerBuilder $container, array $componentClasses, array $assetRoots, bool $autoDiscovery): array
+    {
+        $candidates = [];
+
+        foreach ($componentClasses as $class) {
+            $reflection = $container->getReflectionClass($class, false);
+            if (null === $reflection) {
+                continue;
+            }
+
+            if ([] !== $reflection->getAttributes(Asset::class) || [] !== $reflection->getAttributes(AsSdcComponent::class)) {
+                $candidates[] = $class;
+
+                continue;
+            }
+
+            $fileName = $reflection->getFileName();
+            if ($autoDiscovery && false !== $fileName && self::isInRoots(\dirname($fileName), $assetRoots)) {
+                $candidates[] = $class;
+            }
+        }
+
+        return $candidates;
+    }
+
+    /**
+     * The anonymous components that can have a script, for the import map:
+     * with auto discovery, those whose template is in a directory of the
+     * AssetMapper paths, as the script next to it has to be.
+     *
+     * @param list<string>          $templates
+     * @param array<string, string> $assetRoots real path => namespace
+     *
+     * @return list<string>
+     */
+    private function filterScriptTemplateCandidates(array $templates, ComponentMetadataResolver $resolver, array $assetRoots, bool $autoDiscovery): array
+    {
+        if (!$autoDiscovery) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $templates,
+            static fn (string $template): bool => null !== ($file = $resolver->locateTemplate($template)) && self::isInRoots(\dirname($file), $assetRoots),
+        ));
+    }
+
+    /**
+     * @param array<string, string> $roots real path => namespace
+     */
+    private static function isInRoots(string $directory, array $roots): bool
+    {
+        $directory = (realpath($directory) ?: $directory) . DIRECTORY_SEPARATOR;
+
+        foreach (array_keys($roots) as $root) {
+            if (str_starts_with($directory, rtrim($root, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

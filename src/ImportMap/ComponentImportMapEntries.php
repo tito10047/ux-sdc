@@ -33,7 +33,9 @@ use Tito10047\UX\Sdc\Service\ComponentMetadataResolver;
  * import map, a component script is one of them; its relative imports then get
  * their entries, as those of the application's own modules do.
  *
- * The entries are those of every component, not only of those a page renders:
+ * The entries are those of every component, not only of those a page renders
+ * (of those that can have a script: AssetComponentCompilerPass leaves out the
+ * components of other bundles, which have none):
  * a component a Live Component re-render or a Turbo Frame inserts later needs
  * them in the import map the page already has, and a browser takes one import
  * map only (Firefox does not merge a second one). Every page also gets the same
@@ -60,13 +62,14 @@ final class ComponentImportMapEntries
     private ?array $entries = null;
 
     /**
-     * @param bool         $metadataCache      whether `ux_sdc.metadata_cache` resolved to true
-     * @param list<string> $componentClasses   the classes of the `twig.component` services
-     * @param list<string> $anonymousTemplates the templates of anonymous components, as Twig Components names them
+     * @param ComponentMetadataResolver|null $metadataResolver   null with the metadata cache on, which needs none
+     * @param bool                           $metadataCache      whether `ux_sdc.metadata_cache` resolved to true
+     * @param list<string>                   $componentClasses   the classes of the `twig.component` services that can have a script
+     * @param list<string>                   $anonymousTemplates the templates of anonymous components that can have a script, as Twig Components names them
      */
     public function __construct(
         private readonly SdcMetadataRegistry $metadataRegistry,
-        private readonly ComponentMetadataResolver $metadataResolver,
+        private readonly ?ComponentMetadataResolver $metadataResolver,
         private readonly bool $metadataCache,
         private readonly AssetMapperRepository $assetMapperRepository,
         private readonly PublicAssetsPathResolverInterface $publicAssetsPathResolver,
@@ -113,24 +116,26 @@ final class ComponentImportMapEntries
      */
     private function collectMetadata(): iterable
     {
+        $resolver = $this->metadataCache ? null : $this->metadataResolver;
+
         foreach ($this->componentClasses as $class) {
-            if ($this->metadataCache) {
+            if (null === $resolver) {
                 yield $this->metadataRegistry->getComponentMetadata($class);
 
                 continue;
             }
 
             try {
-                yield $this->metadataResolver->resolve($class);
+                yield $resolver->resolve($class);
             } catch (\InvalidArgumentException) {
                 // An invalid #[Asset]: the component fails with the reason when it renders.
             }
         }
 
         foreach ($this->anonymousTemplates as $template) {
-            yield $this->metadataCache
+            yield null === $resolver
                 ? $this->metadataRegistry->getAnonymousComponentMetadata($template)
-                : $this->metadataResolver->resolveAnonymous($template);
+                : $resolver->resolveAnonymous($template);
         }
     }
 }

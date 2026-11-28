@@ -13,7 +13,6 @@ namespace Tito10047\UX\Sdc\Tests\Unit\Response;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
-use Symfony\Component\AssetMapper\MappedAsset;
 use Tito10047\UX\Sdc\Response\AssetResolver;
 use Tito10047\UX\Sdc\Response\ResolvedAsset;
 use Tito10047\UX\Sdc\Tests\TestLogger;
@@ -99,9 +98,9 @@ final class AssetResolverTest extends TestCase
     private function createResolver(bool $debug): AssetResolver
     {
         $assetMapper = $this->createMock(AssetMapperInterface::class);
-        $assetMapper->method('getAsset')->willReturnCallback(static fn (string $logicalPath): ?MappedAsset => match ($logicalPath) {
-            'Alert/Alert.css' => new MappedAsset($logicalPath, publicPath: '/assets/Alert/Alert-1a2b3c.css'),
-            'Alert/Alert.js' => new MappedAsset($logicalPath, publicPath: '/assets/Alert/Alert-4d5e6f.js'),
+        $assetMapper->method('getPublicPath')->willReturnCallback(static fn (string $logicalPath): ?string => match ($logicalPath) {
+            'Alert/Alert.css' => '/assets/Alert/Alert-1a2b3c.css',
+            'Alert/Alert.js' => '/assets/Alert/Alert-4d5e6f.js',
             default => null,
         });
 
